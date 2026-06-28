@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/secrets.json)",
+      "Read(**/credentials.json)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/Library/Keychains/**)",
+      "Write(.env)",
+      "Write(.env.*)",
+      "Write(**/.env)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(env)",
+      "Bash(printenv)",
+      "Bash(cat ~/.ssh/*)",
+      "Bash(cat ~/.zsh_history*)",
+      "Bash(cat ~/.bash_history*)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": false,
+    "network": {
+      "allowedDomains": ["pypi.org", "files.pythonhosted.org"]
+    },
+    "filesystem": {
+      "allowWrite": ["."],
+      "denyRead": [
+        "~/.ssh",
+        "~/.aws",
+        "~/.gnupg",
+        "~/.config/gcloud",
+        "~/Library/Keychains",
+        "~/.secrets"
+      ]
+    }
+  }
+}
