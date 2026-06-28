@@ -1,0 +1,912 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Poker Training API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api V1 Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drill/next": {
+      "get": {
+        "tags": [
+          "drill"
+        ],
+        "summary": "Next Drill",
+        "operationId": "next_drill_api_v1_drill_next_get",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "random",
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextDrillResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/drill/grade": {
+      "post": {
+        "tags": [
+          "drill"
+        ],
+        "summary": "Grade Drill",
+        "operationId": "grade_drill_api_v1_drill_grade_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stats/leaks": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Get Leaks",
+        "operationId": "get_leaks_api_v1_stats_leaks_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LeakStat"
+                  },
+                  "type": "array",
+                  "title": "Response Get Leaks Api V1 Stats Leaks Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stats/summary": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Get Summary",
+        "operationId": "get_summary_api_v1_stats_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActionEval": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "size_bb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bb"
+          },
+          "frequency": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Frequency"
+          },
+          "ev_bb": {
+            "type": "number",
+            "title": "Ev Bb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "frequency",
+          "ev_bb"
+        ],
+        "title": "ActionEval"
+      },
+      "ActionType": {
+        "type": "string",
+        "enum": [
+          "fold",
+          "check",
+          "call",
+          "bet",
+          "raise",
+          "post"
+        ],
+        "title": "ActionType"
+      },
+      "ChosenEval": {
+        "properties": {
+          "frequency": {
+            "type": "number",
+            "title": "Frequency"
+          },
+          "ev_bb": {
+            "type": "number",
+            "title": "Ev Bb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frequency",
+          "ev_bb"
+        ],
+        "title": "ChosenEval"
+      },
+      "Correctness": {
+        "type": "string",
+        "enum": [
+          "optimal",
+          "acceptable",
+          "mistake",
+          "blunder"
+        ],
+        "title": "Correctness"
+      },
+      "Coverage": {
+        "type": "string",
+        "enum": [
+          "full",
+          "partial",
+          "not_found"
+        ],
+        "title": "Coverage"
+      },
+      "Decision": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "size_bb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bb"
+          },
+          "size_fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Fraction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "Decision"
+      },
+      "EvaluationResult": {
+        "properties": {
+          "per_action": {
+            "items": {
+              "$ref": "#/components/schemas/ActionEval"
+            },
+            "type": "array",
+            "title": "Per Action"
+          },
+          "best_action": {
+            "$ref": "#/components/schemas/ActionEval"
+          },
+          "chosen_eval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChosenEval"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ev_loss_bb": {
+            "type": "number",
+            "title": "Ev Loss Bb",
+            "default": 0.0
+          },
+          "correctness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Correctness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rationale_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rationale Tags"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation",
+            "default": ""
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "leak_category": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leak Category"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage",
+            "default": "full"
+          },
+          "solver_node_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solver Node Key"
+          },
+          "is_mixed": {
+            "type": "boolean",
+            "title": "Is Mixed",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "per_action",
+          "best_action",
+          "provider"
+        ],
+        "title": "EvaluationResult"
+      },
+      "GameConfig": {
+        "properties": {
+          "variant": {
+            "type": "string",
+            "title": "Variant",
+            "default": "NLHE"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "default": "cash"
+          },
+          "table_size": {
+            "type": "integer",
+            "title": "Table Size",
+            "default": 9
+          },
+          "stakes": {
+            "$ref": "#/components/schemas/Stakes"
+          },
+          "max_buyin_bb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Buyin Bb"
+          },
+          "rake": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rake"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stakes"
+        ],
+        "title": "GameConfig"
+      },
+      "GradeRequest": {
+        "properties": {
+          "spot": {
+            "$ref": "#/components/schemas/Spot"
+          },
+          "action": {
+            "$ref": "#/components/schemas/Decision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spot",
+          "action"
+        ],
+        "title": "GradeRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Hero": {
+        "properties": {
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "hole_cards": {
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Hole Cards"
+          },
+          "stack_bb": {
+            "type": "number",
+            "title": "Stack Bb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "position",
+          "hole_cards",
+          "stack_bb"
+        ],
+        "title": "Hero"
+      },
+      "HistoryAction": {
+        "properties": {
+          "street": {
+            "$ref": "#/components/schemas/Street"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "amount_bb": {
+            "type": "number",
+            "title": "Amount Bb",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "street",
+          "position",
+          "action"
+        ],
+        "title": "HistoryAction"
+      },
+      "LeakStat": {
+        "properties": {
+          "category": {
+            "type": "integer",
+            "title": "Category"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          },
+          "avg_ev_loss": {
+            "type": "number",
+            "title": "Avg Ev Loss"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "name",
+          "attempts",
+          "accuracy",
+          "avg_ev_loss"
+        ],
+        "title": "LeakStat"
+      },
+      "LegalAction": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ActionType"
+          },
+          "min_bb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Bb"
+          },
+          "max_bb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Bb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "LegalAction"
+      },
+      "NextDrillResponse": {
+        "properties": {
+          "spot": {
+            "$ref": "#/components/schemas/Spot"
+          },
+          "grid": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Grid",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "spot"
+        ],
+        "title": "NextDrillResponse"
+      },
+      "NodeContext": {
+        "type": "string",
+        "enum": [
+          "RFI",
+          "vs_RFI",
+          "vs_3bet",
+          "vs_4bet",
+          "blind_defense",
+          "squeeze",
+          "vs_limpers"
+        ],
+        "title": "NodeContext",
+        "description": "Strategic node tags \u2014 drive provider lookup and leak mapping.\n\nPostflop contexts (CBET, VS_CBET, ...) are reserved for Phase 2."
+      },
+      "PlayerState": {
+        "properties": {
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "stack_bb": {
+            "type": "number",
+            "title": "Stack Bb"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlayerStatus",
+            "default": "in"
+          },
+          "is_hero": {
+            "type": "boolean",
+            "title": "Is Hero",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "position",
+          "stack_bb"
+        ],
+        "title": "PlayerState"
+      },
+      "PlayerStatus": {
+        "type": "string",
+        "enum": [
+          "in",
+          "folded",
+          "allin"
+        ],
+        "title": "PlayerStatus"
+      },
+      "Position": {
+        "type": "string",
+        "enum": [
+          "UTG",
+          "UTG1",
+          "UTG2",
+          "LJ",
+          "HJ",
+          "CO",
+          "BTN",
+          "SB",
+          "BB"
+        ],
+        "title": "Position"
+      },
+      "ProviderKind": {
+        "type": "string",
+        "enum": [
+          "heuristic",
+          "solver",
+          "hybrid"
+        ],
+        "title": "ProviderKind"
+      },
+      "Spot": {
+        "properties": {
+          "game": {
+            "$ref": "#/components/schemas/GameConfig"
+          },
+          "street": {
+            "$ref": "#/components/schemas/Street",
+            "default": "preflop"
+          },
+          "board": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Board"
+          },
+          "pot_bb": {
+            "type": "number",
+            "title": "Pot Bb"
+          },
+          "hero": {
+            "$ref": "#/components/schemas/Hero"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerState"
+            },
+            "type": "array",
+            "title": "Players"
+          },
+          "effective_stack_bb": {
+            "type": "number",
+            "title": "Effective Stack Bb"
+          },
+          "spr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spr"
+          },
+          "action_history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryAction"
+            },
+            "type": "array",
+            "title": "Action History"
+          },
+          "to_act": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "legal_actions": {
+            "items": {
+              "$ref": "#/components/schemas/LegalAction"
+            },
+            "type": "array",
+            "title": "Legal Actions"
+          },
+          "node_context": {
+            "items": {
+              "$ref": "#/components/schemas/NodeContext"
+            },
+            "type": "array",
+            "title": "Node Context"
+          },
+          "facing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Position"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limper_count": {
+            "type": "integer",
+            "title": "Limper Count",
+            "default": 0
+          },
+          "villain_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VillainType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "game",
+          "pot_bb",
+          "hero",
+          "players",
+          "effective_stack_bb",
+          "to_act"
+        ],
+        "title": "Spot"
+      },
+      "Stakes": {
+        "properties": {
+          "sb": {
+            "type": "number",
+            "title": "Sb"
+          },
+          "bb": {
+            "type": "number",
+            "title": "Bb"
+          },
+          "ante": {
+            "type": "number",
+            "title": "Ante",
+            "default": 0.0
+          },
+          "straddle": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Straddle"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sb",
+          "bb"
+        ],
+        "title": "Stakes"
+      },
+      "StatsSummary": {
+        "properties": {
+          "total_attempts": {
+            "type": "integer",
+            "title": "Total Attempts"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          },
+          "due_count": {
+            "type": "integer",
+            "title": "Due Count"
+          },
+          "streak_days": {
+            "type": "integer",
+            "title": "Streak Days"
+          },
+          "trend": {
+            "type": "number",
+            "title": "Trend"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_attempts",
+          "accuracy",
+          "due_count",
+          "streak_days",
+          "trend"
+        ],
+        "title": "StatsSummary"
+      },
+      "Street": {
+        "type": "string",
+        "enum": [
+          "preflop",
+          "flop",
+          "turn",
+          "river"
+        ],
+        "title": "Street"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VillainType": {
+        "type": "string",
+        "enum": [
+          "calling_station",
+          "nit",
+          "lag",
+          "passive_fish"
+        ],
+        "title": "VillainType"
+      }
+    }
+  }
+}

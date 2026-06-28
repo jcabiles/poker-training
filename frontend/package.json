@@ -1,0 +1,25 @@
+{
+  "name": "poker-training-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "gen:api": "openapi-typescript ./openapi.json -o src/api/schema.d.ts"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "openapi-typescript": "^7.4.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0"
+  }
+}

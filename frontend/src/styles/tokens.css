@@ -1,0 +1,75 @@
+/* Design tokens — the ONLY place raw colors live. Components reference var(). */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #1a1d23;
+  --muted: #5b6573;
+  --border: #d7dbe0;
+  --primary: #1457c8;
+  --primary-text: #ffffff;
+  --good: #1a7f4b;
+  --good-bg: #e6f5ec;
+  --bad: #b22f24;
+  --bad-bg: #fbe9e7;
+  --warn: #8a5a00;
+  --warn-bg: #fbf1dc;
+  --felt: #1f6f54;
+  --felt-text: #eafff6;
+  --card-bg: #ffffff;
+  --suit-red: #c1372c;
+  --suit-black: #1a1d23;
+  --accent-cell: #2f6fed;
+
+  --radius: 10px;
+  --space: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] {
+  --bg: #0f1217;
+  --surface: #161b22;
+  --text: #e6e9ee;
+  --muted: #9aa4b2;
+  --border: #2a313b;
+  --primary: #4a90ff;
+  --primary-text: #0b1220;
+  --good: #46c98a;
+  --good-bg: #10271d;
+  --bad: #ff6b5e;
+  --bad-bg: #2a1512;
+  --warn: #e3b341;
+  --warn-bg: #2a2410;
+  --felt: #15543f;
+  --felt-text: #eafff6;
+  --card-bg: #eef1f6;
+  --suit-red: #c1372c;
+  --suit-black: #11151b;
+  --accent-cell: #4a90ff;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Range-grid action colors (theme-independent; white text reads on all four). */
+:root {
+  --act-raise: #b23a2a;
+  --act-call: #2c8a52;
+  --act-fold: #585f6b;
+  --act-mixed: #8a6410;
+  --act-on: #ffffff;
+}
