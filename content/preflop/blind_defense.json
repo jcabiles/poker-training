@@ -1,0 +1,58 @@
+{
+  "id": "preflop-blind-defense",
+  "version": 1,
+  "domain": "preflop",
+  "description": "SB/BB facing a single open: defend by 3-bet (value+bluff) / call / fold. BB defends wide vs late opens; SB plays 3-bet-or-fold vs steals.",
+  "entries": [
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "TT+, AQs, AKs, AKo", "frequency": 1.0 },
+        { "action": "raise", "combos": "A5s, A4s", "frequency": 0.5 },
+        { "action": "call", "combos": "22-99, A2s, A3s, A6s, A7s, A8s, A9s, ATs, AJs, K9s, KTs, KJs, KQs, Q9s, QTs, QJs, J9s, JTs, T8s, T9s, 98s, 87s, 76s, 65s, 54s, A9o, ATo, AJo, AQo, KTo, KJo, KQo, QJo, JTo", "frequency": 1.0 },
+        { "action": "call", "combos": "A5s, A4s", "frequency": 0.5 }
+      ],
+      "sizing_bb": 11.0
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "CO",
+      "actions": [
+        { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-TT, ATs, AJs, A9s, KTs, KJs, KQs, QTs, QJs, JTs, T9s, 98s, 87s, 76s, 65s, AQo, KQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo", "frequency": 1.0 },
+        { "action": "call", "combos": "99-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, TT", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "55+, A8s+, KTs+, QTs+, J9s+, T9s, AJo+, KQo, A5s, A4s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 11.0
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "CO",
+      "actions": [
+        { "action": "raise", "combos": "77+, ATs+, KJs+, QJs, AQo+, A5s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0
+    }
+  ]
+}

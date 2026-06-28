@@ -1,0 +1,38 @@
+{
+  "id": "preflop-vs-4bet",
+  "version": 1,
+  "domain": "preflop",
+  "description": "You 3-bet and face a 4-bet: jam (raise all-in) / call / fold. Very tight at these stakes (4-bets are nutted); jam/call AA/KK/AK, fold the rest. Keyed by hero position x 4-bettor (opener) position. Jam size is overridden to the effective stack by the sampler.",
+  "entries": [
+    {
+      "node_context": "vs_4bet",
+      "position": "CO",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "AA, KK", "frequency": 1.0 },
+        { "action": "call", "combos": "AKs, AKo, QQ", "frequency": 1.0 }
+      ],
+      "sizing_bb": 100.0
+    },
+    {
+      "node_context": "vs_4bet",
+      "position": "BTN",
+      "facing": "CO",
+      "actions": [
+        { "action": "raise", "combos": "AA, KK, AKs", "frequency": 1.0 },
+        { "action": "call", "combos": "QQ, AKo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 100.0
+    },
+    {
+      "node_context": "vs_4bet",
+      "position": "BB",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "AA, KK, AKs, AKo", "frequency": 1.0 },
+        { "action": "call", "combos": "QQ, JJ", "frequency": 1.0 }
+      ],
+      "sizing_bb": 100.0
+    }
+  ]
+}

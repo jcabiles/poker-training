@@ -1,0 +1,38 @@
+{
+  "id": "preflop-vs-limpers",
+  "version": 1,
+  "domain": "preflop",
+  "description": "Facing limper(s): isolate-raise / over-limp(call) / fold, by limper count + hero position. Iso ranges value-skewed; over-limp reserved for speculative hands in multiway. Live-specific.",
+  "entries": [
+    {
+      "node_context": "vs_limpers",
+      "position": "CO",
+      "limper_count": 1,
+      "actions": [
+        { "action": "raise", "combos": "66+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-55, 54s, 65s, 76s, 87s, 98s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 5.0
+    },
+    {
+      "node_context": "vs_limpers",
+      "position": "BTN",
+      "limper_count": 1,
+      "actions": [
+        { "action": "raise", "combos": "55+, A7s+, K9s+, Q9s+, J9s+, T9s, 98s, 87s, A9o+, KJo+, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-44, 54s, 65s, 76s, A2s, A3s, A4s, K8s, Q8s, J8s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 5.0
+    },
+    {
+      "node_context": "vs_limpers",
+      "position": "BTN",
+      "limper_count": 2,
+      "actions": [
+        { "action": "raise", "combos": "77+, ATs+, KTs+, QJs, AJo+, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-66, 54s, 65s, 76s, 87s, 98s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 6.0
+    }
+  ]
+}

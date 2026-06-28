@@ -1,0 +1,68 @@
+{
+  "id": "preflop-vs-rfi",
+  "version": 1,
+  "domain": "preflop",
+  "description": "Facing a single open from a non-blind seat: 3-bet (value+bluff) / call / fold, by hero position x opener position. Linear/value-heavy per low-stakes research.",
+  "entries": [
+    {
+      "node_context": "vs_RFI",
+      "position": "HJ",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "77-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "CO",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "66-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, T9s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "CO",
+      "facing": "HJ",
+      "actions": [
+        { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "66-TT, AJs, ATs, KQs, KJs, QJs, JTs, AQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 9.0
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "BTN",
+      "facing": "CO",
+      "actions": [
+        { "action": "raise", "combos": "TT+, AQs, AKs, AKo, A5s, A4s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-99, AJs, ATs, A9s, KJs, KTs, QJs, QTs, JTs, T9s, 98s, AQo, AJo, KQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 8.0
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "BTN",
+      "facing": "HJ",
+      "actions": [
+        { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-TT, AJs, ATs, KJs, QJs, JTs, T9s, AQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 9.0
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "BTN",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo", "frequency": 1.0 },
+        { "action": "call", "combos": "99-JJ, AQs, AJs, KQs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 9.0
+    }
+  ]
+}

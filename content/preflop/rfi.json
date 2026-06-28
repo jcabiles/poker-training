@@ -1,0 +1,44 @@
+{
+  "id": "preflop-rfi",
+  "version": 1,
+  "domain": "preflop",
+  "description": "Simplified RFI (open-raise-first-in) ranges by position, 9-handed live $1/$2-$2/$3. Source: docs/research/01-preflop-strategy.md.",
+  "entries": [
+    {
+      "node_context": "RFI",
+      "position": "UTG",
+      "actions": [{ "action": "raise", "combos": "77+, A7s+, A5s, KJs+, QJs, JTs, AJo+, KQo", "frequency": 1.0 }],
+      "sizing_bb": 3.0
+    },
+    {
+      "node_context": "RFI",
+      "position": "LJ",
+      "actions": [{ "action": "raise", "combos": "66+, A5s+, KTs+, QTs+, JTs, T9s, 98s, AJo+, KQo", "frequency": 1.0 }],
+      "sizing_bb": 3.0
+    },
+    {
+      "node_context": "RFI",
+      "position": "HJ",
+      "actions": [{ "action": "raise", "combos": "55+, A4s+, KTs+, QTs+, J9s+, T9s, 98s, ATo+, KJo+, QJo", "frequency": 1.0 }],
+      "sizing_bb": 2.5
+    },
+    {
+      "node_context": "RFI",
+      "position": "CO",
+      "actions": [{ "action": "raise", "combos": "22+, A2s+, K9s+, Q9s+, J9s+, T8s+, 98s, 87s, 76s, 65s, A9o+, KTo+, QTo+, JTo", "frequency": 1.0 }],
+      "sizing_bb": 2.5
+    },
+    {
+      "node_context": "RFI",
+      "position": "BTN",
+      "actions": [{ "action": "raise", "combos": "22+, A2s+, K5s+, Q7s+, J7s+, T7s+, 96s+, 86s+, 75s+, 64s+, 54s, A2o+, K9o+, Q9o+, J9o+, T9o", "frequency": 1.0 }],
+      "sizing_bb": 2.5
+    },
+    {
+      "node_context": "RFI",
+      "position": "SB",
+      "actions": [{ "action": "raise", "combos": "22+, A2s+, K7s+, Q8s+, J8s+, T8s+, 97s+, 87s, 76s, 65s, 54s, A8o+, KTo+, QTo+, JTo", "frequency": 1.0 }],
+      "sizing_bb": 3.0
+    }
+  ]
+}

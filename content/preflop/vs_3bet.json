@@ -1,0 +1,58 @@
+{
+  "id": "preflop-vs-3bet",
+  "version": 1,
+  "domain": "preflop",
+  "description": "You opened and face a 3-bet: 4-bet (value+bluff) / call / fold, keyed by hero position x 3-bettor position. Value-heavy per low-stakes research; IP continues wider than OOP.",
+  "entries": [
+    {
+      "node_context": "vs_3bet",
+      "position": "UTG",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "KK+, AKs", "frequency": 1.0 },
+        { "action": "call", "combos": "QQ, JJ, AKo, AQs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 22.0
+    },
+    {
+      "node_context": "vs_3bet",
+      "position": "CO",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "99-JJ, AQs, AJs, KQs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 22.0
+    },
+    {
+      "node_context": "vs_3bet",
+      "position": "CO",
+      "facing": "SB",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "TT, JJ, AQs, AJs, KQs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 22.0
+    },
+    {
+      "node_context": "vs_3bet",
+      "position": "BTN",
+      "facing": "BB",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s, A4s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, T9s, AQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 21.0
+    },
+    {
+      "node_context": "vs_3bet",
+      "position": "BTN",
+      "facing": "SB",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, AQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 21.0
+    }
+  ]
+}

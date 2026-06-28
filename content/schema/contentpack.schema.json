@@ -1,0 +1,204 @@
+{
+  "$defs": {
+    "ActionRange": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ActionType"
+        },
+        "combos": {
+          "title": "Combos",
+          "type": "string"
+        },
+        "frequency": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Frequency",
+          "type": "number"
+        }
+      },
+      "required": [
+        "action",
+        "combos"
+      ],
+      "title": "ActionRange",
+      "type": "object"
+    },
+    "ActionType": {
+      "enum": [
+        "fold",
+        "check",
+        "call",
+        "bet",
+        "raise",
+        "post"
+      ],
+      "title": "ActionType",
+      "type": "string"
+    },
+    "Entry": {
+      "properties": {
+        "node_context": {
+          "$ref": "#/$defs/NodeContext"
+        },
+        "position": {
+          "$ref": "#/$defs/Position"
+        },
+        "facing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "limper_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limper Count"
+        },
+        "villain_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VillainType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/ActionRange"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "sizing_bb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sizing Bb"
+        }
+      },
+      "required": [
+        "node_context",
+        "position",
+        "actions"
+      ],
+      "title": "Entry",
+      "type": "object"
+    },
+    "NodeContext": {
+      "description": "Strategic node tags \u2014 drive provider lookup and leak mapping.\n\nPostflop contexts (CBET, VS_CBET, ...) are reserved for Phase 2.",
+      "enum": [
+        "RFI",
+        "vs_RFI",
+        "vs_3bet",
+        "vs_4bet",
+        "blind_defense",
+        "squeeze",
+        "vs_limpers"
+      ],
+      "title": "NodeContext",
+      "type": "string"
+    },
+    "Position": {
+      "enum": [
+        "UTG",
+        "UTG1",
+        "UTG2",
+        "LJ",
+        "HJ",
+        "CO",
+        "BTN",
+        "SB",
+        "BB"
+      ],
+      "title": "Position",
+      "type": "string"
+    },
+    "VillainType": {
+      "enum": [
+        "calling_station",
+        "nit",
+        "lag",
+        "passive_fish"
+      ],
+      "title": "VillainType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "domain": {
+      "title": "Domain",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/Entry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "sizing_rules": {
+      "additionalProperties": true,
+      "title": "Sizing Rules",
+      "type": "object"
+    },
+    "exploit_overlays": {
+      "additionalProperties": true,
+      "title": "Exploit Overlays",
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "domain"
+  ],
+  "title": "ContentPack",
+  "type": "object"
+}
