@@ -6,6 +6,7 @@ from app.domain.spot import (
     ActionType,
     GameConfig,
     Hero,
+    HistoryAction,
     LegalAction,
     NodeContext,
     PlayerState,
@@ -41,4 +42,49 @@ def make_rfi_spot(
             LegalAction(action=ActionType.RAISE, min_bb=2.0, max_bb=eff_bb),
         ],
         node_context=[NodeContext.RFI],
+    )
+
+
+def make_cbet_spot(
+    hole_cards=("Ah", "Ks"),
+    position: Position = Position.BTN,
+    eff_bb: float = 100.0,
+) -> Spot:
+    """A canonical flop c-bet spot (BTN vs BB, $1/$2, 9-handed). Hero is the aggressor."""
+    game = GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0)
+    osize = 2.5
+    pot = round(2 * osize + 0.5, 2)
+    remaining = round(eff_bb - osize, 2)
+    spr = round(remaining / pot, 1)
+    small = round(0.33 * pot, 1)
+    big = round(0.75 * pot, 1)
+
+    return Spot(
+        game=game,
+        street=Street.FLOP,
+        board=["Ac", "Kd", "Qh"],
+        pot_bb=pot,
+        hero=Hero(position=position, hole_cards=hole_cards, stack_bb=remaining),
+        players=[
+            PlayerState(position=position, stack_bb=remaining, is_hero=True),
+            PlayerState(position=Position.BB, stack_bb=remaining),
+        ],
+        effective_stack_bb=remaining,
+        spr=spr,
+        action_history=[
+            HistoryAction(street=Street.PREFLOP, position=Position.SB, action=ActionType.POST, amount_bb=1.0),
+            HistoryAction(street=Street.PREFLOP, position=Position.BB, action=ActionType.POST, amount_bb=2.0),
+            HistoryAction(street=Street.PREFLOP, position=position, action=ActionType.RAISE, amount_bb=osize),
+            HistoryAction(street=Street.PREFLOP, position=Position.BB, action=ActionType.CALL, amount_bb=osize),
+        ],
+        to_act=position,
+        legal_actions=[
+            LegalAction(action=ActionType.CHECK),
+            LegalAction(action=ActionType.BET, min_bb=small, max_bb=remaining),
+            LegalAction(action=ActionType.BET, min_bb=big, max_bb=remaining),
+        ],
+        node_context=[NodeContext.CBET],
+        facing=Position.BB,
+        hero_range="22+, A2s+, KTs+, QJs, AJo+",
+        villain_range="22-99, ATs+, KJs+, QJs, AJo+, KQo",
     )
