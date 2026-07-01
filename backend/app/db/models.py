@@ -30,6 +30,9 @@ class DrillAttempt(SQLModel, table=True):
     ev_loss_bb: float = 0.0
     provider: str
     created_at: datetime = Field(default_factory=_utcnow)
+    # Hand class (e.g. "AKo", "77") derived from hero's hole cards at grade time
+    # (Phase: Challenge mode T1). Nullable — not backfilled for historical rows.
+    hand_class: str | None = Field(default=None)
 
 
 class SRSItemRow(SQLModel, table=True):

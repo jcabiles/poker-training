@@ -30,6 +30,7 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "review", label: "Review (due)" },
   { id: "leak_focus", label: "Leak focus" },
   { id: "exploit", label: "Exploit" },
+  { id: "challenge", label: "Challenge" },
   { id: "postflop", label: "Postflop (c-bet)" },
   { id: "vs_cbet", label: "Facing c-bet" },
   { id: "vs_check_raise", label: "Facing check-raise" },

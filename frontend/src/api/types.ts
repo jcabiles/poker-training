@@ -89,6 +89,7 @@ export type Mode =
   | "review"
   | "leak_focus"
   | "exploit"
+  | "challenge"
   | "postflop"
   | "vs_cbet"
   | "vs_check_raise";

@@ -168,6 +168,23 @@ def test_vs_check_raise_mode_grades_and_persists(client, temp_engine):
         assert len(list(s.exec(select(DrillAttempt)))) == 1
 
 
+def test_challenge_mode_returns_rfi_spot_and_grades(client, temp_engine):
+    body = client.get("/api/v1/drill/next?mode=challenge").json()
+    spot = Spot.model_validate(body["spot"])
+    assert spot.street.value == "preflop"
+    assert "RFI" in spot.node_context
+    assert body["grid"]  # preflop -> non-empty grid
+    resp = client.post(
+        "/api/v1/drill/grade",
+        json={"spot": body["spot"], "action": {"action": "fold"}},
+    )
+    assert resp.status_code == 200
+    with Session(temp_engine) as s:
+        rows = list(s.exec(select(DrillAttempt)))
+        assert len(rows) == 1
+        assert rows[0].hand_class  # persisted on every grade, per T1
+
+
 def test_vs_check_raise_due_row_graduates_via_review(client, temp_engine):
     from datetime import date, timedelta
 

@@ -1,7 +1,7 @@
 """Drill endpoints.
 
 GET  /drill/next?mode=<mode> -> a Spot to solve.
-     modes: random|review|leak_focus|exploit|postflop|vs_cbet|vs_check_raise
+     modes: random|review|leak_focus|exploit|postflop|vs_cbet|vs_check_raise|challenge
 POST /drill/grade -> grade via the StrategyProvider, persist the attempt, update SM-2.
 GET  /drill/quiz/next?kind=texture|equity|random -> a foundational quiz item.
 POST /drill/quiz/grade -> grade a quiz answer, persist it (provider="quiz").
@@ -17,6 +17,8 @@ from sqlmodel import Session
 from app.db.models import DrillAttempt
 from app.db.session import get_session
 from app.domain.archetypes import VillainType
+from app.domain.challenge import sample_challenge_spot
+from app.domain.content.notation import hole_cards_to_class
 from app.domain.content.registry import build_index, load_preflop_packs, lookup
 from app.domain.equity import combos_for_range, equity_vs_range
 from app.domain.evaluation import EvaluationResult
@@ -46,7 +48,7 @@ from app.schemas.drill import (
     QuizResult,
 )
 from app.services.review import due_items, record_attempt
-from app.services.stats import leak_stats
+from app.services.stats import hand_error_weights, leak_stats
 
 router = APIRouter(prefix="/drill", tags=["drill"])
 
@@ -177,6 +179,11 @@ def _next_leak_focus(session: Session) -> Spot:
     return build_spot(_RNG.choice(pool), _RNG) if pool else _next_random()
 
 
+def _next_challenge(session: Session) -> Spot:
+    weights = hand_error_weights(session)
+    return sample_challenge_spot(_RNG, personal_weights=weights)
+
+
 @router.get("/next", response_model=NextDrillResponse)
 async def next_drill(
     mode: str = Query("random"),
@@ -194,6 +201,8 @@ async def next_drill(
         spot = _next_vs_cbet()
     elif mode == "vs_check_raise":
         spot = _next_vs_check_raise()
+    elif mode == "challenge":
+        spot = _next_challenge(session)
     else:
         spot = _next_random()
     # range_grid is preflop-only; the frontend hides the grid for postflop spots.
@@ -211,6 +220,7 @@ async def grade_drill(
     # Honor the SRS-key override (review spots) so the attempt + SRS update key the
     # same archetype row. record_attempt reads req.spot.srs_signature internally.
     sig = req.spot.srs_signature or spot_signature(req.spot)
+    hand_class = hole_cards_to_class(*req.spot.hero.hole_cards)
     session.add(
         DrillAttempt(
             spot_signature=sig,
@@ -219,6 +229,7 @@ async def grade_drill(
             correctness=correctness,
             ev_loss_bb=result.ev_loss_bb,
             provider=result.provider.value,
+            hand_class=hand_class,
         )
     )
     session.commit()

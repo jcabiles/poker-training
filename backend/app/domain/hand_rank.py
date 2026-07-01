@@ -29,7 +29,13 @@ def _strength(hand: str) -> float:
     return s
 
 
-_SORTED = sorted(all_hands(), key=_strength)
+# `all_hands()` returns a `set[str]`; its iteration order depends on
+# `PYTHONHASHSEED` (string hashing is seed-randomized). `_strength()` has 24
+# genuine ties (e.g. 88/KQo both 0.73), and Python's `sorted()` is stable, so
+# without a secondary key those ties would resolve by set-iteration order and
+# swap between process runs. Tie-break on the hand string itself (stable,
+# seed-independent) so HAND_RANK is fully deterministic.
+_SORTED = sorted(all_hands(), key=lambda h: (_strength(h), h))
 HAND_RANK: dict[str, float] = {h: i / (len(_SORTED) - 1) for i, h in enumerate(_SORTED)}
 
 
