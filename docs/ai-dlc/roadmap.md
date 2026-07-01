@@ -1,7 +1,7 @@
 # Poker Training App — Phase 0 Roadmap
 
 > Living planning document. Built from four research streams (see `docs/research/`).
-> Status: **Phases 0, 1a, 1b, 1c complete & verified.** **Phase 2a (first postflop slice: flop c-bet + foundational drills) built & verified** — 128 backend tests green; `scripts/verify.sh` → `BACKEND VERIFY OK`. Adds a pure-Python equity engine, a board-texture classifier, a dedicated flop c-bet grader (texture + positional range-advantage heuristic, not equity-backed), a `CompositeProvider` (route by street), a flop-c-bet drill mode, and two foundational quizzes (texture classification, equity estimation). Postflop spots get a texture/SPR-bucketed signature; preflop hashes unchanged; no new DB migration. Remaining slices: Phase 2b (turn / facing-a-c-bet / check-raise + equity-backed range advantage), squeeze (multiway), mastery-gating.
+> Status: **Phases 0, 1a, 1b, 1c, 2a, 2b complete & verified.** **Phase 2c (postflop SRS review) built & verified** — 148 backend tests green; `scripts/verify.sh` → `BACKEND VERIFY OK`; migration 0004 head. Flop c-bet + vs-c-bet spots now re-surface in `mode=review` via SM-2, keyed on their texture/SPR/faced-bet archetype: `srs_item` gains 4 nullable postflop columns, `record_attempt` persists + backfills them, `_rebuild_postflop` reconstructs a due archetype via the 2a/2b builders, and a `Spot.srs_signature` override guarantees the due row graduates even on an approximate reconstruction. Closes the core "surface → drill → re-surface until mastered" loop for postflop. Remaining slices: Phase 2d (turn / river / check-raise-as-aggressor + equity-backed range advantage), squeeze (multiway), mastery-gating.
 
 ---
 
@@ -95,8 +95,11 @@ The complete learning loop, preflop content only.
 
 ### Phase 2 — Postflop expansion
 - **2a (DONE):** flop c-bet (HU SRP) graded by texture + positional range-advantage; pure-Python equity engine; board-texture classifier; `CompositeProvider` route-by-street; flop-c-bet drill mode; foundational quizzes (texture classification, equity estimation); postflop leak buckets (200/210/211); texture/SPR-bucketed postflop signature.
-- **2b (next):** turn play, facing a c-bet, check-raise; **equity-backed** range advantage (range-vs-range); postflop SRS review mode (texture/SPR columns).
-- **2c:** river value/bluff, multiway, simplified math surfaced (rule of 2&4, pot odds, MDF); **full-hand (preflop→river)** drill mode.
+- **2b (DONE):** facing a flop c-bet (HU SRP defense) — fold/call/raise graded by texture + defender-perspective range advantage + pot-odds/MDF + bet-size; `vs_cbet` drill mode; faced-bet bucket in the postflop signature; leak `VS_CBET=201`.
+- **2c (DONE):** postflop SRS review — flop c-bet + vs-c-bet spots re-surface in `mode=review` via SM-2 (4 nullable `srs_item` columns, migration 0004, archetype reconstruction, `srs_signature` graduation override). First migration since 1c.
+- **2d (INVESTIGATED → DEFERRED to Phase 3):** equity-backed range advantage. Bounded Monte-Carlo over the heuristic ranges does not recover a stable signal (mean equity flat ~0.5; strong-share width-biased; top-of-range noisy/counterintuitive). Real range advantage is a solver/EV property → revisit with Phase 3 solver tables. Positional+texture heuristic retained. See `tickets/phase-2d-equity-backed.md`.
+- **2e (next real slice):** turn play (2nd barrel) and/or check-raise as the aggressor's response — stable heuristics, new strategy coverage.
+- **2f:** river value/bluff, multiway, simplified math surfaced (rule of 2&4, pot odds, MDF); **full-hand (preflop→river)** drill mode.
 - Postflop heuristics: c-bet by texture, barreling, river value/bluff, multiway, simplified math.
 - New drill modes: **street**, **full-hand**; drills for line construction, hand-reading, multiway.
 - Extend leak taxonomy + analytics + mastery ladder to postflop.

@@ -75,8 +75,28 @@ range-advantage heuristic, *not* equity-backed — that's 2b), a `CompositeProvi
 (board-texture classification, equity estimation) with tolerance-band grading. Postflop spots get a
 texture/SPR-bucketed signature; preflop hashes are byte-identical to before. No new DB migration.
 
-Next: Phase 2b (turn / facing-a-c-bet / check-raise + equity-backed range advantage), then squeeze
-(multiway) + mastery-gating.
+**Phase 2b — facing a flop c-bet (defense) — built & verified (141 backend tests green):** the other
+side of the 2a spot — hero (BB) defends vs a flop c-bet with **fold / call / raise (check-raise)**,
+graded by a defender-perspective range-advantage rule + `grade_vs_cbet` (texture + range advantage +
+pot-odds/MDF + a bet-size term), a `vs_cbet` spot builder + drill mode, and a **faced-bet bucket** in
+the postflop signature so small vs big c-bets stay in separate SRS items. Still not equity-backed; no
+new DB migration.
+
+**Phase 2c — postflop SRS review — built & verified (148 backend tests green; migration 0004):** the
+flop **c-bet** and **vs-c-bet** spots now re-surface in `mode=review` via SM-2, keyed on their
+texture/SPR/faced-bet archetype. `srs_item` gains 4 nullable postflop columns; `record_attempt`
+persists + backfills them; `_rebuild_postflop` reconstructs a due archetype from the 2a/2b builders; a
+`Spot.srs_signature` override guarantees the due row graduates even when reconstruction is approximate.
+This closes the core *surface → drill → re-surface until mastered* loop for postflop.
+
+**Phase 2d — equity-backed range advantage — investigated, then deferred to Phase 3.** A bounded
+Monte-Carlo over the simplified ranges can't recover a stable range-advantage signal (mean equity is
+flat ~0.5; combo-share is range-width-biased; top-of-range strength is noisy/counterintuitive) — real
+range advantage is a solver/EV property. The stable positional+texture heuristic was kept; the swap to
+solver-backed range advantage lands in Phase 3 behind the existing `StrategyProvider`. (FeedbackPanel
+polish — per-action sizes — shipped.)
+
+Next: turn play / check-raise-as-aggressor (stable heuristics), then squeeze (multiway) + mastery-gating.
 
 ## How this was built
 Developed with an AI-assisted, spec-first workflow: each phase started from written research and a
