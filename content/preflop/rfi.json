@@ -7,7 +7,7 @@
     {
       "node_context": "RFI",
       "position": "UTG",
-      "actions": [{ "action": "raise", "combos": "77+, A7s+, A5s, KJs+, QJs, JTs, AJo+, KQo", "frequency": 1.0 }],
+      "actions": [{ "action": "raise", "combos": "77+, A7s+, A5s, KJs+, QJs, JTs, AJo+", "frequency": 1.0 }],
       "sizing_bb": 3.0
     },
     {
@@ -19,7 +19,7 @@
     {
       "node_context": "RFI",
       "position": "HJ",
-      "actions": [{ "action": "raise", "combos": "55+, A4s+, KTs+, QTs+, J9s+, T9s, 98s, ATo+, KJo+, QJo", "frequency": 1.0 }],
+      "actions": [{ "action": "raise", "combos": "55+, A4s+, KTs+, QTs+, J9s+, T9s, 98s, ATo+, KJo+", "frequency": 1.0 }],
       "sizing_bb": 2.5
     },
     {

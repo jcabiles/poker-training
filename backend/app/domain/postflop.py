@@ -68,7 +68,14 @@ def range_advantage(
     and pays an out-of-position penalty.
     """
     score = 1.0  # preflop-aggressor baseline edge
-    score += 1.0 if texture.high_board else -1.0
+    if texture.high_board:
+        # doc 06 §2 (citing this project's own doc 02): ace-high is a documented
+        # exception, not just "another high-card board" — live BB defenders
+        # over-continue with any ace, so the aggressor's range/nut edge is
+        # smaller on ace-high boards than on K/Q/J/T-high boards.
+        score += 0.5 if texture.high_card == "A" else 1.0
+    else:
+        score -= 1.0
     if texture.wetness == "dry":
         score += 1.0
     elif texture.wetness == "wet":
@@ -162,6 +169,12 @@ def _merits(adv: str, texture: Texture, cat: str) -> tuple[float, float, float]:
         check += 0.6
     if texture.wetness == "wet":
         check += 0.4
+    if texture.suitedness == "monotone":
+        # doc 06 §2: monotone boards get c-bet at roughly half the frequency of
+        # two-tone/wet boards (checks most of the range) — `classify()`'s
+        # wetness score folds monotone into "wet" via the suitedness term, so
+        # without this a monotone board graded identically to a two-tone one.
+        check += 0.6
 
     bet = value + adv_bonus
     if texture.wetness == "dry":
@@ -178,6 +191,14 @@ def _merits(adv: str, texture: Texture, cat: str) -> tuple[float, float, float]:
             big += 0.4
         else:
             big -= 0.6
+    if texture.suitedness == "monotone":
+        # doc 06 §2: even when a monotone board IS bet, sizing stays small
+        # (~33% pot) for real value/nut draws — the big/polarized-overbet
+        # sizing menu is a two-tone-wet-board play, not a monotone one.
+        small += 0.3
+        big -= 0.6
+        if cat not in ("strong", "draw"):
+            big -= 0.4  # discourage big bluffs/thin bets on monotone further
     if cat == "air":
         big -= 1.0  # never barrel big with pure air
     return check, small, big
@@ -375,6 +396,14 @@ def _merits_vs_cbet(value: float, adv: str, price: float, texture: Texture, cat:
         raise_ = -1.0
         if adv == "defender" and texture.connectedness == "connected" and texture.wetness == "wet":
             raise_ += 0.6  # occasional check-raise bluff on low connected boards
+
+    if texture.pairing == "paired" and adv == "defender":
+        # doc 06 §4: paired boards get check-raised ~2.5-5x more often than other
+        # textures (GTOWizard, "Defending vs BB Check-Raise on Paired Flops") —
+        # cheap to represent trips/a boat for both ranges. `texture.pairing` was
+        # computed but never read anywhere in this module before this fix.
+        raise_ += 0.5
+
     return fold, call, raise_
 
 

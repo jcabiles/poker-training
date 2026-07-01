@@ -10,7 +10,7 @@
       "facing": "UTG",
       "actions": [
         { "action": "raise", "combos": "AA, KK", "frequency": 1.0 },
-        { "action": "call", "combos": "AKs, AKo, QQ", "frequency": 1.0 }
+        { "action": "call", "combos": "AKs, AKo", "frequency": 1.0 }
       ],
       "sizing_bb": 100.0
     },

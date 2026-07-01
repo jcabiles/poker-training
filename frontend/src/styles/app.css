@@ -246,6 +246,27 @@ kbd {
   margin-bottom: calc(var(--space) * 2);
 }
 
+/* Mode groups (Practice view only): preflop spot-selection vs postflop
+   situations are different kinds of choice, so each gets its own labeled
+   row instead of one flat button list. */
+.mode-groups {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 1.5);
+  margin-bottom: calc(var(--space) * 2);
+}
+.mode-group .modes {
+  margin-bottom: 0;
+}
+.mode-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 6px;
+}
+
 /* Stats strip */
 .statstrip {
   display: flex;

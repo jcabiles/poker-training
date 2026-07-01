@@ -3,6 +3,8 @@ from app.domain.evaluation import Correctness
 from app.domain.leaks import LeakCategory
 from app.domain.postflop import (
     _hand_category,
+    _merits,
+    _merits_vs_cbet,
     grade_cbet,
     grade_vs_cbet,
     grade_vs_check_raise,
@@ -371,3 +373,72 @@ def test_vs_check_raise_frequencies_normalized_and_raise_sized():
         spot, None, None, Decision(action=ActionType.RAISE, size_bb=3 * (2.0 + SMALL))
     )
     assert sized.correctness is not None
+
+
+# --- CW-2 (doc 06 errata): suitedness + pairing wired into the merit functions ---
+
+
+def test_monotone_checks_more_and_bets_smaller_than_two_tone():
+    # Same ranks/connectedness (K-J-7, semi-connected, high) -- suits differ only
+    # in suitedness: two-tone (Kh Jh 7d) vs monotone (Kh Jh 7h). Both classify as
+    # "wet" under `classify()` (suitedness folds monotone into the wetness score),
+    # which is exactly why `_merits()` used to treat them identically -- it only
+    # branched on `texture.wetness`, never `texture.suitedness`. Doc 06 §2: a
+    # monotone board should check more and, when bet, size down vs. a two-tone
+    # wet board (small-only, not the big/polarized menu).
+    two_tone = classify(["Kh", "Jh", "7d"])
+    monotone = classify(["Kh", "Jh", "7h"])
+    assert two_tone.suitedness == "two-tone"
+    assert monotone.suitedness == "monotone"
+    assert two_tone.wetness == monotone.wetness == "wet"  # same bucket pre-fix
+
+    check_tt, small_tt, big_tt = _merits("neutral", two_tone, "weak_made")
+    check_mono, small_mono, big_mono = _merits("neutral", monotone, "weak_made")
+
+    assert check_mono > check_tt  # bets (checks) less often on monotone
+    assert big_mono < big_tt  # doesn't polarize big on monotone
+    # small is preferred over big by a wider margin on monotone than two-tone
+    assert (small_mono - big_mono) > (small_tt - big_tt)
+
+
+def test_paired_board_raises_defender_check_raise():
+    # Doc 06 §4: paired boards (Q♥Q♣6♦ example) get check-raised ~24% vs 5-9% on
+    # other textures -- `_merits_vs_cbet`'s raise_ never read `texture.pairing`
+    # before this fix (confirmed by grep: the string didn't appear in the file).
+    paired = classify(["Qh", "Qc", "6d"])
+    unpaired = classify(["Kh", "Qc", "6d"])  # same high-card tier, unpaired
+    assert paired.pairing == "paired"
+    assert unpaired.pairing == "unpaired"
+
+    _, _, raise_paired = _merits_vs_cbet(
+        value=0.8, adv="defender", price=0.33, texture=paired, cat="weak_made"
+    )
+    _, _, raise_unpaired = _merits_vs_cbet(
+        value=0.8, adv="defender", price=0.33, texture=unpaired, cat="weak_made"
+    )
+    assert raise_paired > raise_unpaired
+
+    # the bump is specific to the DEFENDER's check-raise -- it must not leak
+    # into the aggressor's/neutral's raise merit on the very same paired board.
+    _, _, raise_aggressor = _merits_vs_cbet(
+        value=0.8, adv="aggressor", price=0.33, texture=paired, cat="weak_made"
+    )
+    assert raise_aggressor < raise_paired
+
+
+def test_ace_high_board_scored_below_other_high_boards():
+    # Doc 06 §2 (citing this project's own doc 02): ace-high boards are a
+    # documented exception -- the aggressor's range/nut edge is smaller than on
+    # other high-card (K/Q/J/T) boards, because live BB defenders over-continue
+    # with any ace. Same shape (rainbow, semi-connected, unpaired, span=6) on
+    # both boards -- only the top card differs (K vs A) -- isolating the
+    # ace-high discount from any wetness/connectedness difference.
+    king_high = classify(["Kh", "8d", "7c"])
+    ace_high = classify(["Ah", "9d", "8c"])
+    assert king_high.high_card == "K" and king_high.wetness == "medium"
+    assert ace_high.high_card == "A" and ace_high.wetness == "medium"
+
+    king_adv = range_advantage(NodeContext.CBET, Position.BTN, Position.BB, king_high)
+    ace_adv = range_advantage(NodeContext.CBET, Position.BTN, Position.BB, ace_high)
+    assert king_adv == "hero"
+    assert ace_adv != "hero"  # ace-high doesn't clear the "hero" bar the K-high board does

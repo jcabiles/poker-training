@@ -11,6 +11,7 @@ import type {
 } from "./api/types";
 import DecisionBar from "./components/DecisionBar";
 import FeedbackPanel from "./components/FeedbackPanel";
+import ModeGroup from "./components/ModeGroup";
 import PokerTable from "./components/PokerTable";
 import QuizPanel from "./components/QuizPanel";
 import RangeGrid from "./components/RangeGrid";
@@ -25,11 +26,16 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "equity", label: "Equity quiz" },
 ];
 
-const MODES: { id: Mode; label: string }[] = [
+// Spot-selection strategy: which spot to serve next, within the current mode.
+const PREFLOP_MODES: { id: Mode; label: string }[] = [
   { id: "random", label: "Random" },
   { id: "review", label: "Review (due)" },
   { id: "leak_focus", label: "Leak focus" },
   { id: "exploit", label: "Exploit" },
+];
+
+// Postflop situations: which street/action spot to drill.
+const POSTFLOP_MODES: { id: Mode; label: string }[] = [
   { id: "postflop", label: "Postflop (c-bet)" },
   { id: "vs_cbet", label: "Facing c-bet" },
   { id: "vs_check_raise", label: "Facing check-raise" },
@@ -144,16 +150,19 @@ export default function App() {
 
       {view === "drill" ? (
         <>
-          <div className="modes">
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                className={"btn" + (m.id === mode ? " btn-primary" : "")}
-                onClick={() => selectMode(m.id)}
-              >
-                {m.label}
-              </button>
-            ))}
+          <div className="mode-groups">
+            <ModeGroup
+              label="Preflop practice"
+              modes={PREFLOP_MODES}
+              activeMode={mode}
+              onSelect={selectMode}
+            />
+            <ModeGroup
+              label="Postflop spots"
+              modes={POSTFLOP_MODES}
+              activeMode={mode}
+              onSelect={selectMode}
+            />
           </div>
 
           {error && (
