@@ -386,3 +386,88 @@ def build_vs_cbet_spot(
 def sample_vs_cbet_spot(rng: random.Random | None = None) -> Spot:
     rng = rng or random.Random()
     return build_vs_cbet_spot(rng, eff_bb=rng.choice(_DEPTHS))
+
+
+# --- Postflop: facing a flop check-raise (Phase 2e-1) ---
+# Same HU SRP pairing as 2a/2b: hero = opener/aggressor (the flop c-bettor),
+# villain = caller = BB defender who check-raises. Extends build_cbet_spot's
+# flow one step further: hero c-bets, the defender check-raises to a total of
+# `raise_to`, and hero (still the original aggressor) must fold / call / 4-bet.
+#
+# CALL sizing is the INCREMENTAL amount hero still owes: hero already has `cbet`
+# invested this street, so hero only adds `raise_to - cbet` to call (mirrors the
+# preflop VS_3BET/VS_4BET precedent `CALL.min_bb = tbet - osize`, NOT
+# build_vs_cbet_spot's `CALL.min_bb = cbet` zero-prior-investment shortcut).
+def build_check_raise_spot(
+    rng: random.Random,
+    pairing: tuple[Position, Position] | None = None,
+    eff_bb: float = 100.0,
+    raise_mult: float | None = None,
+) -> Spot:
+    from app.domain.equity import combos_for_range
+
+    opener, caller = pairing or rng.choice(_CBET_PAIRINGS)
+    rfi = _find_entry(NodeContext.RFI, opener, None)
+    bd = _find_entry(NodeContext.BLIND_DEFENSE, caller, opener)
+    hero_range = _combos_for(rfi, ActionType.RAISE) or "22+, A2s+, KTs+, QJs, AJo+"
+    villain_range = _combos_for(bd, ActionType.CALL) or "22-99, ATs+, KJs+, QJs, AJo+, KQo"
+
+    h1, h2 = rng.choice(combos_for_range(hero_range))
+    dead = {h1, h2}
+    flop = rng.sample([c for c in _DECK if c not in dead], 3)
+
+    osize = _OPEN_SIZE.get(opener, 2.5)
+    flop_pot = round(2 * osize + 0.5, 2)  # opener + BB call + SB dead 0.5
+    frac = rng.choice([0.33, 0.75])  # same small/big c-bet convention as 2a
+    cbet = round(frac * flop_pot, 1)
+    mult = raise_mult if raise_mult is not None else rng.choice([2.5, 3.0])  # §4.4
+    raise_to = round(mult * cbet, 2)  # defender check-raises to this TOTAL
+
+    pot = round(flop_pot + cbet + raise_to, 2)  # pot includes everything committed so far
+    hero_remaining = round(eff_bb - osize - cbet, 2)  # hero: preflop open + flop c-bet
+    villain_remaining = round(eff_bb - osize - raise_to, 2)  # villain: preflop call + check-raise
+    effective = min(hero_remaining, villain_remaining)
+    spr = round(effective / pot, 1)
+    call_amt = round(raise_to - cbet, 2)  # INCREMENTAL amount hero owes, NOT raise_to
+    raise_size = round(3 * raise_to, 2)  # a further 4-bet
+
+    history = _blinds() + [
+        _raise(opener, osize),
+        HistoryAction(
+            street=Street.PREFLOP, position=caller, action=ActionType.CALL, amount_bb=osize
+        ),
+        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
+        HistoryAction(
+            street=Street.FLOP, position=caller, action=ActionType.RAISE, amount_bb=raise_to
+        ),
+    ]
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
+        street=Street.FLOP,
+        board=flop,
+        pot_bb=pot,
+        hero=Hero(position=opener, hole_cards=(h1, h2), stack_bb=hero_remaining),
+        players=[
+            PlayerState(position=opener, stack_bb=hero_remaining, is_hero=True),
+            PlayerState(position=caller, stack_bb=villain_remaining),
+        ],
+        effective_stack_bb=effective,
+        spr=spr,
+        action_history=history,
+        to_act=opener,
+        legal_actions=[
+            LegalAction(action=ActionType.FOLD),
+            LegalAction(action=ActionType.CALL, min_bb=call_amt),
+            LegalAction(action=ActionType.RAISE, min_bb=raise_size, max_bb=hero_remaining),
+        ],
+        node_context=[NodeContext.VS_CHECK_RAISE],
+        facing=caller,
+        hero_range=hero_range,
+        villain_range=villain_range,
+    )
+
+
+def sample_check_raise_spot(rng: random.Random | None = None) -> Spot:
+    rng = rng or random.Random()
+    return build_check_raise_spot(rng, eff_bb=rng.choice(_DEPTHS))

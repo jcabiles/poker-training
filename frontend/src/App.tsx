@@ -32,6 +32,7 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "exploit", label: "Exploit" },
   { id: "postflop", label: "Postflop (c-bet)" },
   { id: "vs_cbet", label: "Facing c-bet" },
+  { id: "vs_check_raise", label: "Facing check-raise" },
 ];
 
 export default function App() {

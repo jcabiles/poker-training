@@ -80,6 +80,14 @@ with TestClient(app) as c:  # triggers lifespan -> alembic upgrade head (incl sr
     vg = c.post("/api/v1/drill/grade", json={"spot": vc["spot"], "action": {"action": "call"}})
     assert vg.status_code == 200 and vg.json()["leak_category"] == 201, "vs_cbet grade (VS_CBET)"
 
+    # --- Phase 2e-1: facing a flop check-raise (hero = original c-bettor) ---
+    xr = c.get("/api/v1/drill/next?mode=vs_check_raise").json()
+    assert xr["spot"]["street"] == "flop" and "vs_check_raise" in xr["spot"]["node_context"], "vs_check_raise spot"
+    assert xr["grid"] == {}, "grid should be empty for vs_check_raise"
+    assert {la["action"] for la in xr["spot"]["legal_actions"]} == {"fold", "call", "raise"}, "vs_check_raise legal actions"
+    xg = c.post("/api/v1/drill/grade", json={"spot": xr["spot"], "action": {"action": "call"}})
+    assert xg.status_code == 200 and xg.json()["leak_category"] == 202, "vs_check_raise grade (VS_CHECK_RAISE)"
+
     # --- Phase 2c: postflop SRS review (deep graduation correctness covered by pytest above) ---
     pgrade = c.post("/api/v1/drill/grade", json={"spot": pf["spot"], "action": {"action": "check"}})
     assert pgrade.status_code == 200, "postflop grade for SRS"

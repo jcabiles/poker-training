@@ -27,7 +27,7 @@ def _postflop_archetype(spot: Spot) -> tuple[str, str | None, str | None, str | 
     street = spot.street.value
     if spot.street == Street.PREFLOP:
         return street, None, None, None
-    tex = classify(spot.board).texture_class if len(spot.board) >= 3 else None  # guard <3 cards
+    tex = classify(spot.board[:3]).texture_class if len(spot.board) >= 3 else None  # guard <3 cards
     return street, tex, spr_bucket(spot.spr), faced_bet_bucket(spot)
 
 

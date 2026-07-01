@@ -29,7 +29,9 @@ class Texture:
 
 
 def classify(board: list[str]) -> Texture:
-    """Classify a flop (first 3 cards). Raises if fewer than 3 cards."""
+    """Classifies exactly the FIRST 3 cards of `board` (the flop). Callers with a longer board
+    must slice deliberately — this function does not know which 3 cards are the 'flop' beyond
+    position. Raises if fewer than 3 cards."""
     if len(board) < 3:
         raise ValueError(f"texture.classify needs >=3 board cards, got {len(board)}")
     cards = board[:3]

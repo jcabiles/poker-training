@@ -127,6 +127,7 @@ def _vs_cbet_spot(board, cbet, flop_pot=6.0, spr=5.0):
         GameConfig,
         Hero,
         HistoryAction,
+        LegalAction,
         NodeContext,
         PlayerState,
         Spot,
@@ -152,6 +153,7 @@ def _vs_cbet_spot(board, cbet, flop_pot=6.0, spr=5.0):
         action_history=[
             HistoryAction(street=Street.FLOP, position=Position.BTN, action=ActionType.BET, amount_bb=cbet),
         ],
+        legal_actions=[LegalAction(action=ActionType.CALL, min_bb=cbet)],
     )
 
 

@@ -4,14 +4,22 @@ import Card from "./Card";
 const RAISE_VERB = ["opens", "3-bets", "4-bets", "5-bets", "jams"];
 
 function bettingLine(history: HistoryAction[]): string {
-  let raises = 0;
+  // The opens/3-bets/4-bets escalation ladder is preflop-only, so only preflop
+  // raises advance the counter. A postflop raise (e.g. a flop check-raise) is not
+  // part of that ladder and renders as "raises to" — otherwise it would inherit a
+  // "3-bets" from an earlier preflop open.
+  let preflopRaises = 0;
   const parts: string[] = [];
   for (const h of history) {
     if (h.action === "post") continue;
     if (h.action === "raise") {
-      const verb = RAISE_VERB[Math.min(raises, RAISE_VERB.length - 1)];
-      parts.push(`${h.position} ${verb} ${h.amount_bb}`);
-      raises += 1;
+      if (h.street === "preflop") {
+        const verb = RAISE_VERB[Math.min(preflopRaises, RAISE_VERB.length - 1)];
+        parts.push(`${h.position} ${verb} ${h.amount_bb}`);
+        preflopRaises += 1;
+      } else {
+        parts.push(`${h.position} raises to ${h.amount_bb}`);
+      }
     } else if (h.action === "call") {
       parts.push(`${h.position} ${h.amount_bb <= 1 ? "limps" : "calls"}`);
     } else if (h.action === "bet") {

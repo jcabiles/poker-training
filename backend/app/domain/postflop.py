@@ -99,6 +99,20 @@ def _hand_category(hole: tuple[str, str], board: list[str]) -> str:
     bsuits = [c[1] for c in board]
     board_top = max(_RIDX[b] for b in branks)
 
+    allr = {_RIDX[r] for r in hranks + branks}
+    all_suits = hsuits + bsuits
+
+    # Made straight (5 consecutive distinct ranks present across hole+board) and
+    # made flush (>=5 cards of one suit present) are evaluated BEFORE the
+    # pair-based tiers below — a made hand must never fall through to the
+    # flush_draw/oesd draw-flag logic just because it didn't pair the board.
+    made_straight = any(
+        all((lo + i) in allr for i in range(5)) for lo in range(len(_RIDX) - 4)
+    )
+    made_flush = any(all_suits.count(s) >= 5 for s in set(all_suits))
+    if made_straight or made_flush:
+        return "strong"
+
     made = 0
     if hranks[0] == hranks[1]:  # pocket pair
         if hranks[0] in branks:
@@ -114,13 +128,20 @@ def _hand_category(hole: tuple[str, str], board: list[str]) -> str:
         elif len(matches) == 1:
             made = 2 if _RIDX[matches[0]] == board_top else 1  # top pair vs weak pair
 
-    flush_draw = any(hsuits.count(s) + bsuits.count(s) >= 4 for s in set(hsuits))
-    allr = {_RIDX[r] for r in hranks + branks}
+    # flush_draw/oesd only need to distinguish "not yet made" from "made" for the
+    # exactly-4-of-a-suit / exactly-4-consecutive-ranks case: any 5-of-a-suit or
+    # 5-consecutive-ranks hand already returned "strong" above, so by the time we
+    # get here neither flag can be hiding an already-made hand.
+    flush_draw = any(hsuits.count(s) + bsuits.count(s) == 4 for s in set(hsuits))
     oesd = any(sum(1 for x in (lo, lo + 1, lo + 2, lo + 3) if x in allr) >= 4 for lo in range(10))
 
-    if made >= 2:
+    if made >= 3:
         return "strong"
-    if made == 1:
+    if made in (1, 2):
+        # made == 2 is plain top pair (any kicker) — deliberately demoted from
+        # "strong" to join made == 1. Was a live bug: `made >= 2` conflated top
+        # pair with two-pair/set, so grade_vs_cbet recommended "never fold" with
+        # a marginal top pair vs. a big c-bet. Phase 2e-0 T2.
         return "weak_made"
     if flush_draw or oesd:
         return "draw"
@@ -439,5 +460,179 @@ def grade_vs_cbet(
         ev_loss_bb=ev_loss,
         correctness=correctness,
         rationale_tags=["vs_cbet", adv, cat, tex.wetness],
+        explanation=why,
+    )
+
+
+# --- Phase 2e-1: facing a flop check-raise (hero = the original c-bettor) ---
+
+
+def _merits_vs_check_raise(
+    value: float, adv: str, price: float, texture: Texture, cat: str
+) -> tuple[float, float, float]:
+    """Return (fold, call, raise) merit scores (proxy EV, ~bb) for hero — the
+    ORIGINAL flop c-bettor — facing a defender's check-raise.
+
+    `adv` is the AGGRESSOR-view `range_advantage()` result ('hero'|'neutral'|
+    'villain'), since hero is still the preflop+flop aggressor. `price` = pot odds
+    to call (faced check-raise / pot).
+
+    Live $1/$2 check-raises are rarely bluffs (research §10.3) — a raise-after-my-
+    bet is fresh strength news, a STRONGER prior than the static board range read.
+    So the fold baseline here (1.6) is meaningfully higher than `_merits_vs_cbet`'s
+    (0.6), and a nominal range advantage does NOT rescue a marginal/air hand (the
+    check-raise overrides the static read for hands that only bluff-catch). Texture
+    modulates it (§4.4): bluffs are more plausible on low/connected/wet boards, rare
+    on dry rainbow boards — texture shifts fold/call balance but never overrides a
+    clear air-hand fold on a dry board (bluffy is negative there, so it can't).
+    """
+    adv_bonus = {"hero": 0.5, "neutral": 0.0, "villain": -0.5}[adv]
+
+    # texture-conditioned bluff plausibility (§4.4)
+    bluffy = 0.0
+    if not texture.high_board:
+        bluffy += 0.3
+    if texture.connectedness == "connected":
+        bluffy += 0.3
+    if texture.wetness == "wet":
+        bluffy += 0.4
+    elif texture.wetness == "dry":
+        bluffy -= 0.4
+    low_connected_wet = (
+        not texture.high_board
+        and texture.connectedness == "connected"
+        and texture.wetness == "wet"
+    )
+
+    # FOLD — baseline well above _merits_vs_cbet's 0.6 (the check-raise-strength prior)
+    fold = 1.6
+    if cat == "air":
+        fold += 1.2
+    elif cat == "weak_made":
+        fold += 0.6
+    fold += price * 1.5  # worse price (bigger check-raise) -> folding better
+    if adv == "villain":
+        fold += 0.3  # villain's range even stronger -> fold more
+    fold -= value * 0.8  # strong made hands / draws fold far less
+    fold -= max(0.0, bluffy)  # bluffier boards -> fold a bit less (never on dry: bluffy<=0)
+
+    # CALL — range advantage only rewards genuinely-continuing hands (strong/draw);
+    # a check-raise strips a marginal/air hand of the static-edge call boost.
+    call = value
+    if cat in ("strong", "draw"):
+        call += adv_bonus
+    call += (0.4 - price) * 1.5  # cheap check-raise -> call better
+    if cat == "draw" and texture.wetness == "wet":
+        call += 0.6  # draws want to continue on wet boards (equity to realize)
+    if cat == "air":
+        call -= 1.4  # bluff-catching pure air vs a check-raise is bad
+    elif cat == "weak_made":
+        call += bluffy * 0.5  # a marginal bluff-catch only where a bluff is plausible
+
+    # RAISE (4-bet)
+    if cat == "strong":
+        raise_ = value + 0.6 + adv_bonus  # value 4-bet
+    elif cat == "draw":
+        raise_ = value - 0.4  # kept below call so call stays best on wet boards
+        if low_connected_wet:
+            raise_ += 0.5  # semibluff 4-bet only where check-raise bluffs are plausible
+    elif cat == "weak_made":
+        raise_ = -1.0  # don't 4-bet a marginal made hand into a check-raise
+    else:  # air
+        raise_ = -1.4
+        if low_connected_wet:
+            raise_ += 0.8  # rare semibluff 4-bet with backdoors on very wet boards
+    return fold, call, raise_
+
+
+def grade_vs_check_raise(
+    spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
+) -> EvaluationResult:
+    board = spot.board[:3]
+    tex = classify(board)
+    ctx = spot.node_context[0] if spot.node_context else NodeContext.VS_CHECK_RAISE
+    # CRITICAL: the third arg is the check-raiser's position (_villain_pos), NOT
+    # hero's own. Hero is the aggressor here; passing hero's position twice would
+    # corrupt range_advantage()'s in-position read (refuter-caught).
+    adv = range_advantage(ctx, spot.hero.position, _villain_pos(spot), tex)
+    cat = _hand_category(spot.hero.hole_cards, board)
+    value = _HAND_VALUE[cat]
+    faced, pot = _faced_call_and_pot(spot)
+    price = faced / pot if pot > 0 else 0.5
+
+    raise_size = next(
+        (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
+        None,
+    )
+    m_fold, m_call, m_raise = _merits_vs_check_raise(value, adv, price, tex, cat)
+    specs = [
+        (ActionType.FOLD, None, m_fold),
+        (ActionType.CALL, faced or None, m_call),
+        (ActionType.RAISE, raise_size, m_raise),
+    ]
+    freqs = _frequencies([m for _, _, m in specs])
+    evals = [
+        ActionEval(action=a, size_bb=size, frequency=round(f, 3), ev_bb=round(m, 2))
+        for (a, size, m), f in zip(specs, freqs, strict=True)
+    ]
+    best = max(evals, key=lambda e: e.ev_bb)
+    is_mixed = sum(1 for f in freqs if f > POST_MIX) >= 2
+    leak = int(LeakCategory.VS_CHECK_RAISE)
+
+    base_kwargs = {
+        "per_action": evals,
+        "best_action": best,
+        "provider": ProviderKind.HEURISTIC,
+        "coverage": Coverage.FULL,
+        "leak_category": leak,
+        "is_mixed": is_mixed,
+    }
+
+    if decision is None:
+        return EvaluationResult(
+            **base_kwargs,
+            rationale_tags=["vs_check_raise", adv, cat, tex.wetness],
+            explanation=(
+                f"{cat} facing a check-raise on a {tex.wetness} board "
+                f"({adv} range advantage): {best.action.value} is the play."
+            ),
+        )
+
+    # RAISE matches by ActionType alone (one raise option), like grade_vs_cbet.
+    chosen = next((e for e in evals if e.action == decision.action), None)
+    if chosen is None:
+        chosen = ActionEval(
+            action=decision.action, frequency=0.0, ev_bb=min(e.ev_bb for e in evals) - 1.0
+        )
+    ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    if chosen.action == best.action:
+        correctness = Correctness.OPTIMAL
+    elif chosen.frequency > POST_MIX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_ACCEPTABLE_MAX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_MISTAKE_MAX:
+        correctness = Correctness.MISTAKE
+    else:
+        correctness = Correctness.BLUNDER
+
+    if correctness == Correctness.OPTIMAL:
+        why = (
+            f"{cat} vs a check-raise on a {tex.wetness} board ({adv} edge): "
+            f"{best.action.value} is the play."
+        )
+    else:
+        why = (
+            f"{cat} vs a check-raise on a {tex.wetness} board ({adv} edge): best is "
+            f"{best.action.value}; you chose {decision.action.value} (-{ev_loss}bb)."
+        )
+
+    return EvaluationResult(
+        **base_kwargs,
+        chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
+        ev_loss_bb=ev_loss,
+        correctness=correctness,
+        rationale_tags=["vs_check_raise", adv, cat, tex.wetness],
         explanation=why,
     )

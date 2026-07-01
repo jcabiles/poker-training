@@ -234,3 +234,132 @@ def test_vs_cbet_spot_grades_via_provider():
     res = asyncio.run(p.evaluate(s, Decision(action=ActionType.CALL)))
     assert res.leak_category == 201  # VS_CBET
     assert res.correctness is not None
+
+
+# --- Phase 2e-1: facing a flop check-raise ---
+def _flop_bet(spot):
+    """Hero's (the aggressor's) flop c-bet amount from action_history."""
+    return next(
+        h.amount_bb
+        for h in spot.action_history
+        if h.action == ActionType.BET and h.position == spot.hero.position
+    )
+
+
+def _flop_raise(spot):
+    """The defender's flop check-raise total from action_history."""
+    return next(
+        h.amount_bb
+        for h in spot.action_history
+        if h.action == ActionType.RAISE and h.position == spot.facing
+    )
+
+
+def test_check_raise_spot_is_valid_flop_with_ranges():
+    from app.domain.scenarios import build_check_raise_spot
+    from app.domain.spot import Street
+
+    s = build_check_raise_spot(random.Random(7), eff_bb=100.0, raise_mult=2.5)
+    assert s.street == Street.FLOP and len(s.board) == 3
+    assert s.node_context == [NodeContext.VS_CHECK_RAISE]
+    # hero is the ORIGINAL aggressor (opener / c-bettor), still to act
+    hero_ps = next(p for p in s.players if p.is_hero)
+    assert hero_ps.position == s.hero.position == s.to_act
+    assert s.facing is not None and s.facing != s.hero.position  # villain = check-raiser
+    # the defender's RAISE (check-raise) sits in the history at raise_to
+    raise_h = next(
+        h for h in s.action_history if h.action == ActionType.RAISE and h.position == s.facing
+    )
+    assert raise_h.amount_bb == _flop_raise(s)
+    assert s.hero_range and s.villain_range
+    acts = {la.action for la in s.legal_actions}
+    assert acts == {ActionType.FOLD, ActionType.CALL, ActionType.RAISE}
+    # cards disjoint: hole ∩ board == ∅
+    cards = list(s.hero.hole_cards) + s.board
+    assert len(set(cards)) == 5
+
+
+def test_check_raise_call_size_is_incremental_not_total():
+    """THE refuter-caught bug: hero already has `cbet` invested this street, so
+    the CALL amount is the delta `raise_to - cbet`, NOT the raise's raw total."""
+    from app.domain.scenarios import build_check_raise_spot
+
+    s = build_check_raise_spot(
+        random.Random(3), pairing=(Position.BTN, Position.BB), eff_bb=100.0, raise_mult=2.5
+    )
+    cbet = _flop_bet(s)
+    raise_to = _flop_raise(s)
+    call = next(la.min_bb for la in s.legal_actions if la.action == ActionType.CALL)
+    assert call == round(raise_to - cbet, 2)  # incremental delta owed
+    assert call != raise_to  # NOT the raise-to total (the double-count bug)
+    assert call < raise_to  # hero's own c-bet already counts toward the call
+
+
+def test_check_raise_pot_includes_both_bets():
+    from app.domain.scenarios import build_check_raise_spot
+
+    s = build_check_raise_spot(
+        random.Random(9), pairing=(Position.CO, Position.BB), eff_bb=100.0, raise_mult=3.0
+    )
+    cbet = _flop_bet(s)
+    raise_to = _flop_raise(s)
+    osize = 2.5  # CO open
+    flop_pot = round(2 * osize + 0.5, 2)
+    assert s.pot_bb == round(flop_pot + cbet + raise_to, 2)
+
+
+def test_check_raise_has_concrete_numeric_raise_size():
+    from app.domain.scenarios import build_check_raise_spot
+
+    s = build_check_raise_spot(random.Random(5), eff_bb=100.0, raise_mult=2.5)
+    raise_la = next(la for la in s.legal_actions if la.action == ActionType.RAISE)
+    assert raise_la.min_bb is not None and raise_la.min_bb > 0  # concrete 4-bet size
+
+
+def test_check_raise_raise_mult_differentiates_faced_bet_bucket():
+    """A wider check-raise must land in a different `faced_bet_bucket` than a
+    modest 2.5x one at the SAME c-bet baseline (via the builder's raise_mult
+    param). The 2.5x lands in "small" only when the internally-chosen c-bet is
+    the 0.33-pot size, so scan seeds for one that does, then confirm a much
+    wider raise on the SAME baseline flips it to "big"."""
+    from app.domain.scenarios import build_check_raise_spot
+    from app.domain.srs import faced_bet_bucket
+
+    pairing = (Position.BTN, Position.BB)
+    for seed in range(200):
+        small = build_check_raise_spot(
+            random.Random(seed), pairing=pairing, eff_bb=100.0, raise_mult=2.5
+        )
+        if faced_bet_bucket(small) != "small":
+            continue
+        big = build_check_raise_spot(
+            random.Random(seed), pairing=pairing, eff_bb=100.0, raise_mult=6.0
+        )
+        # same seed + pairing => identical flop_pot and c-bet baseline
+        assert _flop_bet(small) == _flop_bet(big)
+        assert faced_bet_bucket(small) == "small"
+        assert faced_bet_bucket(big) == "big"
+        return
+    raise AssertionError("no seed produced a small-bucket 2.5x check-raise")
+
+
+def test_check_raise_faced_bet_bucket_valid_for_defaults():
+    """faced_bet_bucket runs and returns a valid bucket for default-sampled
+    check-raise spots (they always carry a CALL legal action)."""
+    from app.domain.scenarios import sample_check_raise_spot
+    from app.domain.srs import faced_bet_bucket
+
+    rng = random.Random(21)
+    for _ in range(20):
+        s = sample_check_raise_spot(rng)
+        assert faced_bet_bucket(s) in {"small", "big"}
+
+
+def test_check_raise_sample_is_deterministic_with_seed():
+    from app.domain.scenarios import sample_check_raise_spot
+
+    a = sample_check_raise_spot(random.Random(4))
+    b = sample_check_raise_spot(random.Random(4))
+    assert a.hero.hole_cards == b.hero.hole_cards
+    assert a.board == b.board
+    assert a.pot_bb == b.pot_bb
