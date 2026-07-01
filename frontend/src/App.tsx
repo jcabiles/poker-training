@@ -94,6 +94,14 @@ export default function App() {
   useEffect(() => {
     if (view !== "drill") return;
     const handler = (e: KeyboardEvent) => {
+      const target = document.activeElement;
+      const interactiveTags = ["BUTTON", "INPUT", "SELECT", "TEXTAREA"];
+      if (
+        target instanceof HTMLElement &&
+        (interactiveTags.includes(target.tagName) || target.isContentEditable)
+      ) {
+        return;
+      }
       if (result) {
         if (e.key === " " || e.key.toLowerCase() === "n") {
           e.preventDefault();
