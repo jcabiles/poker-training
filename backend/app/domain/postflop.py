@@ -45,6 +45,13 @@ POST_ACCEPTABLE_MAX = 0.6
 POST_MISTAKE_MAX = 1.8
 POST_MIX = 0.20
 
+# NOTE (Phase 2d, deferred): equity-backed range advantage was investigated and
+# reverted. Bounded Monte-Carlo over the wide-vs-condensed heuristic ranges does not
+# recover a stable range-advantage signal (mean equity is flat ~0.5; strong-combo
+# share is range-width-biased; top-of-range strength is noisy/counterintuitive). Real
+# range advantage is an equity-distribution + EV property solvers compute over the full
+# tree — so it waits for Phase 3 solver tables (swappable behind StrategyProvider). The
+# positional+texture heuristic below is the sound, stable simplified prior for now.
 
 
 def _in_position(hero: Position, villain: Position) -> bool:
