@@ -5,6 +5,36 @@
 
 ---
 
+## Direction update — the Learning-Experience mandate (July 2026 review)
+
+> Full analysis + SOTA UX research: `docs/ai-dlc/roadmap-review-and-proposal.md` (+ `best-practices-drafts/`).
+> **Decided:** the engine-first street sequencing below **stays**, but is now bound by a hard mandate.
+
+**MUST: become a true *teacher*, not just a grader — across ALL streets.** Today the app tests but barely teaches
+(feedback is one tautological sentence; the strategy docs 01–08 are invisible in-app; the UI is a flat pile of
+mode-buttons). Deferring this is no longer acceptable. Every postflop epic (2f–2k) now ships **with its teaching layer**
+— a concept card + an enriched "why" explanation — and **teaching, IA, and onboarding interleave with the engine build**
+rather than waiting until after it.
+
+**What this adds (see capability P below):**
+- **Multi-tier feedback that teaches the WHY** — deliver the long-promised tiers (verdict → reasoning → deep-dive). Much
+  of this is *surfacing data the code already has* (`Entry.rationale`, `EvaluationResult.rationale_tags`, the SM-2
+  due-queue) — cheap, not a rebuild.
+- **In-app theory — concept cards now, full lessons library later** (decided scope). Cards surface at point-of-need
+  (a missed rep links to its concept); a browsable lessons library from docs 01–08 follows as a later phase.
+- **Cohesive IA + onboarding** — split the flat mode-buttons into two labeled axes (spot-selection × situation), a
+  home/curriculum hub, a first-run placement diagnostic, a study-vs-test toggle, and reveal-the-chart-after-answer.
+- **Accuracy debt paid down** — fold the verified research errata (docs 05/06/08) into the near-term build: preflop
+  leaks (UTG KQo, HJ QJo, vs-4bet CO QQ), grader leaks (`Texture.suitedness`/`pairing` computed-but-never-read, the
+  ace-high exception), and `hand_rank` pocket-pair undervaluation.
+
+**Immediate next build — the "cheap-wins bundle" (approved):** 2-axis mode split · surface `rationale` in feedback ·
+consistent decision-quality tiers · grid-absent-then-reveal + study/test toggle · ARIA/live-region/focus fixes · the
+05–08 errata. Highest visible improvement for lowest cost/risk; spec + tickets in `docs/ai-dlc/`.
+
+**Reconcile:** the running app shows **no "Challenge" mode** despite prior "merged" status — verify `main` before
+planning around it.
+
 ## 1. Player profile (who this is for)
 
 - Plays **live** No-Limit Texas Hold'em **cash** only (not online, not tournaments).
@@ -19,7 +49,7 @@ A local, **desktop-first, live-cash-focused** NLHE trainer built around one tigh
 
 > **Surface a leak → drill it with fast reps → instant "why + EV cost" feedback → space it with SM-2 → re-surface until mastered.**
 
-It finds leaks from your own drilling (**no hand-history imports**), grades against a **simplified-GTO baseline**, and layers **exploitative adjustments vs live villain types** on top. Covers **preflop and postflop**, simplified for the $1/$2 → $2/$3 climb.
+It finds leaks from your own drilling (**no hand-history imports**), grades against a **simplified-GTO baseline**, and layers **exploitative adjustments vs live villain types** on top. Covers **preflop and postflop**, simplified for the $1/$2 → $2/$3 climb. Critically, it must **teach the *why*, not just grade** — every rep links to the concept behind it and theory is surfaced in-app, across all streets — so the loop builds understanding, not just pattern-matching (see the Direction update above).
 
 ## 3. Goals · Requirements · Constraints (from the original intent)
 
@@ -29,6 +59,7 @@ It finds leaks from your own drilling (**no hand-history imports**), grades agai
 - Preflop AND postflop coverage (postflop phased after preflop).
 - Simplified strategy grounded in modern theory — not perfect GTO.
 - Best-in-class learning workflow (deliberate practice + spaced repetition + explanatory feedback).
+- **A true teacher, not just a grader** — in-app explanation of the WHY + surfaced theory (concept cards now, lessons library later), delivered across **all streets**; cohesive, onboarded, teaching-forward UX. Interleaves with the engine build — non-deferrable.
 - Emulate what the best products do well; avoid their documented pitfalls.
 
 **Constraints**
@@ -70,6 +101,7 @@ These are non-negotiable so the app scales from preflop-MVP to a solver-grade, p
 | M | Move-up readiness diagnostic + mental-game / variance framing | 4 |
 | N | Content authoring + validation tooling | 0/ongoing |
 | O | Test/quality infra (golden scenarios, range sanity) | 0/ongoing |
+| P | **Learning Experience** — in-app concept cards/lessons, multi-tier "why" feedback, onboarding, curriculum/home hub, cohesive IA | 1/2 (interleaved) |
 
 ## 6. Phased roadmap
 
