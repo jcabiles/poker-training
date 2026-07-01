@@ -32,10 +32,13 @@ docs 05/06/08 (present in-repo) and the SOTA UX findings. Doctrine: simplified-b
 - **Wave 3:** CW-5 · CW-6 · CW-7 (frontend, sequential on shared files) → verify.
 
 ## Follow-ups (from the Wave-2 refuter — non-blocking, logged at commit of Wave 1)
-- **CW-3b — equity-anchor pocket-pair ranks.** The uniform `0.03→0.045` coefficient bump fixed the big
-  mis-orderings (77/66 > QJs, 55 > Q7s) but nudged **66 just above AJo** (real equity AJo ≈.655 > 66 ≈.635).
-  Zero grading impact today (no shipped chart's `_range_floor` is 66), but the proper fix per doc 08 is to
-  anchor pair ranks to the *computed* equity ordering rather than a linear proxy coefficient. Small dedicated ticket.
+- **CW-3b — equity-anchor pocket-pair ranks.** CW-3's `0.03→0.045` coefficient bump was **REVERTED during the
+  merge with `main`** (#7 Challenge mode): the bump broke `test_hand_rank.py`'s `TIED_PAIRS` invariants (it
+  un-ties pairs like 88≈KQo) and shifts the rank order Challenge's edge-score depends on. It had also nudged
+  66 above AJo. The proper fix per doc 08 is to anchor pair ranks to the **computed equity ordering** — and it
+  must reconcile with `test_hand_rank.py`'s determinism/tie model (update those expectations deliberately, don't
+  just bump a coefficient). Dedicated ticket; pocket-pair undervaluation persists until then (zero grading
+  blast radius today — no shipped chart's `_range_floor` is a low pair).
 - **CW-2b — vs-check-raise pairing note.** Doc 06 named `_merits_vs_check_raise` alongside `_merits_vs_cbet` for
   the missing `texture.pairing` read; Wave 1 patched only the latter (defensible — no solver data for hero's
   post-check-raise re-raise, and the doc protects that fn's fold-heavy live prior). Add a one-line code comment

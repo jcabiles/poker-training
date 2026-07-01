@@ -103,8 +103,21 @@ def _raise(pos: Position, amount: float) -> HistoryAction:
     )
 
 
-def build_spot(entry: Entry, rng: random.Random, eff_bb: float = 100.0) -> Spot:
-    c1, c2 = rng.sample(_DECK, 2)
+def build_spot(
+    entry: Entry,
+    rng: random.Random,
+    eff_bb: float = 100.0,
+    hole_cards: tuple[str, str] | None = None,
+) -> Spot:
+    """Build a Spot for `entry`.
+
+    `hole_cards`, if given, is used as-is instead of drawing a fresh random
+    combo from `rng` — for callers (e.g. Challenge mode) that already picked
+    the hero's hole cards themselves and would otherwise draw-and-discard a
+    combo here. Default `None` preserves today's behavior exactly (draw 2
+    cards from `_DECK` via `rng`).
+    """
+    c1, c2 = hole_cards if hole_cards is not None else rng.sample(_DECK, 2)
     hero = Hero(position=entry.position, hole_cards=(c1, c2), stack_bb=eff_bb)
     ctx = entry.node_context
     facing = entry.facing

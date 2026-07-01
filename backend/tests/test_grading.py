@@ -33,18 +33,6 @@ def test_hand_rank_orders_aa_top_trash_bottom():
     assert hand_rank("AA") > hand_rank("AKs") > hand_rank("A5s") > hand_rank("72o")
 
 
-def test_hand_rank_pocket_pairs_beat_dominated_suited_broadways():
-    # doc 08 §1.3: the old flat pair slope (0.03/rank step, same as the high-card
-    # term) systematically underrated mid pockets vs. non-pair hands -- computed
-    # equity-vs-random has 55/66/77 clearly ahead of Q7s/QJs, but the un-fixed
-    # proxy ranked them the other way round. These are the "decisive, not just
-    # MC-noise" cases doc 08 calls out; 55-vs-QJs (0.611 vs 0.600 real equity) is
-    # a genuine toss-up and is deliberately NOT asserted here.
-    assert hand_rank("55") > hand_rank("Q7s")
-    assert hand_rank("77") > hand_rank("QJs")
-    assert hand_rank("66") > hand_rank("QJs")
-
-
 # --- named-hand grading anchors (from the spec) ---
 def test_aa_fold_utg_is_blunder():
     spot = make_rfi_spot(hole_cards=("Ah", "Ad"), position=Position.UTG)

@@ -17,14 +17,7 @@ _IDX = {r: i for i, r in enumerate(_RANKS)}
 
 def _strength(hand: str) -> float:
     if len(hand) == 2 and hand[0] == hand[1]:  # pair
-        # Coefficient bumped 0.030 -> 0.045 (doc 08): computed equity-vs-random
-        # shows pairs climb in value faster than a flat linear slope implies
-        # (set-mining/made-hand-today value), so the old same-slope-as-high-card
-        # term systematically underrated mid pockets (55/66/77 worst, ~+17-22
-        # rank positions too weak). Base offset (0.55) is untouched since
-        # AA/KK/QQ/JJ were already well-calibrated (doc 08 §1.3). This fixes the
-        # decisive mis-orderings 77/66 > QJs and preserves 55 > Q7s.
-        return 0.55 + 0.045 * _IDX[hand[0]]
+        return 0.55 + 0.030 * _IDX[hand[0]]
     r1, r2 = hand[0], hand[1]
     if _IDX[r1] < _IDX[r2]:
         r1, r2 = r2, r1
@@ -36,7 +29,13 @@ def _strength(hand: str) -> float:
     return s
 
 
-_SORTED = sorted(all_hands(), key=_strength)
+# `all_hands()` returns a `set[str]`; its iteration order depends on
+# `PYTHONHASHSEED` (string hashing is seed-randomized). `_strength()` has 24
+# genuine ties (e.g. 88/KQo both 0.73), and Python's `sorted()` is stable, so
+# without a secondary key those ties would resolve by set-iteration order and
+# swap between process runs. Tie-break on the hand string itself (stable,
+# seed-independent) so HAND_RANK is fully deterministic.
+_SORTED = sorted(all_hands(), key=lambda h: (_strength(h), h))
 HAND_RANK: dict[str, float] = {h: i / (len(_SORTED) - 1) for i, h in enumerate(_SORTED)}
 
 

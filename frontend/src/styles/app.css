@@ -201,6 +201,30 @@ kbd {
   color: var(--muted);
   margin-bottom: var(--space);
 }
+.gridtoggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 36px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 6px var(--space);
+  margin-bottom: var(--space);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gridtoggle:hover {
+  background: var(--bg);
+  border-color: var(--border);
+}
+.gridchevron {
+  color: var(--muted);
+  margin-left: var(--space);
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(13, 1fr);

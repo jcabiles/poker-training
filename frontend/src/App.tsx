@@ -32,6 +32,7 @@ const PREFLOP_MODES: { id: Mode; label: string }[] = [
   { id: "review", label: "Review (due)" },
   { id: "leak_focus", label: "Leak focus" },
   { id: "exploit", label: "Exploit" },
+  { id: "challenge", label: "Challenge" },
 ];
 
 // Postflop situations: which street/action spot to drill.
@@ -100,6 +101,14 @@ export default function App() {
   useEffect(() => {
     if (view !== "drill") return;
     const handler = (e: KeyboardEvent) => {
+      const target = document.activeElement;
+      const interactiveTags = ["BUTTON", "INPUT", "SELECT", "TEXTAREA"];
+      if (
+        target instanceof HTMLElement &&
+        (interactiveTags.includes(target.tagName) || target.isContentEditable)
+      ) {
+        return;
+      }
       if (result) {
         if (e.key === " " || e.key.toLowerCase() === "n") {
           e.preventDefault();
