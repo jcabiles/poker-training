@@ -11,6 +11,7 @@ const LEGEND: [string, string][] = [
 ];
 
 const COLLAPSED_KEY = "rangeGrid.collapsed";
+const TITLE_ID = "range-grid-title";
 
 function readCollapsed(): boolean {
   try {
@@ -31,11 +32,18 @@ function writeCollapsed(collapsed: boolean): void {
 export default function RangeGrid({
   spot,
   grid,
+  revealed = false,
 }: {
   spot: Spot;
   grid: Record<string, string>;
+  /** CW-6: true only for the Test-mode post-grade reveal. That mount always
+   * starts expanded (ignoring the persisted collapse preference — Study mode
+   * may have left it collapsed) and plays a one-shot reveal animation. The
+   * user can still collapse it afterward via the existing toggle, same as
+   * Study mode. */
+  revealed?: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState(() => readCollapsed());
+  const [collapsed, setCollapsed] = useState(() => (revealed ? false : readCollapsed()));
   const hero = handClass(spot.hero.hole_cards[0], spot.hero.hole_cards[1]);
   const node = spot.node_context.join(", ") + (spot.facing ? ` vs ${spot.facing}` : "");
 
@@ -48,7 +56,7 @@ export default function RangeGrid({
   };
 
   return (
-    <div className="gridwrap">
+    <div className={"gridwrap" + (revealed ? " reveal" : "")}>
       <button
         type="button"
         className="gridtoggle"
@@ -62,25 +70,38 @@ export default function RangeGrid({
         </span>
       </button>
       <div id="range-grid-body" hidden={collapsed}>
-        <div className="gridtitle">{node} range</div>
-        <div className="grid">
-          {RANK_ORDER.map((r1, i) =>
-            RANK_ORDER.map((r2, j) => {
-              const cls =
-                i === j ? r1 + r2 : i < j ? r1 + r2 + "s" : RANK_ORDER[j] + RANK_ORDER[i] + "o";
-              const action = grid[cls] ?? "fold";
-              const isHero = cls === hero;
-              return (
-                <div
-                  key={`${i}-${j}`}
-                  className={`cell action-${action}${isHero ? " hero" : ""}`}
-                  title={`${cls}: ${action}`}
-                >
-                  {cls}
-                </div>
-              );
-            }),
-          )}
+        <div className="gridtitle" id={TITLE_ID}>
+          {node} range
+        </div>
+        {/* APG "table" semantics (CW-7), not "grid" — these cells are static,
+            read-only lookups (no click/selection), so the interactive
+            grid pattern (roving tabindex, arrow-key cell navigation) does
+            not apply; APG itself says to use table for read-only data. Each
+            row is a real role="row" element kept out of the box tree via
+            `display: contents` so it doesn't disturb the existing 13-column
+            CSS Grid placement on `.grid`. */}
+        <div className="grid" role="table" aria-labelledby={TITLE_ID}>
+          {RANK_ORDER.map((r1, i) => (
+            <div className="gridrow" role="row" key={`row-${i}`}>
+              {RANK_ORDER.map((r2, j) => {
+                const cls =
+                  i === j ? r1 + r2 : i < j ? r1 + r2 + "s" : RANK_ORDER[j] + RANK_ORDER[i] + "o";
+                const action = grid[cls] ?? "fold";
+                const isHero = cls === hero;
+                return (
+                  <div
+                    key={`${i}-${j}`}
+                    role="cell"
+                    className={`cell action-${action}${isHero ? " hero" : ""}`}
+                    title={`${cls}: ${action}`}
+                    aria-label={`${cls}: ${action}${isHero ? ", your hand" : ""}`}
+                  >
+                    {cls}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
         <div className="gridlegend">
           {LEGEND.map(([c, label]) => (

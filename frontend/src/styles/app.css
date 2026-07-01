@@ -189,6 +189,25 @@ kbd {
   margin-left: 6px;
 }
 
+/* Rationale tags (CW-5): the "why" behind the verdict — node type, range
+   advantage, hand category, board texture — as scannable chips. */
+.rationale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: var(--space) 0;
+}
+.rationale-chip {
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
 /* Range grid */
 .gridwrap {
   background: var(--surface);
@@ -263,6 +282,32 @@ kbd {
   aspect-ratio: auto;
 }
 
+/* ARIA table semantics (CW-7): one role="row" wrapper per rank row. Kept out
+   of the box tree via `display: contents` so it's invisible to the existing
+   CSS Grid placement on `.grid` (repeat(13, 1fr)) while staying present in
+   the accessibility tree. */
+.gridrow {
+  display: contents;
+}
+
+/* Test-mode grid reveal (CW-6): plays once when the answer grid mounts after
+   grading. prefers-reduced-motion users get an instant, static appearance. */
+@media (prefers-reduced-motion: no-preference) {
+  .gridwrap.reveal {
+    animation: gridReveal 220ms ease-out;
+  }
+}
+@keyframes gridReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Mode selector */
 .modes {
   display: flex;
@@ -289,6 +334,23 @@ kbd {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 6px;
+}
+
+/* Study / Test toggle (CW-6) */
+.studytest {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 1.5);
+  margin-bottom: calc(var(--space) * 2);
+  flex-wrap: wrap;
+}
+.studytest-toggle {
+  display: flex;
+  gap: var(--space);
+}
+.studytest-hint {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 /* Stats strip */

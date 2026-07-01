@@ -29,7 +29,9 @@ docs 05/06/08 (present in-repo) and the SOTA UX findings. Doctrine: simplified-b
 ## Waves
 - **Wave 1 (now, parallel, disjoint):** CW-1/2/3 (backend errata agent) ‖ CW-4 (frontend IA agent).
 - **Wave 2:** refuter/verify (maker ≠ checker) — backend correctness of CW-2/CW-3 + pytest/ruff; frontend build + nav check.
-- **Wave 3:** CW-5 · CW-6 · CW-7 (frontend, sequential on shared files) → verify.
+- **Wave 3 (DONE):** CW-5 · CW-6 · CW-7 (frontend) — verified live + typecheck/build clean: rationale chips
+  render, Test mode hides→reveals the grid (Study = PR #6 behavior untouched), APG toolbar/table + aria-live
+  status + focus-to-Next. New `RationaleTags.tsx` / `StudyTestToggle.tsx`.
 
 ## Follow-ups (from the Wave-2 refuter — non-blocking, logged at commit of Wave 1)
 - **CW-3b — equity-anchor pocket-pair ranks.** CW-3's `0.03→0.045` coefficient bump was **REVERTED during the

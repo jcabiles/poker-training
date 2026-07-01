@@ -16,6 +16,7 @@ import PokerTable from "./components/PokerTable";
 import QuizPanel from "./components/QuizPanel";
 import RangeGrid from "./components/RangeGrid";
 import StatsStrip from "./components/StatsStrip";
+import StudyTestToggle, { type StudyTestMode } from "./components/StudyTestToggle";
 import { legalDecisions } from "./lib/decisions";
 
 type View = "drill" | "texture" | "equity";
@@ -42,12 +43,33 @@ const POSTFLOP_MODES: { id: Mode; label: string }[] = [
   { id: "vs_check_raise", label: "Facing check-raise" },
 ];
 
+// CW-6: Study shows the answer grid while deciding (PR #6 behavior); Test
+// hides it until the spot is graded, then reveals it.
+const STUDY_TEST_KEY = "studyTestMode";
+
+function readStudyTestMode(): StudyTestMode {
+  try {
+    return window.localStorage.getItem(STUDY_TEST_KEY) === "test" ? "test" : "study";
+  } catch {
+    return "study";
+  }
+}
+
+function writeStudyTestMode(mode: StudyTestMode): void {
+  try {
+    window.localStorage.setItem(STUDY_TEST_KEY, mode);
+  } catch {
+    /* localStorage unavailable — preference just won't persist */
+  }
+}
+
 export default function App() {
   const [view, setView] = useState<View>("drill");
   const [spot, setSpot] = useState<Spot | null>(null);
   const [grid, setGrid] = useState<Record<string, string>>({});
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [mode, setMode] = useState<Mode>("random");
+  const [studyTestMode, setStudyTestMode] = useState<StudyTestMode>(() => readStudyTestMode());
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [leaks, setLeaks] = useState<LeakStat[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +104,11 @@ export default function App() {
   const selectMode = (m: Mode) => {
     setMode(m);
     loadNext(m);
+  };
+
+  const selectStudyTestMode = (m: StudyTestMode) => {
+    setStudyTestMode(m);
+    writeStudyTestMode(m);
   };
 
   const decide = useCallback(
@@ -130,7 +157,10 @@ export default function App() {
     h.dataset.theme = h.dataset.theme === "dark" ? "light" : "dark";
   };
 
-  const showGrid = Object.keys(grid).length > 0;
+  const hasGrid = Object.keys(grid).length > 0;
+  // CW-6: Study shows the grid as soon as it exists (#6 behavior, unchanged);
+  // Test withholds it until the spot is graded, then it reveals.
+  const showGrid = hasGrid && (studyTestMode === "study" || !!result);
 
   return (
     <div className="app">
@@ -174,6 +204,8 @@ export default function App() {
             />
           </div>
 
+          <StudyTestToggle mode={studyTestMode} onChange={selectStudyTestMode} />
+
           {error && (
             <div className="panel bad-bg">Error: {error}. Is the backend running on :8008?</div>
           )}
@@ -187,7 +219,7 @@ export default function App() {
               </section>
               {showGrid && (
                 <aside>
-                  <RangeGrid spot={spot} grid={grid} />
+                  <RangeGrid spot={spot} grid={grid} revealed={studyTestMode === "test"} />
                 </aside>
               )}
             </main>
