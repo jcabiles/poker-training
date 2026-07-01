@@ -11,7 +11,7 @@ backend/   FastAPI API + pure domain core + SQLite/Alembic
 frontend/  React + Vite
 content/   strategy content packs + JSON schema
 docs/      research, roadmap, specs, tickets
-scripts/   verify.sh
+scripts/   dev.sh, verify.sh
 ```
 
 ## Architecture (why it scales)
@@ -42,14 +42,19 @@ cd frontend
 npm install
 ```
 
-**Run** (two terminals):
+**Run** (one command — backend on :8008 + frontend on :5173, backend dies on exit):
+```bash
+./scripts/dev.sh
+```
+Open `http://localhost:5173`. API health: `http://localhost:8008/api/v1/health` · interactive docs at `/docs`.
+
+Or run separately (two terminals):
 ```bash
 # backend — API on :8008
 cd backend && uvicorn app.main:app --port 8008 --reload
 # frontend — UI on :5173
 cd frontend && npm run dev
 ```
-Open `http://localhost:5173`. API health: `http://localhost:8008/api/v1/health` · interactive docs at `/docs`.
 
 **Checks:**
 ```bash
