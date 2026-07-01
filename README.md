@@ -44,12 +44,12 @@ npm install
 
 **Run** (two terminals):
 ```bash
-# backend — API on :8000
-cd backend && uvicorn app.main:app --reload
+# backend — API on :8008
+cd backend && uvicorn app.main:app --port 8008 --reload
 # frontend — UI on :5173
 cd frontend && npm run dev
 ```
-Open `http://localhost:5173`. API health: `http://localhost:8000/api/v1/health` · interactive docs at `/docs`.
+Open `http://localhost:5173`. API health: `http://localhost:8008/api/v1/health` · interactive docs at `/docs`.
 
 **Checks:**
 ```bash

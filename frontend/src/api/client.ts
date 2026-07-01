@@ -12,7 +12,7 @@ import type {
   StatsSummary,
 } from "./types";
 
-const BASE = "/api/v1"; // proxied to FastAPI :8000 in dev
+const BASE = "/api/v1"; // proxied to FastAPI :8008 in dev
 
 async function json<T>(r: Response): Promise<T> {
   if (!r.ok) throw new Error(`${r.url} -> ${r.status}`);

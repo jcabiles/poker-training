@@ -155,7 +155,7 @@ export default function App() {
           </div>
 
           {error && (
-            <div className="panel bad-bg">Error: {error}. Is the backend running on :8000?</div>
+            <div className="panel bad-bg">Error: {error}. Is the backend running on :8008?</div>
           )}
 
           {spot && (

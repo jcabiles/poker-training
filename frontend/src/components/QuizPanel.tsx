@@ -54,7 +54,7 @@ export default function QuizPanel({ kind }: { kind: QuizKind }) {
   };
 
   if (error)
-    return <div className="panel bad-bg">Error: {error}. Is the backend running on :8000?</div>;
+    return <div className="panel bad-bg">Error: {error}. Is the backend running on :8008?</div>;
   if (!item) return <div className="panel">Loading…</div>;
 
   return (
