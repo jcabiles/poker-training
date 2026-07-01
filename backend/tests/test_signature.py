@@ -116,3 +116,74 @@ def test_preflop_signature_ignores_new_range_fields():
     base = make_rfi_spot()
     with_ranges = base.model_copy(update={"hero_range": "AA", "villain_range": "KK"})
     assert spot_signature(base) == spot_signature(with_ranges)
+
+
+# --- Phase 2b: faced-bet bucket in the postflop signature ---
+
+
+def _vs_cbet_spot(board, cbet, flop_pot=6.0, spr=5.0):
+    from app.domain.spot import (
+        ActionType,
+        GameConfig,
+        Hero,
+        HistoryAction,
+        LegalAction,
+        NodeContext,
+        PlayerState,
+        Spot,
+        Stakes,
+        Street,
+    )
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=0.5, bb=1.0), table_size=9),
+        street=Street.FLOP,
+        board=board,
+        pot_bb=flop_pot + cbet,
+        hero=Hero(position=Position.BB, hole_cards=("Ah", "Kh"), stack_bb=100),
+        players=[
+            PlayerState(position=Position.BB, stack_bb=100, is_hero=True),
+            PlayerState(position=Position.BTN, stack_bb=100),
+        ],
+        effective_stack_bb=100,
+        spr=spr,
+        to_act=Position.BB,
+        node_context=[NodeContext.VS_CBET],
+        facing=Position.BTN,
+        action_history=[
+            HistoryAction(street=Street.FLOP, position=Position.BTN, action=ActionType.BET, amount_bb=cbet),
+        ],
+        legal_actions=[LegalAction(action=ActionType.CALL, min_bb=cbet)],
+    )
+
+
+def test_faced_bet_size_changes_signature():
+    small = spot_signature(_vs_cbet_spot(["As", "Kd", "2c"], cbet=2.0))   # 33% of 6
+    big = spot_signature(_vs_cbet_spot(["As", "Kd", "2c"], cbet=4.5))     # 75% of 6
+    assert small != big  # small vs big c-bet must not collapse to one SRS item
+
+
+def test_same_faced_bet_same_signature():
+    a = spot_signature(_vs_cbet_spot(["As", "Kd", "2c"], cbet=2.0))
+    b = spot_signature(_vs_cbet_spot(["Ah", "Qd", "3c"], cbet=2.0))  # same texture+size
+    assert a == b
+
+
+def test_vs_cbet_distinct_from_cbet_node():
+    assert spot_signature(_vs_cbet_spot(["As", "Kd", "2c"], cbet=2.0)) != spot_signature(
+        _flop_spot(["As", "Kd", "2c"])
+    )
+
+
+# --- Phase 2c: srs_signature is metadata, excluded from the hash ---
+
+
+def test_srs_signature_excluded_from_hash():
+    base = make_rfi_spot()
+    assert spot_signature(base) == spot_signature(
+        base.model_copy(update={"srs_signature": "deadbeef0000"})
+    )
+    flop = _flop_spot(["As", "Kd", "2c"])
+    assert spot_signature(flop) == spot_signature(
+        flop.model_copy(update={"srs_signature": "x"})
+    )

@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Poker Training API", version="0.1.0", lifespan=lifespan)
 
-# Dev: Vite (5173) -> FastAPI (8000) is cross-origin. In prod the SPA is
+# Dev: Vite (5173) -> FastAPI (8008) is cross-origin. In prod the SPA is
 # served same-origin and this is a no-op.
 app.add_middleware(
     CORSMiddleware,

@@ -92,6 +92,122 @@ def test_postflop_mode_returns_flop_spot_no_grid(client):
     assert spot.hero_range and spot.villain_range
 
 
+def test_postflop_due_row_graduates_via_review(client, temp_engine):
+    from datetime import date, timedelta
+    from factories import make_cbet_spot
+
+    # 1. grade a postflop spot (with strong hand so check is acceptable) -> creates exactly one SRS row
+    spot = make_cbet_spot(hole_cards=("Kh", "Kd")).model_dump(mode="json")
+    client.post("/api/v1/drill/grade", json={"spot": spot, "action": {"action": "check"}})
+    with Session(temp_engine) as s:
+        rows = list(s.exec(select(SRSItemRow)))
+        assert len(rows) == 1
+        row = rows[0]
+        sig = row.signature
+        row.due_date = date.today() - timedelta(days=1)  # backdate so it's due
+        s.add(row)
+        s.commit()
+
+    # 2. review serves a postflop spot carrying the SRS-key override
+    review = client.get("/api/v1/drill/next?mode=review").json()["spot"]
+    assert review["street"] == "flop"
+    assert review["srs_signature"] == sig
+
+    # 3. re-grade the review spot -> the SAME row graduates; NO new row is created
+    #    (even though the reconstructed board's own signature may differ)
+    client.post("/api/v1/drill/grade", json={"spot": review, "action": {"action": "check"}})
+    with Session(temp_engine) as s:
+        rows = list(s.exec(select(SRSItemRow)))
+        assert len(rows) == 1
+        assert rows[0].signature == sig
+        assert rows[0].repetitions >= 1
+
+
+def test_vs_cbet_mode_grades_and_persists(client, temp_engine):
+    body = client.get("/api/v1/drill/next?mode=vs_cbet").json()
+    spot = Spot.model_validate(body["spot"])
+    assert spot.street.value == "flop"
+    assert "vs_cbet" in spot.node_context
+    assert body["grid"] == {}
+    resp = client.post(
+        "/api/v1/drill/grade",
+        json={"spot": body["spot"], "action": {"action": "call"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["leak_category"] == 201  # VS_CBET
+    with Session(temp_engine) as s:
+        assert len(list(s.exec(select(DrillAttempt)))) == 1
+
+
+def test_vs_check_raise_mode_returns_flop_spot(client):
+    body = client.get("/api/v1/drill/next?mode=vs_check_raise").json()
+    spot = Spot.model_validate(body["spot"])
+    assert spot.street.value == "flop"
+    assert len(spot.board) == 3
+    assert "vs_check_raise" in spot.node_context
+    assert body["grid"] == {}  # grid is preflop-only
+    # hero (the original aggressor) faces a fold/call/raise decision
+    legal = {la.action.value for la in spot.legal_actions}
+    assert {"fold", "call", "raise"} <= legal
+
+
+def test_vs_check_raise_mode_grades_and_persists(client, temp_engine):
+    body = client.get("/api/v1/drill/next?mode=vs_check_raise").json()
+    spot = Spot.model_validate(body["spot"])
+    assert spot.street.value == "flop"
+    assert "vs_check_raise" in spot.node_context
+    assert body["grid"] == {}
+    resp = client.post(
+        "/api/v1/drill/grade",
+        json={"spot": body["spot"], "action": {"action": "call"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["leak_category"] == 202  # VS_CHECK_RAISE
+    with Session(temp_engine) as s:
+        assert len(list(s.exec(select(DrillAttempt)))) == 1
+
+
+def test_vs_check_raise_due_row_graduates_via_review(client, temp_engine):
+    from datetime import date, timedelta
+    from factories import make_check_raise_spot
+
+    # 1. grade a check-raise spot (top two pair -> a natural call) -> exactly one SRS row
+    spot = make_check_raise_spot().model_dump(mode="json")
+    graded = client.post(
+        "/api/v1/drill/grade", json={"spot": spot, "action": {"action": "call"}}
+    )
+    assert graded.status_code == 200
+    assert graded.json()["leak_category"] == 202
+    with Session(temp_engine) as s:
+        rows = list(s.exec(select(SRSItemRow)))
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.node_context == "vs_check_raise"
+        sig = row.signature
+        row.due_date = date.today() - timedelta(days=1)  # backdate so it's due
+        s.add(row)
+        s.commit()
+
+    # 2. review serves a RECONSTRUCTED check-raise spot carrying the SRS-key override
+    review = client.get("/api/v1/drill/next?mode=review").json()["spot"]
+    assert review["street"] == "flop"
+    assert "vs_check_raise" in review["node_context"]
+    assert review["srs_signature"] == sig
+
+    # 3. re-grade the review spot -> the SAME row graduates; NO new row is created
+    #    (even though the reconstructed board's own signature may differ). We assert
+    #    the backdated (due-yesterday) row was rescheduled FORWARD rather than
+    #    repetitions>=1: the reconstructed spot has a random board+hand, so "call"
+    #    vs a check-raise may score as a failed recall (SM-2 resets reps to 0). The
+    #    real graduation guarantee is that re-grading routed to the SAME row.
+    client.post("/api/v1/drill/grade", json={"spot": review, "action": {"action": "call"}})
+    with Session(temp_engine) as s:
+        rows = list(s.exec(select(SRSItemRow)))
+        assert len(rows) == 1  # no new row from the reconstructed board's own signature
+        assert rows[0].signature == sig
+        assert rows[0].due_date >= date.today()  # re-graded -> rescheduled off yesterday
+
+
 def test_postflop_grade_persists_and_grades(client, temp_engine):
     spot = client.get("/api/v1/drill/next?mode=postflop").json()["spot"]
     resp = client.post(

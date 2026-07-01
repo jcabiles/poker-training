@@ -16,7 +16,7 @@ import hashlib
 
 from pydantic import BaseModel, Field
 
-from app.domain.spot import Spot, Street
+from app.domain.spot import ActionType, Spot, Street
 
 DEFAULT_EASE = 2.5
 
@@ -68,14 +68,51 @@ def spot_signature(spot: Spot) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+def faced_bet_bucket(spot: Spot) -> str:
+    """Coarse bucket for the bet hero is FACING, as a fraction of the pre-bet pot.
+
+    Reads the CURRENT decision point from `spot.legal_actions` (the amount hero
+    must call right now) rather than scanning `action_history` for a historical
+    max — this handles a facing `RAISE` (check-raise) as well as a facing `BET`,
+    and does not get confused by bets on earlier streets.
+
+    'none' when hero is the bettor (no CALL option — no opponent bet/raise to
+    face). Keeps a small/big bet on the same texture in SEPARATE SRS items — the
+    correct defense differs by size, so they must not collapse to one bucket.
+
+    The pre-bet pot subtracts `hero_prior_this_street`: hero's own BET/RAISE
+    amounts already invested on the current street. For a first bet (facing a
+    c-bet), this is 0, so the formula reduces exactly to `pot_bb - faced`. For a
+    check-raise, hero already put in a bet this street before villain raised, so
+    that prior investment must come back out of the pot to recover the pot the
+    raise is actually sized against.
+    """
+    faced = next(
+        (la.min_bb for la in spot.legal_actions if la.action == ActionType.CALL),
+        None,
+    )
+    if faced is None or faced <= 0:
+        return "none"
+    hero_prior_this_street = sum(
+        h.amount_bb
+        for h in spot.action_history
+        if h.street == spot.street
+        and h.position == spot.hero.position
+        and h.action in (ActionType.BET, ActionType.RAISE)
+    )
+    pre_bet_pot = spot.pot_bb - faced - hero_prior_this_street
+    return "small" if faced <= 0.5 * pre_bet_pot else "big"
+
+
 def _postflop_signature(spot: Spot) -> str:
-    """Postflop signature — keyed on texture CLASS + SPR bucket, not the exact
-    board or hole cards, so same-archetype flops collapse to one SRS item."""
+    """Postflop signature — keyed on texture CLASS + SPR bucket + faced-bet
+    bucket, not the exact board or hole cards, so same-archetype flops collapse
+    to one SRS item (but small vs big faced bets stay separate)."""
     from app.domain.texture import classify
 
     ctx = ",".join(sorted(c.value for c in spot.node_context))
     facing = spot.facing.value if spot.facing else "-"
-    tex = classify(spot.board).texture_class if len(spot.board) >= 3 else "-"
+    tex = classify(spot.board[:3]).texture_class if len(spot.board) >= 3 else "-"
     parts = [
         spot.game.variant,
         spot.game.format,
@@ -85,6 +122,7 @@ def _postflop_signature(spot: Spot) -> str:
         facing,
         tex,
         spr_bucket(spot.spr),
+        faced_bet_bucket(spot),
     ]
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]

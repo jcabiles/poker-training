@@ -53,3 +53,69 @@ def test_exploit_attempt_persists_villain_type(engine):
     with Session(engine) as s:
         row = record_attempt(s, spot, "optimal", leak_category=301)
     assert row.villain_type == "nit"
+
+
+# --- Phase 2c: postflop archetype persistence + override ---
+import random  # noqa: E402
+
+from sqlmodel import select  # noqa: E402
+
+from app.db.models import SRSItemRow  # noqa: E402
+from app.domain.scenarios import build_cbet_spot, build_vs_cbet_spot  # noqa: E402
+from app.domain.srs import spot_signature  # noqa: E402
+
+
+def test_cbet_attempt_persists_archetype(engine):
+    spot = build_cbet_spot(random.Random(1), eff_bb=100.0)
+    with Session(engine) as s:
+        row = record_attempt(s, spot, "optimal", 200)
+    assert row.street == "flop"
+    assert row.texture_class and row.spr_bucket
+    assert row.faced_bet_bucket == "none"  # hero is the bettor
+
+
+def test_vs_cbet_attempt_persists_faced_bucket(engine):
+    spot = build_vs_cbet_spot(random.Random(2), eff_bb=100.0, cbet_frac=0.75)
+    with Session(engine) as s:
+        row = record_attempt(s, spot, "mistake", 201)
+    assert row.street == "flop"
+    assert row.faced_bet_bucket in ("small", "big")
+
+
+def test_preflop_attempt_has_null_buckets(engine):
+    spot = make_rfi_spot(position=Position.CO)
+    with Session(engine) as s:
+        row = record_attempt(s, spot, "optimal", 102)
+    assert row.street == "preflop"
+    assert row.texture_class is None and row.faced_bet_bucket is None
+
+
+def test_legacy_null_row_backfills(engine):
+    spot = build_cbet_spot(random.Random(4), eff_bb=100.0)
+    sig = spot_signature(spot)
+    with Session(engine) as s:
+        s.add(
+            SRSItemRow(
+                signature=sig,
+                node_context="cbet",
+                position=spot.hero.position.value,
+                facing=spot.facing.value if spot.facing else None,
+            )
+        )
+        s.commit()
+        row = record_attempt(s, spot, "optimal", 200)
+    assert row.street == "flop"
+    assert row.texture_class is not None  # backfilled on next attempt
+
+
+def test_srs_signature_override_routes_to_named_row(engine):
+    spot = build_cbet_spot(random.Random(6), eff_bb=100.0)
+    with Session(engine) as s:
+        first = record_attempt(s, spot, "optimal", 200)
+        n1 = len(list(s.exec(select(SRSItemRow))))
+        other = build_vs_cbet_spot(random.Random(7), eff_bb=100.0)
+        other.srs_signature = first.signature
+        assert spot_signature(other) != first.signature
+        second = record_attempt(s, other, "optimal", 201)
+        assert second.signature == first.signature
+        assert len(list(s.exec(select(SRSItemRow)))) == n1  # no new row created

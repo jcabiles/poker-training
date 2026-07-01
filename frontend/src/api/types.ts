@@ -33,6 +33,7 @@ export interface Spot {
   villain_type?: string | null;
   hero_range?: string | null;
   villain_range?: string | null;
+  srs_signature?: string | null; // SRS-key override for review spots; echoed back on grade
   action_history: HistoryAction[];
 }
 
@@ -83,7 +84,14 @@ export interface StatsSummary {
   trend: number;
 }
 
-export type Mode = "random" | "review" | "leak_focus" | "exploit" | "postflop";
+export type Mode =
+  | "random"
+  | "review"
+  | "leak_focus"
+  | "exploit"
+  | "postflop"
+  | "vs_cbet"
+  | "vs_check_raise";
 
 // --- Foundational quizzes (Phase 2a) ---
 export type QuizKind = "texture" | "equity";

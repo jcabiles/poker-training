@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlmodel import Session, select
 
@@ -51,7 +51,9 @@ def _accuracy(items: list[DrillAttempt]) -> float:
 
 
 def summary(session: Session, today: date | None = None) -> dict:
-    today = today or date.today()
+    # DrillAttempt.created_at is stamped in UTC; compare the streak in UTC too so
+    # "today" matches the stored dates (avoids a UTC-vs-local date-boundary gap).
+    today = today or datetime.now(UTC).date()
     rows = list(session.exec(select(DrillAttempt)))
     ordered = sorted(rows, key=lambda r: r.created_at)
 

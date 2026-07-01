@@ -44,6 +44,11 @@ class SRSItemRow(SQLModel, table=True):
     limper_count: int = 0
     villain_type: str | None = Field(default=None)
     leak_category: int | None = Field(default=None)
+    # Postflop archetype (Phase 2c) — nullable; preflop rows leave these NULL.
+    street: str | None = Field(default=None)
+    texture_class: str | None = Field(default=None)
+    spr_bucket: str | None = Field(default=None)
+    faced_bet_bucket: str | None = Field(default=None)
     ease_factor: float = 2.5
     interval_days: int = 0
     repetitions: int = 0

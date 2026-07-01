@@ -1,7 +1,7 @@
 # Poker Training App — Phase 0 Roadmap
 
 > Living planning document. Built from four research streams (see `docs/research/`).
-> Status: **Phases 0, 1a, 1b, 1c complete & verified.** **Phase 2a (first postflop slice: flop c-bet + foundational drills) built & verified** — 128 backend tests green; `scripts/verify.sh` → `BACKEND VERIFY OK`. Adds a pure-Python equity engine, a board-texture classifier, a dedicated flop c-bet grader (texture + positional range-advantage heuristic, not equity-backed), a `CompositeProvider` (route by street), a flop-c-bet drill mode, and two foundational quizzes (texture classification, equity estimation). Postflop spots get a texture/SPR-bucketed signature; preflop hashes unchanged; no new DB migration. Remaining slices: Phase 2b (turn / facing-a-c-bet / check-raise + equity-backed range advantage), squeeze (multiway), mastery-gating.
+> Status: **Phases 0, 1a, 1b, 1c, 2a, 2b, 2c complete & verified** — 148 backend tests green; `scripts/verify.sh` → `BACKEND VERIFY OK`; migration 0004 head. **2d investigated → deferred to Phase 3** (equity-backed range advantage; see below). Flop c-bet + vs-c-bet spots re-surface in `mode=review` via SM-2. **Next: 2e–2k (turn/river/multiway/full-hand), sequenced by dependency — see the Phase 2 section below and `contracts/postflop-turn-river.md`.**
 
 ---
 
@@ -95,11 +95,20 @@ The complete learning loop, preflop content only.
 
 ### Phase 2 — Postflop expansion
 - **2a (DONE):** flop c-bet (HU SRP) graded by texture + positional range-advantage; pure-Python equity engine; board-texture classifier; `CompositeProvider` route-by-street; flop-c-bet drill mode; foundational quizzes (texture classification, equity estimation); postflop leak buckets (200/210/211); texture/SPR-bucketed postflop signature.
-- **2b (next):** turn play, facing a c-bet, check-raise; **equity-backed** range advantage (range-vs-range); postflop SRS review mode (texture/SPR columns).
-- **2c:** river value/bluff, multiway, simplified math surfaced (rule of 2&4, pot odds, MDF); **full-hand (preflop→river)** drill mode.
-- Postflop heuristics: c-bet by texture, barreling, river value/bluff, multiway, simplified math.
-- New drill modes: **street**, **full-hand**; drills for line construction, hand-reading, multiway.
-- Extend leak taxonomy + analytics + mastery ladder to postflop.
+- **2b (DONE):** facing a flop c-bet (HU SRP defense) — fold/call/raise graded by texture + defender-perspective range advantage + pot-odds/MDF + bet-size; `vs_cbet` drill mode; faced-bet bucket in the postflop signature; leak `VS_CBET=201`.
+- **2c (DONE):** postflop SRS review — flop c-bet + vs-c-bet spots re-surface in `mode=review` via SM-2 (4 nullable `srs_item` columns, migration 0004, archetype reconstruction, `srs_signature` graduation override). First migration since 1c.
+- **2d (INVESTIGATED → DEFERRED to Phase 3):** equity-backed range advantage. Bounded Monte-Carlo over the heuristic ranges does not recover a stable signal (mean equity flat ~0.5; strong-share width-biased; top-of-range noisy/counterintuitive). Real range advantage is a solver/EV property → revisit with Phase 3 solver tables. Positional+texture heuristic retained. See `tickets/phase-2d-equity-backed.md`.
+- **2e–2k (planned; sequenced by dependency, one epic per session — see `contracts/postflop-turn-river.md`):** turn/river coverage + multiway + full-hand mode. There is currently NO street-level dispatch past preflop (flop/turn/river all hit the same provider), and 5 call sites silently truncate any board to its first 3 cards — this must be fixed before turn/river grading is safe, not worked around per-feature.
+  - **2e-0 — Foundational fixes** *(DONE & verified — 163 tests green, `BACKEND VERIFY OK`)*: raise-aware `srs.faced_bet_bucket()` rewrite (reads current `CALL.min_bb` + subtracts hero's prior street investment, not a history max-scan); `postflop._hand_category()` fix (added made-straight/made-flush detection AND demoted plain top pair from `strong` to `weak_made` — a live bug already in shipped 2b, caught by the refuter pass); street-gated `PostflopHeuristicProvider.supports()` (turn/river now → `NOT_FOUND`, no longer silently graded as a flop); all 5 `texture.classify()` call sites now slice `board[:3]` explicitly.
+  - **2e-1 — Facing a flop check-raise** *(DONE & verified — 183 tests green, `BACKEND VERIFY OK`)*: hero c-bet, defender check-raised, hero responds fold/call/raise (sized 4-bet). New `grade_vs_check_raise` grader encodes the "$1/$2 check-raises are rarely bluffs" prior as a genuinely stronger fold baseline (1.6 vs vs-cbet's 0.6 — verified: a weak_made hand folds ~0.69 here vs ~0.55 vs a plain c-bet); `build_check_raise_spot` builder with the incremental-`CALL` sizing the refuter caught (`raise_to − cbet`, not the raw total); `vs_check_raise` drill mode + SRS-review reconstruction; leak `VS_CHECK_RAISE=202`; frontend "Facing check-raise" mode + a street-scoped betting-line verb fix (a flop check-raise no longer mislabels as "3-bets"). Closes the flop c-bet loop.
+  - **2f — Turn barrel** *(needs 2e-0)*: aggressor's 2nd-bet decision — scare-card / picked-up-equity / capped-range logic per `docs/research/02-postflop-strategy.md` §5.1–5.2. `range_advantage()`'s `node_context` param is currently dead code — this needs real new scoring, not just a new tag. ~7 tickets.
+  - **2g — Facing a turn bet** *(needs 2e-0, 2f)*: defender fold/call/raise vs the barrel. ~6 tickets.
+  - **2h — River value/bluff** *(needs 2e-0 — `_hand_category` fix is a hard prereq)*: value betting + blocker-aware bluff selection per §6.1–6.3. Genuinely new domain code (blocker logic touches hole-card/board suit-rank overlap, not just merit scoring). ~7-8 tickets.
+  - **2i — Facing a river bet** *(needs 2h)*: bluff-catching per §6.4 (blockers + range-capping reads). ~6-7 tickets.
+  - **2j — Multiway adjustments** *(needs 2e-1 through 2i)*: cross-cutting sizing/frequency modifier (research §9) touching every grader above — sequenced last-but-one because it changes a moving target if done earlier. ~6-8 tickets.
+  - **2k — Full-hand (preflop→river) drill mode** *(needs everything above)*: pure drill-engine/UI orchestration routing hero through the existing graders across one continuous hand — mechanically last, not a judgment call. ~5-6 tickets.
+  - ~53 tickets total across 8 epics — larger than 2a+2b+2c combined; each epic ships as its own spec → tickets → build → verify cycle, matching how every phase 0–2c was actually built (never batched).
+- Extend leak taxonomy (postflop 200–299, 96 numbers free) + analytics + mastery ladder as each epic lands.
 
 ### Phase 3 — Solver-grade strategy (swap-in)
 - `SolverTableProvider` implementing the same interface: precomputed solver tables, board isomorphism + bet-size bucketing, spot keying.

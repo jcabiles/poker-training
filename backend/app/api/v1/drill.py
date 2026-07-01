@@ -1,6 +1,7 @@
 """Drill endpoints.
 
-GET  /drill/next?mode=random|review|leak_focus|exploit|postflop -> a Spot to solve.
+GET  /drill/next?mode=<mode> -> a Spot to solve.
+     modes: random|review|leak_focus|exploit|postflop|vs_cbet|vs_check_raise
 POST /drill/grade -> grade via the StrategyProvider, persist the attempt, update SM-2.
 GET  /drill/quiz/next?kind=texture|equity|random -> a foundational quiz item.
 POST /drill/quiz/grade -> grade a quiz answer, persist it (provider="quiz").
@@ -23,13 +24,19 @@ from app.domain.grading import archetype_leak, leak_category_for, range_grid
 from app.domain.leaks import LeakCategory
 from app.domain.providers import get_provider
 from app.domain.scenarios import (
+    _DEPTHS,
+    build_cbet_spot,
+    build_check_raise_spot,
     build_spot,
+    build_vs_cbet_spot,
     sample_cbet_spot,
+    sample_check_raise_spot,
     sample_exploit_spot,
     sample_spot,
+    sample_vs_cbet_spot,
 )
 from app.domain.spot import NodeContext, Position, Spot, Street
-from app.domain.srs import spot_signature
+from app.domain.srs import faced_bet_bucket, spot_signature, spr_bucket
 from app.domain.texture import classify
 from app.schemas.drill import (
     GradeRequest,
@@ -68,10 +75,83 @@ def _next_postflop() -> Spot:
     return sample_cbet_spot(_RNG)
 
 
+def _next_vs_cbet() -> Spot:
+    return sample_vs_cbet_spot(_RNG)
+
+
+def _next_vs_check_raise() -> Spot:
+    return sample_check_raise_spot(_RNG)
+
+
+_POSTFLOP_CTX = (NodeContext.CBET, NodeContext.VS_CBET, NodeContext.VS_CHECK_RAISE)
+
+
+def _rebuild_postflop(row) -> Spot | None:
+    """Reconstruct a postflop spot of the row's archetype (node + position +
+    texture/SPR/faced-bet bucket) by rejection-sampling the 2a/2b builders.
+    Tag it with the row's signature so re-grading graduates THIS row regardless
+    of the reconstructed board's own (possibly-different) signature."""
+    try:
+        pos = Position(row.position)
+    except ValueError:
+        return None
+    if row.node_context == NodeContext.CBET.value:
+        def build() -> Spot:
+            return build_cbet_spot(_RNG, pairing=(pos, Position.BB), eff_bb=_RNG.choice(_DEPTHS))
+    elif row.node_context == NodeContext.VS_CBET.value and row.facing:
+        try:
+            opener = Position(row.facing)
+        except ValueError:
+            return None
+        frac = 0.33 if row.faced_bet_bucket == "small" else 0.75
+        def build() -> Spot:
+            return build_vs_cbet_spot(
+                _RNG, pairing=(opener, Position.BB), eff_bb=_RNG.choice(_DEPTHS), cbet_frac=frac
+            )
+    elif row.node_context == NodeContext.VS_CHECK_RAISE.value and row.facing:
+        # Hero is the OPENER/aggressor here (`pos` == row.position), like the CBET
+        # branch — NOT the caller as in vs_cbet; the check-raiser (villain) is the
+        # BB (row.facing). Unlike vs_cbet (where cbet_frac maps 1:1 to the faced-bet
+        # bucket), the check-raise faced-bet bucket depends on the INTERACTION of the
+        # internally randomized c-bet size and the raise multiple, so no fixed
+        # raise_mult deterministically hits `row.faced_bet_bucket`. Leave raise_mult
+        # to randomize; the rejection-sampling loop below + the srs_signature
+        # override still graduate THIS row regardless of the reconstructed board's
+        # own bucket.
+        def build() -> Spot:
+            return build_check_raise_spot(
+                _RNG, pairing=(pos, Position.BB), eff_bb=_RNG.choice(_DEPTHS), raise_mult=None
+            )
+    else:
+        return None
+
+    candidates = [build() for _ in range(150)]
+    target = (row.texture_class, row.spr_bucket, row.faced_bet_bucket)
+
+    def _key(s: Spot):
+        return (classify(s.board[:3]).texture_class, spr_bucket(s.spr), faced_bet_bucket(s))
+
+    chosen = (
+        next((s for s in candidates if _key(s) == target), None)  # tier a: exact
+        or next((s for s in candidates if classify(s.board[:3]).texture_class == row.texture_class), None)  # tier b
+        or candidates[0]  # tier c: same node + position
+    )
+    chosen.srs_signature = row.signature
+    return chosen
+
+
 def _next_review(session: Session) -> Spot:
     for row in due_items(session):
         try:
             ctx = NodeContext(row.node_context)
+        except ValueError:
+            continue
+        if ctx in _POSTFLOP_CTX:
+            spot = _rebuild_postflop(row)
+            if spot is not None:
+                return spot
+            continue
+        try:
             pos = Position(row.position)
             facing = Position(row.facing) if row.facing else None
             villain = VillainType(row.villain_type) if row.villain_type else None
@@ -80,7 +160,7 @@ def _next_review(session: Session) -> Spot:
         entry = _INDEX.get((ctx, pos, facing, row.limper_count or 0, villain))
         if entry is not None:
             return build_spot(entry, _RNG)
-    return _next_random()  # nothing due -> fall back
+    return _next_random()  # nothing due / reconstructable -> fall back
 
 
 def _next_leak_focus(session: Session) -> Spot:
@@ -105,6 +185,10 @@ async def next_drill(
         spot = _next_exploit()
     elif mode == "postflop":
         spot = _next_postflop()
+    elif mode == "vs_cbet":
+        spot = _next_vs_cbet()
+    elif mode == "vs_check_raise":
+        spot = _next_vs_check_raise()
     else:
         spot = _next_random()
     # range_grid is preflop-only; the frontend hides the grid for postflop spots.
@@ -119,9 +203,12 @@ async def grade_drill(
 ) -> EvaluationResult:
     result = await _provider.evaluate(req.spot, req.action)
     correctness = result.correctness.value if result.correctness else None
+    # Honor the SRS-key override (review spots) so the attempt + SRS update key the
+    # same archetype row. record_attempt reads req.spot.srs_signature internally.
+    sig = req.spot.srs_signature or spot_signature(req.spot)
     session.add(
         DrillAttempt(
-            spot_signature=spot_signature(req.spot),
+            spot_signature=sig,
             leak_category=result.leak_category,
             chosen_action=req.action.action.value,
             correctness=correctness,
@@ -185,7 +272,7 @@ async def quiz_next(kind: str = Query("random")) -> QuizItem:
 @router.post("/quiz/grade", response_model=QuizResult)
 async def quiz_grade(ans: QuizAnswer, session: Session = Depends(get_session)) -> QuizResult:
     if ans.kind == "texture":
-        tex = classify(ans.board)
+        tex = classify(ans.board[:3])
         choice = (ans.choice or "").strip().lower()
         correctness, correct = _grade_texture(choice, tex.wetness)
         leak = int(LeakCategory.BOARD_TEXTURE)

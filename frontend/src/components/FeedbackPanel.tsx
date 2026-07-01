@@ -27,8 +27,13 @@ export default function FeedbackPanel({
       <ul className="mix">
         {result.per_action.map((a, i) => (
           <li key={i}>
-            <b>{a.action}</b> {Math.round(a.frequency * 100)}% · EV {a.ev_bb}bb
-            {a.action === result.best_action.action && <span className="best">best</span>}
+            <b>
+              {a.action}
+              {a.size_bb ? ` ${a.size_bb}bb` : ""}
+            </b>{" "}
+            {Math.round(a.frequency * 100)}% · EV {a.ev_bb}bb
+            {a.action === result.best_action.action &&
+              a.size_bb === result.best_action.size_bb && <span className="best"> best</span>}
           </li>
         ))}
       </ul>

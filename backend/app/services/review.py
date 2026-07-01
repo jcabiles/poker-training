@@ -11,8 +11,24 @@ from datetime import UTC, date, datetime, timedelta
 from sqlmodel import Session, select
 
 from app.db.models import SRSItemRow
-from app.domain.spot import Spot
-from app.domain.srs import quality_from_correctness, sm2, spot_signature
+from app.domain.spot import Spot, Street
+from app.domain.srs import (
+    faced_bet_bucket,
+    quality_from_correctness,
+    sm2,
+    spot_signature,
+    spr_bucket,
+)
+from app.domain.texture import classify
+
+
+def _postflop_archetype(spot: Spot) -> tuple[str, str | None, str | None, str | None]:
+    """(street, texture_class, spr_bucket, faced_bet_bucket); buckets None for preflop."""
+    street = spot.street.value
+    if spot.street == Street.PREFLOP:
+        return street, None, None, None
+    tex = classify(spot.board[:3]).texture_class if len(spot.board) >= 3 else None  # guard <3 cards
+    return street, tex, spr_bucket(spot.spr), faced_bet_bucket(spot)
 
 
 def record_attempt(
@@ -21,8 +37,11 @@ def record_attempt(
     correctness: str | None,
     leak_category: int | None = None,
 ) -> SRSItemRow:
-    sig = spot_signature(spot)
+    # Honor an SRS-key override (a reconstructed review spot graduates the SAME row
+    # it was rebuilt from, regardless of the reconstructed board's own signature).
+    sig = spot.srs_signature or spot_signature(spot)
     quality = quality_from_correctness(correctness)
+    street, tex, sprb, facedb = _postflop_archetype(spot)
     row = session.get(SRSItemRow, sig)
     if row is None:
         row = SRSItemRow(
@@ -33,6 +52,17 @@ def record_attempt(
             limper_count=spot.limper_count,
             villain_type=spot.villain_type.value if spot.villain_type else None,
             leak_category=leak_category,
+            street=street,
+            texture_class=tex,
+            spr_bucket=sprb,
+            faced_bet_bucket=facedb,
+        )
+    elif row.street is None:  # backfill legacy / pre-2c rows on their next attempt
+        row.street, row.texture_class, row.spr_bucket, row.faced_bet_bucket = (
+            street,
+            tex,
+            sprb,
+            facedb,
         )
     ease, interval, reps = sm2(row.ease_factor, row.interval_days, row.repetitions, quality)
     row.ease_factor, row.interval_days, row.repetitions = ease, interval, reps
@@ -47,4 +77,8 @@ def record_attempt(
 
 def due_items(session: Session, today: date | None = None) -> list[SRSItemRow]:
     today = today or date.today()
-    return list(session.exec(select(SRSItemRow).where(SRSItemRow.due_date <= today)))
+    return list(
+        session.exec(
+            select(SRSItemRow).where(SRSItemRow.due_date <= today).order_by(SRSItemRow.due_date)
+        )
+    )

@@ -31,6 +31,8 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "leak_focus", label: "Leak focus" },
   { id: "exploit", label: "Exploit" },
   { id: "postflop", label: "Postflop (c-bet)" },
+  { id: "vs_cbet", label: "Facing c-bet" },
+  { id: "vs_check_raise", label: "Facing check-raise" },
 ];
 
 export default function App() {
@@ -155,7 +157,7 @@ export default function App() {
           </div>
 
           {error && (
-            <div className="panel bad-bg">Error: {error}. Is the backend running on :8000?</div>
+            <div className="panel bad-bg">Error: {error}. Is the backend running on :8008?</div>
           )}
 
           {spot && (

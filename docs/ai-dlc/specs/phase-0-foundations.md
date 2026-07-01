@@ -88,7 +88,7 @@ No SRS / leak analytics / exploit logic yet (Phase 1) — just the wiring + ever
 - Frontend: React 18 + TypeScript + Vite.
 - **OpenAPI-typed client = `openapi-typescript` (types) + `openapi-fetch` (tiny typed client)** *(refuter should-fix #3)* — type-only generation, no heavy codegen toolchain to conflict with tsconfig. Both are npm deps (see sandbox note).
 - API versioned under `/api/v1`; OpenAPI auto-generated.
-- **CORS middleware** *(refuter should-fix #2)* allows `http://localhost:5173` (Vite dev) → `http://localhost:8000` (FastAPI) in dev, or the app is served same-origin in prod.
+- **CORS middleware** *(refuter should-fix #2)* allows `http://localhost:5173` (Vite dev) → `http://localhost:8008` (FastAPI) in dev, or the app is served same-origin in prod.
 - **Migrations auto-run on app startup** in local/dev (`alembic upgrade head` on boot) *(refuter should-fix #4)* so a clean checkout never hits a schema-less SQLite file; a manual `alembic upgrade head` target also exists.
 - Domain core importable with zero web/DB deps (enforced by a test that imports `domain` alone).
 
