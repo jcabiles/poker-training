@@ -11,7 +11,9 @@
   margin-bottom: calc(var(--space) * 2);
 }
 .topbar h1 {
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 600;
   margin: 0;
 }
 .tag {
@@ -131,6 +133,7 @@
   border-color: var(--primary);
 }
 kbd {
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -236,9 +239,12 @@ kbd {
   padding-top: var(--space-3);
 }
 .concept-card-title {
+  /* Display serif at exactly --text-base (15px) — the floor for the serif;
+     nothing smaller ever uses --font-display. */
+  font-family: var(--font-display);
   margin: 0 0 var(--space-1);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
 }
 .concept-card-summary {
   margin: 0 0 var(--space-2);
@@ -580,7 +586,9 @@ kbd {
   gap: calc(var(--space) * 2);
 }
 .home-section-title {
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 600;
   margin: 0 0 var(--space);
 }
 .home-due-count {
