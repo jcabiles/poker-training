@@ -19,6 +19,11 @@ const MODE_IDS: readonly Mode[] = [
   "postflop",
   "vs_cbet",
   "vs_check_raise",
+  "rfi",
+  "vs_rfi",
+  "blind_defense",
+  "vs_limpers",
+  "vs_3bet",
 ];
 
 export interface Route {

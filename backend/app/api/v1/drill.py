@@ -2,6 +2,7 @@
 
 GET  /drill/next?mode=<mode> -> a Spot to solve.
      modes: random|review|leak_focus|exploit|postflop|vs_cbet|vs_check_raise|challenge
+            |rfi|vs_rfi|blind_defense|vs_limpers|vs_3bet (preflop-family path nodes)
 POST /drill/grade -> grade via the StrategyProvider, persist the attempt, update SM-2.
 GET  /drill/quiz/next?kind=texture|equity|random -> a foundational quiz item.
 POST /drill/quiz/grade -> grade a quiz answer, persist it (provider="quiz").
@@ -170,6 +171,23 @@ def _next_review(session: Session) -> Spot:
     return _next_random()  # nothing due / reconstructable -> fall back
 
 
+# Preflop learning-path families: a drill mode per home-hub node so each node
+# deals its own strategic situation instead of falling back to `random`.
+_FAMILY_CTX: dict[str, NodeContext] = {
+    "rfi": NodeContext.RFI,
+    "vs_rfi": NodeContext.VS_RFI,
+    "blind_defense": NodeContext.BLIND_DEFENSE,
+    "vs_limpers": NodeContext.VS_LIMPERS,
+    "vs_3bet": NodeContext.VS_3BET,
+}
+
+
+def _next_family(family: str) -> Spot:
+    ctx = _FAMILY_CTX[family]
+    pool = [e for e in _BASELINE if e.node_context == ctx]
+    return build_spot(_RNG.choice(pool), _RNG) if pool else _next_random()
+
+
 def _next_leak_focus(session: Session) -> Spot:
     stats = leak_stats(session)
     if not stats:
@@ -203,6 +221,8 @@ async def next_drill(
         spot = _next_vs_check_raise()
     elif mode == "challenge":
         spot = _next_challenge(session)
+    elif mode in _FAMILY_CTX:
+        spot = _next_family(mode)
     else:
         spot = _next_random()
     # range_grid is preflop-only; the frontend hides the grid for postflop spots.

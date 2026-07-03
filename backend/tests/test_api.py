@@ -37,6 +37,24 @@ def test_next_returns_valid_spot_for_each_mode(client, mode):
     assert spot.node_context  # has at least one node tag
 
 
+@pytest.mark.parametrize(
+    "mode,ctx",
+    [
+        ("rfi", "RFI"),
+        ("vs_rfi", "vs_RFI"),
+        ("blind_defense", "blind_defense"),
+        ("vs_limpers", "vs_limpers"),
+        ("vs_3bet", "vs_3bet"),
+    ],
+)
+def test_preflop_family_mode_deals_matching_node_context(client, mode, ctx):
+    # Each home-hub path node deals its own family, not a generic random spot.
+    for _ in range(20):
+        spot = client.get(f"/api/v1/drill/next?mode={mode}").json()["spot"]
+        assert spot["villain_type"] is None
+        assert ctx in spot["node_context"]
+
+
 def test_random_mode_never_returns_exploit_spot(client):
     for _ in range(40):
         spot = client.get("/api/v1/drill/next?mode=random").json()["spot"]
