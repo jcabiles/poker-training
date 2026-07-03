@@ -106,7 +106,7 @@ and *partly* real new work (baseline preflop + all postflop are templated tautol
       correctly; FE build green. **Appetite:** ~1 small epic. **No-gos:** no new nav content yet (that's N7); no router lib
       unless justified at spec.
 
-- [ ] **N7 — Home / curriculum hub + "today's plan".** ICE 8·7·5 (needs N6, benefits from N4).
+- [x] **N7 — Home / curriculum hub + "today's plan".** *(done 2026-07-03: Home = first tab + default route (absorb); GET /review/plan surfaces due_items() read-only with family+position labels; 9-node ordered path with attempts-weighted mastery (solid ≥80% · 20+ reps); refuter pass. Known limit: 5 preflop nodes map to random mode pending a per-family /drill/next filter — see Next)* ICE 8·7·5 (needs N6, benefits from N4).
       **Problem:** flat tab pile; mastery hidden; no "what to work on next." The SM-2 due-queue (`due_items()`, already
       computed + indexed `ix_srs_item_due_date`) is invisible.
       **Outcome-link:** primary (guided improvement) + enabling (cohesion).

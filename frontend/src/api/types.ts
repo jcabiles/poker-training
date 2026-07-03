@@ -156,3 +156,16 @@ export interface ConceptCard {
 export interface CardMatchResponse {
   card: ConceptCard | null;
 }
+
+// N7 — read-only "today's plan" surfacing of the SM-2 due queue.
+export interface DuePlanItem {
+  signature: string;
+  due_date: string;
+  last_grade?: number | null;
+  label: string;
+}
+
+export interface ReviewPlanResponse {
+  due_count: number;
+  items: DuePlanItem[];
+}

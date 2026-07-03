@@ -173,6 +173,9 @@ kbd {
 .badge.warn {
   background: var(--warn);
 }
+.badge.neutral {
+  background: var(--muted);
+}
 .why {
   margin: var(--space) 0;
 }
@@ -568,4 +571,37 @@ kbd {
   border-radius: 999px;
   padding: 3px 10px;
   margin-bottom: var(--space);
+}
+
+/* N7 — home/curriculum hub */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+.home-section-title {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space);
+}
+.home-due-count {
+  margin: 0 0 var(--space);
+}
+.home-due-list {
+  margin-bottom: calc(var(--space) * 2);
+}
+.home-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space);
+  list-style: none;
+  padding: 0;
+  margin: var(--space) 0 0;
+}
+.home-path-node {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  text-align: left;
 }

@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getLeaks, getNext, getSummary, grade } from "./api/client";
+import { getLeaks, getNext, getPlan, getSummary, grade } from "./api/client";
 import type {
   ActionType,
   EvaluationResult,
   LeakStat,
   Mode,
+  ReviewPlanResponse,
   Spot,
   StatsSummary,
 } from "./api/types";
 import DecisionBar from "./components/DecisionBar";
 import FeedbackPanel from "./components/FeedbackPanel";
+import Home from "./components/Home";
 import ModeGroup from "./components/ModeGroup";
 import PokerTable from "./components/PokerTable";
 import QuizPanel from "./components/QuizPanel";
@@ -21,6 +23,7 @@ import { legalDecisions } from "./lib/decisions";
 import { formatHash, parseHash, type View } from "./lib/hashRoute";
 
 const VIEWS: { id: View; label: string }[] = [
+  { id: "home", label: "Home" },
   { id: "drill", label: "Practice" },
   { id: "texture", label: "Texture quiz" },
   { id: "equity", label: "Equity quiz" },
@@ -72,6 +75,7 @@ export default function App() {
   const [studyTestMode, setStudyTestMode] = useState<StudyTestMode>(() => readStudyTestMode());
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [leaks, setLeaks] = useState<LeakStat[]>([]);
+  const [plan, setPlan] = useState<ReviewPlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshStats = useCallback(async () => {
@@ -119,6 +123,24 @@ export default function App() {
   useEffect(() => {
     refreshStats();
   }, [refreshStats]);
+
+  // N7 — today's plan is fetched only while home is active; fire-and-forget
+  // (best-effort like stats) so home still renders with a graceful
+  // placeholder (Home treats `plan === null` as an empty due queue) if this fails.
+  useEffect(() => {
+    if (view !== "home") return;
+    let cancelled = false;
+    getPlan()
+      .then((p) => {
+        if (!cancelled) setPlan(p);
+      })
+      .catch(() => {
+        if (!cancelled) setPlan(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [view]);
 
   const selectMode = (m: Mode) => {
     if (m === mode) {
@@ -211,7 +233,9 @@ export default function App() {
         ))}
       </div>
 
-      {view === "drill" ? (
+      {view === "home" ? (
+        <Home plan={plan} leaks={leaks} />
+      ) : view === "drill" ? (
         <>
           <div className="mode-groups">
             <ModeGroup

@@ -9,6 +9,7 @@ import type {
   QuizItem,
   QuizKind,
   QuizResult,
+  ReviewPlanResponse,
   Spot,
   StatsSummary,
 } from "./types";
@@ -54,6 +55,11 @@ export async function quizGrade(answer: QuizAnswer): Promise<QuizResult> {
       body: JSON.stringify(answer),
     }),
   );
+}
+
+// N7 — today's-plan (SM-2 due queue), fire-and-forget/best-effort like stats.
+export async function getPlan(): Promise<ReviewPlanResponse> {
+  return json(await fetch(`${BASE}/review/plan`));
 }
 
 // N8 — point-of-need concept-card lookup. Callers should treat this as
