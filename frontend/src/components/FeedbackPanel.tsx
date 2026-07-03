@@ -36,7 +36,7 @@ export default function FeedbackPanel({
       aria-atomic="true"
     >
       <span className={"badge " + tone}>
-        {(result.correctness ?? "").toUpperCase()} · −{result.ev_loss_bb}bb
+        {(result.correctness ?? "").toUpperCase()} · ≈−{result.ev_loss_bb}bb
       </span>
       {result.is_mixed && (
         <p className="mixed">Mixed spot — more than one action is defensible here.</p>
@@ -50,12 +50,15 @@ export default function FeedbackPanel({
               {a.action}
               {a.size_bb ? ` ${a.size_bb}bb` : ""}
             </b>{" "}
-            {Math.round(a.frequency * 100)}% · EV {a.ev_bb}bb
+            {Math.round(a.frequency * 100)}% · EV ≈{a.ev_bb}bb
             {a.action === result.best_action.action &&
               a.size_bb === result.best_action.size_bb && <span className="best"> best</span>}
           </li>
         ))}
       </ul>
+      {/* N2/CW-2b: EVs are a heuristic proxy, not solver-exact -- the "≈"
+          prefixes above plus this note keep that honest until Phase 3. */}
+      <p className="studytest-hint">EV values are approximate (proxy, not solver-exact).</p>
       <button
         ref={nextRef}
         type="button"

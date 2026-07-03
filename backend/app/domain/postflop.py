@@ -13,6 +13,7 @@ range advantage arrives in 2b.
 from __future__ import annotations
 
 from app.domain.action import Decision
+from app.domain.equity import combos_for_range, equity_vs_range, fold_equity_ev
 from app.domain.evaluation import (
     ActionEval,
     ChosenEval,
@@ -52,6 +53,14 @@ POST_MIX = 0.20
 # range advantage is an equity-distribution + EV property solvers compute over the full
 # tree — so it waits for Phase 3 solver tables (swappable behind StrategyProvider). The
 # positional+texture heuristic below is the sound, stable simplified prior for now.
+
+# CW-2b (doc-06 §4 scope note): `_merits_vs_check_raise`'s raise_ merit deliberately
+# does NOT get the same `texture.pairing` check-raise bump that CW-2 wired into
+# `_merits_vs_cbet` — there is no solver data for hero's post-check-raise 4-bet on
+# paired boards (doc-06 only tables the *defender's* first check-raise), and this
+# function's fold-heavy live-exploit prior (see its own docstring) already
+# discourages exactly the marginal-hand raises a mistaken bump would encourage.
+# Revisit if/when solver data for this specific node lands (Phase 3).
 
 
 def _in_position(hero: Position, villain: Position) -> bool:
@@ -155,9 +164,68 @@ def _hand_category(hole: tuple[str, str], board: list[str]) -> str:
     return "air"
 
 
-def _merits(adv: str, texture: Texture, cat: str) -> tuple[float, float, float]:
-    """Return (check, bet_small, bet_big) merit scores (proxy EV, ~bb)."""
-    value = {"strong": 2.0, "weak_made": 1.0, "draw": 1.2, "air": 0.0}[cat]
+_CAT_VALUE = {"strong": 2.0, "weak_made": 1.0, "draw": 1.2, "air": 0.0}
+
+# Interim fold-equity anchoring (N2/doc-08 §3.2): defender fold-% vs the
+# original c-bet, keyed off the three board textures doc-06 §2/§4 actually
+# tabulates; anything else falls back to doc-06 §6's cited "~40% MDF-
+# equilibrium" reference point. Deliberately coarse (no solver tables) — the
+# point is grounding `value` in a real fold%+equity formula instead of a flat
+# per-category guess, not a full frequency model.
+_CBET_FOLD_PCT_PAIRED_DRY = 0.37  # doc-06 §2/§4: Q♥Q♣6♦, 33% pot
+_CBET_FOLD_PCT_MONOTONE = 0.37  # doc-06 §2: Q♦J♦T♦, 33% pot
+_CBET_FOLD_PCT_WET = 0.62  # doc-06 §2: K♥J♥7♦, 75-125% pot
+_CBET_FOLD_PCT_DEFAULT = 0.40  # doc-06 §6: bettor fold-frequency MDF-equilibrium anchor
+_FOLD_EQUITY_SCALE = 2.5  # maps per-pot fold-equity EV onto the existing merit-unit range
+_FOLD_EQUITY_ITERS = 400  # bounded MC budget -- runs inline on every grade_cbet call
+
+
+def cbet_fold_pct(texture: Texture) -> float:
+    """Defender fold-% vs hero's c-bet, from the doc-06-cited board textures."""
+    if texture.pairing == "paired" and texture.wetness == "dry":
+        return _CBET_FOLD_PCT_PAIRED_DRY
+    if texture.suitedness == "monotone":
+        return _CBET_FOLD_PCT_MONOTONE
+    if texture.wetness == "wet":
+        return _CBET_FOLD_PCT_WET
+    return _CBET_FOLD_PCT_DEFAULT
+
+
+def _cbet_fold_equity_value(
+    spot: Spot, board: list[str], texture: Texture, villain_range: str | None
+) -> float | None:
+    """Hero's `value` term (doc-08 §3.2's one-street fold-equity EV), normalized
+    to the merit-unit scale so it composes with the wetness/position bumps in
+    `_merits()` below. Returns None (falls back to `_CAT_VALUE`) if the pot or
+    villain range makes the formula undefined.
+    """
+    pot = spot.pot_bb
+    if not pot or pot <= 0:
+        return None
+    dead = frozenset(spot.hero.hole_cards)
+    combos = sorted(combos_for_range(villain_range or "*", dead=dead))
+    if not combos:
+        return None
+    equity = equity_vs_range(spot.hero.hole_cards, board, combos, iters=_FOLD_EQUITY_ITERS)
+    fold_pct = cbet_fold_pct(texture)
+    reference_bet = 0.5 * pot  # a canonical bet size -- small/big sizing stays
+    # governed by the existing wetness-based adjustments further down.
+    ev = fold_equity_ev(fold_pct, equity, pot, reference_bet)
+    return (ev / pot) * _FOLD_EQUITY_SCALE
+
+
+def _merits(
+    adv: str, texture: Texture, cat: str, value_override: float | None = None
+) -> tuple[float, float, float]:
+    """Return (check, bet_small, bet_big) merit scores (proxy EV, ~bb).
+
+    `value_override` (optional): a fold-equity-EV-derived `value`
+    (`_cbet_fold_equity_value`) supplied by `grade_cbet`, which has the real
+    hole/board/villain-range context needed to compute it. Falls back to the
+    flat `_CAT_VALUE` category lookup when not supplied (e.g. direct unit-test
+    calls), so existing callers are unaffected.
+    """
+    value = _CAT_VALUE[cat] if value_override is None else value_override
     adv_bonus = {"hero": 1.0, "neutral": 0.0, "villain": -1.0}[adv]
 
     check = 1.0
@@ -230,7 +298,11 @@ def grade_cbet(
     cat = _hand_category(spot.hero.hole_cards, board)
     small, big = _bet_sizes(spot)
 
-    m_check, m_small, m_big = _merits(adv, tex, cat)
+    # N2/doc-08 §3.2: ground `value` in a real fold-equity EV (equity.py's
+    # `equity_vs_range` + doc-06's fold-continuation numbers) instead of the
+    # flat per-category guess, wherever it's computable for this spot.
+    fold_equity_value = _cbet_fold_equity_value(spot, board, tex, villain_range)
+    m_check, m_small, m_big = _merits(adv, tex, cat, value_override=fold_equity_value)
     merits = [m_check, m_small, m_big]
     freqs = _frequencies(merits)
 

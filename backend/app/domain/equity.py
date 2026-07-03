@@ -1,10 +1,12 @@
 """Pure-Python equity engine (Phase 2a).
 
 A dependency-free 7-card best-5 evaluator plus a Monte-Carlo
-`equity_vs_range`. Used ONLY by the equity-estimation drill (single hero hand
-vs a range), bounded to a small iteration cap with its OWN seeded RNG — never
-shared with spot construction. Range-vs-range equity is intentionally out of
-2a (perf); range advantage in the c-bet grader is a positional+texture rule.
+`equity_vs_range`. Originally used ONLY by the equity-estimation drill
+(single hero hand vs a range); N2 (accuracy-debt paydown, doc-08 §3.2) also
+wires `equity_vs_range` into `postflop.py`'s interim fold-equity EV for the
+c-bet grader — bounded MC, its OWN seeded RNG, still never shared with spot
+construction. Range-vs-range equity remains out of scope (perf); range
+advantage in the c-bet grader is still a positional+texture rule.
 
 Dead-card order (the classic bug to avoid): dead = hero ∪ board; filter the
 villain combos to those disjoint from dead BEFORE the loop; each iteration
@@ -135,3 +137,20 @@ def equity_vs_range(
             total += 0.5
         n += 1
     return total / n if n else 0.0
+
+
+def fold_equity_ev(fold_pct: float, equity_if_called: float, pot_bb: float, bet_bb: float) -> float:
+    """Standard textbook one-street fold-equity / semi-bluff EV (doc-08 §3.2):
+
+        EV(bet) = Fold% x Pot
+                + (1 - Fold%) x (Equity_vs_continuing_range x (Pot + 2xBet) - Bet)
+
+    Collapses the rest of the hand into two branches -- villain folds (hero
+    wins the pot as-is) or villain calls and it runs out with a static
+    continuing range -- so it is NOT solver-exact, but it is a real,
+    dimensionally-correct chip-EV formula (bb in, bb out), unlike a hand-tuned
+    unitless merit score. `pot_bb` is the pot BEFORE `bet_bb` is added.
+    """
+    return fold_pct * pot_bb + (1 - fold_pct) * (
+        equity_if_called * (pot_bb + 2 * bet_bb) - bet_bb
+    )

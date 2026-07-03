@@ -5,6 +5,7 @@ from app.domain.equity import (
     class_to_combos,
     combos_for_range,
     equity_vs_range,
+    fold_equity_ev,
 )
 
 
@@ -62,3 +63,26 @@ def test_perf_guard():
     t0 = time.perf_counter()
     equity_vs_range(hero, board, villain, iters=1000, rng=random.Random(5))
     assert time.perf_counter() - t0 < 0.6
+
+
+# --- fold_equity_ev (doc-08 §3.2 one-street fold-equity EV formula) ---
+
+
+def test_fold_equity_ev_always_folds_wins_the_pot():
+    # Fold% = 1.0 -> EV collapses to exactly the current pot, regardless of
+    # equity/bet size (villain always folds, hero never gets called).
+    assert fold_equity_ev(1.0, equity_if_called=0.1, pot_bb=10.0, bet_bb=5.0) == 10.0
+
+
+def test_fold_equity_ev_never_folds_is_showdown_equity():
+    # Fold% = 0.0, Bet = 0.0 -> EV collapses to a free showdown at current
+    # equity share of the pot (the CHECK special case used by postflop.py).
+    assert fold_equity_ev(0.0, equity_if_called=0.6, pot_bb=10.0, bet_bb=0.0) == 6.0
+
+
+def test_fold_equity_ev_bigger_bet_better_ev_when_ahead():
+    # Holding a real equity edge, a bigger bet (more money in when called)
+    # should raise EV relative to a smaller one, all else equal.
+    small = fold_equity_ev(0.4, equity_if_called=0.7, pot_bb=6.0, bet_bb=2.0)
+    big = fold_equity_ev(0.4, equity_if_called=0.7, pot_bb=6.0, bet_bb=4.5)
+    assert big > small
