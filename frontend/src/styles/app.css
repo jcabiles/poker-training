@@ -176,6 +176,39 @@ kbd {
 .why {
   margin: var(--space) 0;
 }
+
+/* N1 tiered feedback: verdict (prominent) -> reasoning -> deep-dive (collapsed).
+   Token values only; the global :focus-visible ring covers the <summary>. */
+.tier-verdict {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.chosen-eval {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  color: var(--muted);
+}
+.tier-reasoning {
+  margin: var(--space-2) 0;
+  font-size: var(--text-md);
+}
+.tier-deepdive {
+  margin: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+.tier-deepdive summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+.deepdive-text {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-md);
+  color: var(--muted);
+}
 .mix {
   list-style: none;
   padding: 0;

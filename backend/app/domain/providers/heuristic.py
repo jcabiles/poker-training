@@ -57,4 +57,7 @@ class HeuristicProvider:
                 parts.append(f"(baseline: {base_top})")
         if entry.rationale:
             parts.append(entry.rationale)
+            # Raw material for the tier composer (compose_tiers reads this field
+            # instead of re-parsing the flat explanation — no double-append).
+            result.authored_rationale = entry.rationale
         result.explanation = " ".join(parts)

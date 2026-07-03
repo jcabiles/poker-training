@@ -44,6 +44,15 @@ export interface ActionEval {
   ev_bb: number;
 }
 
+// N1 tiered teaching feedback: verdict -> reasoning -> deep-dive, composed
+// backend-side by the TieredFeedbackProvider wrapper (never parsed from
+// `explanation`, which is kept for backward compat).
+export interface FeedbackTiers {
+  verdict: string;
+  reasoning: string;
+  deep_dive: string;
+}
+
 export interface EvaluationResult {
   per_action: ActionEval[];
   best_action: ActionEval;
@@ -56,6 +65,8 @@ export interface EvaluationResult {
   leak_category?: number | null;
   coverage: string;
   is_mixed: boolean;
+  authored_rationale?: string | null; // content-pack rationale prose, when present
+  tiers?: FeedbackTiers | null;
 }
 
 export interface NextDrillResponse {

@@ -203,6 +203,9 @@ def test_thin_value_iso_vs_station_is_optimal():
     assert res.correctness == Correctness.OPTIMAL
     assert "exploit" in res.rationale_tags
     assert res.leak_category == int(LeakCategory.CALLING_STATION_EXPLOIT)
+    # N1: the exploit adjustment also reaches the tiered reasoning surface
+    assert res.tiers is not None
+    assert "station" in res.tiers.reasoning.lower()
 
 
 def test_3bet_bluff_vs_station_worse_than_baseline():
@@ -234,7 +237,11 @@ def test_exploit_explanation_carries_rationale():
     )
     res = _asyncio.run(p.optimal(spot))
     assert "exploit" in res.rationale_tags
-    assert "station" in res.explanation.lower()
+    assert "station" in res.explanation.lower()  # flat explanation kept for backward compat
+    # N1: the authored rationale now ALSO lands in the reasoning tier (the
+    # user-facing surface), sourced from authored_rationale — not re-parsed prose.
+    assert res.tiers is not None
+    assert "station" in res.tiers.reasoning.lower()
 
 
 def test_marginal_offchart_call_is_not_a_blunder():

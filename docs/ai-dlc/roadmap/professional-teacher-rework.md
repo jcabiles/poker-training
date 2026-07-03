@@ -34,7 +34,7 @@ and *partly* real new work (baseline preflop + all postflop are templated tautol
 
 > Each is thin + end-to-end + observable. ICE surfaced as the "why" for order — a lens, not a law; re-order at the gate.
 
-- [ ] **N1 — Tiered feedback shape (teaching walking-skeleton).** ICE 9·8·6.
+- [x] **N1 — Tiered feedback shape (teaching walking-skeleton).** *(done 2026-07-02: FeedbackTiers via pure domain/feedback.py composer + TieredFeedbackProvider wrapper in the factory — every provider inherits; chosen_eval rendered; deep-dive collapsed; refuter pass)* ICE 9·8·6.
       **Problem:** post-answer "why" is one flat, tautological string (`grading.py:196` "AKo from CO: raise is the play");
       the promised verdict→reasoning→deep-dive was never built, and `chosen_eval` is delivered-but-never-rendered.
       **Outcome-link:** primary (teach the why) + enabling (stranger understands a rep).

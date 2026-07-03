@@ -3,11 +3,13 @@ from app.domain.providers.composite import CompositeProvider
 from app.domain.providers.factory import get_provider
 from app.domain.providers.heuristic import HeuristicProvider
 from app.domain.providers.postflop import PostflopHeuristicProvider
+from app.domain.providers.tiered import TieredFeedbackProvider
 
 __all__ = [
     "StrategyProvider",
     "HeuristicProvider",
     "PostflopHeuristicProvider",
     "CompositeProvider",
+    "TieredFeedbackProvider",
     "get_provider",
 ]
