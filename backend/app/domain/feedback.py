@@ -120,6 +120,10 @@ def _reasoning(spot: Spot, result: EvaluationResult) -> str:
             f"{_WET.get(wet, '')}".rstrip()
             + "."
         )
+        # N3: authored postflop-node rationale (content path), when available,
+        # is preferred teaching prose over the tag-derived text above.
+        if result.authored_rationale:
+            parts.append(result.authored_rationale)
     else:
         shape = next((t for t in tags if t in _PRE_SHAPE), None)
         if shape is not None:
@@ -136,6 +140,11 @@ def _reasoning(spot: Spot, result: EvaluationResult) -> str:
                 f"The chart's line here is essentially pure: "
                 f"{_fmt(best)} at {_pct(best.frequency)}."
             )
+        # N3: authored baseline (non-exploit) preflop rationale from the content
+        # pack — the exploit branch below already surfaces authored_rationale
+        # for exploit spots, so skip here to avoid double-appending.
+        if result.authored_rationale and "exploit" not in tags:
+            parts.append(result.authored_rationale)
     if "exploit" in tags and spot.villain_type is not None:
         villain = spot.villain_type.value.replace("_", " ")
         if result.authored_rationale:

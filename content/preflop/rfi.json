@@ -8,37 +8,43 @@
       "node_context": "RFI",
       "position": "UTG",
       "actions": [{ "action": "raise", "combos": "77+, A7s+, A5s, KJs+, QJs, JTs, AJo+", "frequency": 1.0 }],
-      "sizing_bb": 3.0
+      "sizing_bb": 3.0,
+      "rationale": "With 7-8 players still to act, UTG opens the tightest range at the table: only pairs 77+, strong broadways, and suited aces down to A5s carry enough raw equity and playability to survive that many potential callers — offsuit broadways like KJo and small pairs are excluded because they get dominated or need to fold too often against this many opponents."
     },
     {
       "node_context": "RFI",
       "position": "LJ",
       "actions": [{ "action": "raise", "combos": "66+, A5s+, KTs+, QTs+, JTs, T9s, 98s, AJo+, KQo", "frequency": 1.0 }],
-      "sizing_bb": 3.0
+      "sizing_bb": 3.0,
+      "rationale": "One seat later than UTG with only 4-5 players left to act, LJ adds 66/55-type pairs (better implied odds with fewer opponents behind) and KQo, whose top-pair value and blockers hold up now that fewer players can wake up with a monster."
     },
     {
       "node_context": "RFI",
       "position": "HJ",
       "actions": [{ "action": "raise", "combos": "55+, A4s+, KTs+, QTs+, J9s+, T9s, 98s, ATo+, KJo+", "frequency": 1.0 }],
-      "sizing_bb": 2.5
+      "sizing_bb": 2.5,
+      "rationale": "HJ's shorter field lets the range extend down to 55 and add suited connectors from J9s: fewer players behind means less multiway risk, so these hands can realize their straight/flush potential instead of folding to preserve equity."
     },
     {
       "node_context": "RFI",
       "position": "CO",
       "actions": [{ "action": "raise", "combos": "22+, A2s+, K9s+, Q9s+, J9s+, T8s+, 98s, 87s, 76s, 65s, A9o+, KTo+, QTo+, JTo", "frequency": 1.0 }],
-      "sizing_bb": 2.5
+      "sizing_bb": 2.5,
+      "rationale": "With only 2-3 players left to act, CO opens any pocket pair (set-mining pays off with so few opponents), suited connectors down to 65s for straight/flush potential, and offsuit broadways like QTo/JTo that can now steal the blinds and dominate weaker calling ranges."
     },
     {
       "node_context": "RFI",
       "position": "BTN",
       "actions": [{ "action": "raise", "combos": "22+, A2s+, K5s+, Q7s+, J7s+, T7s+, 96s+, 86s+, 75s+, 64s+, 54s, A2o+, K9o+, Q9o+, J9o+, T9o", "frequency": 1.0 }],
-      "sizing_bb": 2.5
+      "sizing_bb": 2.5,
+      "rationale": "Facing only the two blinds, BTN opens the widest range at the table: weak suited aces, suited connectors down to 54s, and any pair all carry enough steal equity and positional advantage to show a profit even though most fold outright to a 3-bet."
     },
     {
       "node_context": "RFI",
       "position": "SB",
       "actions": [{ "action": "raise", "combos": "22+, A2s+, K7s+, Q8s+, J8s+, T8s+, 97s+, 87s, 76s, 65s, 54s, A8o+, KTo+, QTo+, JTo", "frequency": 1.0 }],
-      "sizing_bb": 3.0
+      "sizing_bb": 3.0,
+      "rationale": "SB acts last preflop but first on every postflop street, so the range stays raise-or-fold: hands with real showdown value (pairs, suited aces, suited broadways) can justify playing every street OOP, while marginal offsuit hands that need position to realize their equity are folded rather than limped."
     }
   ]
 }

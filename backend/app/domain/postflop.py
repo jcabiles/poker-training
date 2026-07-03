@@ -12,7 +12,10 @@ range advantage arrives in 2b.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.domain.action import Decision
+from app.domain.content.loader import load_pack_file
 from app.domain.equity import combos_for_range, equity_vs_range, fold_equity_ev
 from app.domain.evaluation import (
     ActionEval,
@@ -25,6 +28,36 @@ from app.domain.evaluation import (
 from app.domain.leaks import LeakCategory
 from app.domain.spot import ActionType, NodeContext, Position, Spot
 from app.domain.texture import Texture, classify
+
+# --- N3: authored postflop rationale (content path) ---
+# backend/app/domain/postflop.py -> parents[3] == repo root
+_POSTFLOP_CONTENT_DIR = Path(__file__).resolve().parents[3] / "content" / "postflop"
+_POSTFLOP_RATIONALE_INDEX: dict[tuple, str] | None = None
+
+
+def _postflop_rationale_index() -> dict[tuple, str]:
+    """Authored postflop rationale, keyed by (node_context, hero_position,
+    counterpart_position). Additive teaching content (N3) — reuses the SAME
+    Entry/ContentPack model as the preflop packs (only `.rationale` is read;
+    `.actions` is unused here since postflop scoring stays texture/category-
+    driven, not a content-pack range lookup). Lazily loaded once."""
+    global _POSTFLOP_RATIONALE_INDEX
+    if _POSTFLOP_RATIONALE_INDEX is None:
+        idx: dict[tuple, str] = {}
+        if _POSTFLOP_CONTENT_DIR.is_dir():
+            for path in sorted(_POSTFLOP_CONTENT_DIR.glob("*.json")):
+                pack = load_pack_file(path)
+                for e in pack.entries:
+                    if e.rationale:
+                        idx[(e.node_context, e.position, e.facing)] = e.rationale
+        _POSTFLOP_RATIONALE_INDEX = idx
+    return _POSTFLOP_RATIONALE_INDEX
+
+
+def _postflop_rationale(
+    node_context: NodeContext, hero_pos: Position, counterpart_pos: Position
+) -> str | None:
+    return _postflop_rationale_index().get((node_context, hero_pos, counterpart_pos))
 
 _RIDX = {r: i for i, r in enumerate("23456789TJQKA")}
 
@@ -297,6 +330,7 @@ def grade_cbet(
     adv = range_advantage(ctx, spot.hero.position, _villain_pos(spot), tex)
     cat = _hand_category(spot.hero.hole_cards, board)
     small, big = _bet_sizes(spot)
+    rationale = _postflop_rationale(NodeContext.CBET, spot.hero.position, _villain_pos(spot))
 
     # N2/doc-08 §3.2: ground `value` in a real fold-equity EV (equity.py's
     # `equity_vs_range` + doc-06's fold-continuation numbers) instead of the
@@ -336,7 +370,7 @@ def grade_cbet(
         return "bet"
 
     if decision is None:
-        return EvaluationResult(
+        result = EvaluationResult(
             **base_kwargs,
             rationale_tags=["cbet", adv, cat, tex.wetness],
             explanation=(
@@ -344,6 +378,9 @@ def grade_cbet(
                 f"hero has {cat}: {_size_label(best.size_bb)} is the play."
             ),
         )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
 
     chosen = _match(evals, decision, small, big)
     ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
@@ -372,7 +409,7 @@ def grade_cbet(
             f"(-{ev_loss}bb)."
         )
 
-    return EvaluationResult(
+    result = EvaluationResult(
         **base_kwargs,
         chosen_eval=ChosenEval(frequency=chosen_freq, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
@@ -380,6 +417,9 @@ def grade_cbet(
         rationale_tags=["cbet", adv, cat, tex.wetness],
         explanation=why,
     )
+    if rationale:
+        result.authored_rationale = rationale
+    return result
 
 
 def _match(evals: list[ActionEval], decision: Decision, small, big) -> ActionEval:
@@ -490,6 +530,7 @@ def grade_vs_cbet(
     value = _HAND_VALUE[cat]
     faced, pot = _faced_call_and_pot(spot)
     price = faced / pot if pot > 0 else 0.5
+    rationale = _postflop_rationale(NodeContext.VS_CBET, spot.hero.position, aggressor)
 
     raise_size = next(
         (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
@@ -520,7 +561,7 @@ def grade_vs_cbet(
     }
 
     if decision is None:
-        return EvaluationResult(
+        result = EvaluationResult(
             **base_kwargs,
             rationale_tags=["vs_cbet", adv, cat, tex.wetness],
             explanation=(
@@ -528,6 +569,9 @@ def grade_vs_cbet(
                 f"{best.action.value} is the play."
             ),
         )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
 
     chosen = next((e for e in evals if e.action == decision.action), None)
     if chosen is None:
@@ -555,7 +599,7 @@ def grade_vs_cbet(
             f"you chose {decision.action.value} (-{ev_loss}bb)."
         )
 
-    return EvaluationResult(
+    result = EvaluationResult(
         **base_kwargs,
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
@@ -563,6 +607,9 @@ def grade_vs_cbet(
         rationale_tags=["vs_cbet", adv, cat, tex.wetness],
         explanation=why,
     )
+    if rationale:
+        result.authored_rationale = rationale
+    return result
 
 
 # --- Phase 2e-1: facing a flop check-raise (hero = the original c-bettor) ---
@@ -660,6 +707,9 @@ def grade_vs_check_raise(
     value = _HAND_VALUE[cat]
     faced, pot = _faced_call_and_pot(spot)
     price = faced / pot if pot > 0 else 0.5
+    rationale = _postflop_rationale(
+        NodeContext.VS_CHECK_RAISE, spot.hero.position, _villain_pos(spot)
+    )
 
     raise_size = next(
         (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
@@ -690,7 +740,7 @@ def grade_vs_check_raise(
     }
 
     if decision is None:
-        return EvaluationResult(
+        result = EvaluationResult(
             **base_kwargs,
             rationale_tags=["vs_check_raise", adv, cat, tex.wetness],
             explanation=(
@@ -698,6 +748,9 @@ def grade_vs_check_raise(
                 f"({adv} range advantage): {best.action.value} is the play."
             ),
         )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
 
     # RAISE matches by ActionType alone (one raise option), like grade_vs_cbet.
     chosen = next((e for e in evals if e.action == decision.action), None)
@@ -729,7 +782,7 @@ def grade_vs_check_raise(
             f"{best.action.value}; you chose {decision.action.value} (-{ev_loss}bb)."
         )
 
-    return EvaluationResult(
+    result = EvaluationResult(
         **base_kwargs,
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
@@ -737,3 +790,6 @@ def grade_vs_check_raise(
         rationale_tags=["vs_check_raise", adv, cat, tex.wetness],
         explanation=why,
     )
+    if rationale:
+        result.authored_rationale = rationale
+    return result

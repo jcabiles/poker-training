@@ -78,6 +78,48 @@ def test_exploit_reasoning_carries_authored_rationale():
     assert res.tiers.reasoning != res.explanation  # composed, not the flat string
 
 
+def test_rfi_baseline_authored_rationale_reaches_tiers():
+    """N3: a non-exploit RFI entry's authored `rationale` populates
+    `authored_rationale` and lands in tiers.reasoning as real strategic prose,
+    not the tautological action restated."""
+    p = get_provider()
+    entry = _IDX[(NodeContext.RFI, Position.CO, None, 0, None)]
+    assert entry.rationale  # sanity: the CO RFI entry is authored (N3 tranche)
+    spot = build_spot(entry, random.Random(1))
+    res = _run(p.optimal(spot))
+    _assert_tiers_distinct(res)
+    assert res.authored_rationale == entry.rationale
+    assert entry.rationale in res.tiers.reasoning
+    assert "is the play" not in entry.rationale
+
+
+def test_vs_rfi_baseline_authored_rationale_reaches_tiers():
+    """N3: a non-exploit vs-RFI entry's authored `rationale` populates
+    `authored_rationale` and lands in tiers.reasoning."""
+    p = get_provider()
+    entry = _IDX[(NodeContext.VS_RFI, Position.HJ, Position.UTG, 0, None)]
+    assert entry.rationale
+    spot = build_spot(entry, random.Random(1))
+    res = _run(p.optimal(spot))
+    _assert_tiers_distinct(res)
+    assert res.authored_rationale == entry.rationale
+    assert entry.rationale in res.tiers.reasoning
+    assert "is the play" not in entry.rationale
+
+
+def test_postflop_cbet_authored_rationale_reaches_tiers():
+    """N3: the postflop content path — a cbet node's authored `rationale`
+    (content/postflop/cbet.json, keyed by opener/caller pairing) reaches
+    `authored_rationale` and tiers.reasoning without changing grading."""
+    p = get_provider()
+    spot = make_cbet_spot()  # BTN vs BB — matches an authored cbet.json entry
+    res = _run(p.evaluate(spot, Decision(action=ActionType.CHECK)))
+    _assert_tiers_distinct(res)
+    assert res.authored_rationale
+    assert "is the play" not in res.authored_rationale
+    assert res.authored_rationale in res.tiers.reasoning
+
+
 def test_not_found_tiers_degrade_gracefully():
     p = get_provider()
     spot = make_rfi_spot(position=Position.CO).model_copy(
