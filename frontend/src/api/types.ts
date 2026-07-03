@@ -71,7 +71,7 @@ export interface EvaluationResult {
 
 export interface NextDrillResponse {
   spot: Spot;
-  grid: Record<string, string>; // handclass -> raise|call|fold|mixed
+  grid: Record<string, Record<string, number>>; // handclass -> {action: freq}, freqs sum to ~1.0
 }
 
 export interface Decision {

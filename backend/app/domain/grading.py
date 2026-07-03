@@ -238,20 +238,17 @@ def grade(spot: Spot, entry: Entry | None, decision: Decision | None) -> Evaluat
     )
 
 
-def range_grid(entry: Entry | None) -> dict[str, str]:
-    """Per-handclass label for the node: 'raise' | 'call' | 'fold' | 'mixed'.
+def range_grid(entry: Entry | None) -> dict[str, dict[str, float]]:
+    """Per-handclass action-frequency mix for the node: hand -> {action: freq}.
 
-    Used to color the 13x13 grid so it teaches the node's whole range.
+    Only actions with freq > 0 are included (values sum to ~1.0). Used to
+    render the 13x13 grid as proportional per-action segments so it teaches
+    the node's whole range, not a single collapsed label.
     """
-    grid: dict[str, str] = {}
+    grid: dict[str, dict[str, float]] = {}
     for hand in all_hands():
         mix = _chart_mix(entry, hand)
         full = dict(mix)
         full[ActionType.FOLD] = max(0.0, 1.0 - sum(mix.values()))
-        played = [a for a, v in full.items() if v > MIX_THRESHOLD]
-        if len(played) >= 2:
-            grid[hand] = "mixed"
-        else:
-            top = max(full, key=lambda a: (full[a], _PRIORITY.get(a, 0)))
-            grid[hand] = top.value
+        grid[hand] = {a.value: round(v, 3) for a, v in full.items() if v > 0}
     return grid

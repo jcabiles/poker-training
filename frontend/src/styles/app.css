@@ -285,13 +285,33 @@ kbd {
 }
 .cell {
   aspect-ratio: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 2px;
+}
+/* N5: proportional per-action frequency segments (freq-mix grid cells). A
+   pure single-action hand renders one segment at 100% width, i.e. identical
+   to the old flat-color cell. */
+.cell-segments {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.cell-segment {
+  height: 100%;
+}
+.cell-label {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--text-2xs);
-  background: var(--bg);
-  color: var(--muted);
-  border-radius: 2px;
+  color: var(--act-on);
+  pointer-events: none;
 }
 .cell.pair {
   color: var(--text);
@@ -443,11 +463,16 @@ kbd {
   margin: 4px 0;
 }
 
-/* Range-grid action coloring */
+/* Range-grid action coloring — also used by the legend's static swatches
+   (`.cell.sample.action-*`, no children, so the flat background applies
+   directly). Actual grid cells color their `.cell-segment` children instead
+   (see N5 proportional-mix rules above `.cell.pair`). */
 .cell.action-raise { background: var(--act-raise); color: var(--act-on); }
 .cell.action-call { background: var(--act-call); color: var(--act-on); }
 .cell.action-fold { background: var(--act-fold); color: var(--act-on); }
-.cell.action-mixed { background: var(--act-mixed); color: var(--act-on); }
+.cell-segment.action-raise { background: var(--act-raise); }
+.cell-segment.action-call { background: var(--act-call); }
+.cell-segment.action-fold { background: var(--act-fold); }
 .cell.hero {
   outline: 3px solid var(--text);
   outline-offset: -3px;
