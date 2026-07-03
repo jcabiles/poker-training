@@ -1,0 +1,69 @@
+{
+  "description": "Point-of-need teaching content (N8), versioned JSON under content/cards/.\n\nMatching (leak_category first, rationale_tags to disambiguate) lives in\napp/services/concept_cards.py, NOT here \u2014 this model is pure content-data,\nsame as ContentPack/Entry above.",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "body": {
+      "title": "Body",
+      "type": "string"
+    },
+    "leak_categories": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Leak Categories",
+      "type": "array"
+    },
+    "rationale_tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Rationale Tags",
+      "type": "array"
+    },
+    "drill_mode": {
+      "enum": [
+        "random",
+        "review",
+        "leak_focus",
+        "exploit",
+        "challenge",
+        "postflop",
+        "vs_cbet",
+        "vs_check_raise"
+      ],
+      "title": "Drill Mode",
+      "type": "string"
+    },
+    "source_doc": {
+      "title": "Source Doc",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "title",
+    "summary",
+    "body",
+    "leak_categories",
+    "drill_mode",
+    "source_doc"
+  ],
+  "title": "ConceptCard",
+  "type": "object"
+}

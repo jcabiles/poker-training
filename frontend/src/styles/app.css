@@ -223,6 +223,36 @@ kbd {
   margin-left: 6px;
 }
 
+/* N8 — point-of-need concept card: title + summary always visible below the
+   tiers, full body collapsed behind <details> (same convention as
+   .tier-deepdive above; the global :focus-visible ring covers the button and
+   <summary>). Token values only. */
+.concept-card {
+  margin: var(--space-4) 0 0;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.concept-card-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.concept-card-summary {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  color: var(--muted);
+}
+.concept-card details summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+.concept-card-body {
+  margin: var(--space-2) 0;
+  font-size: var(--text-md);
+}
+
 /* Rationale tags (CW-5): the "why" behind the verdict — node type, range
    advantage, hand category, board texture — as scannable chips. */
 .rationale {

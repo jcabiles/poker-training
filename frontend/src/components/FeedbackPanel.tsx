@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { EvaluationResult } from "../api/types";
+import { matchCard } from "../api/client";
+import type { ConceptCard as ConceptCardData, EvaluationResult } from "../api/types";
+import ConceptCardView from "./ConceptCard";
 import RationaleTags from "./RationaleTags";
 
 const TONE: Record<string, string> = {
@@ -19,6 +21,7 @@ export default function FeedbackPanel({
 }) {
   const tone = TONE[result.correctness ?? "optimal"] ?? "warn";
   const nextRef = useRef<HTMLButtonElement>(null);
+  const [card, setCard] = useState<ConceptCardData | null>(null);
 
   // CW-7: the decision button the user just clicked is now disabled, which
   // would otherwise strand keyboard focus on <body>. This panel only ever
@@ -27,6 +30,28 @@ export default function FeedbackPanel({
   useEffect(() => {
     nextRef.current?.focus();
   }, []);
+
+  // N8 — point-of-need concept card: only for missed reps, fire-and-forget so
+  // feedback still renders if the card fetch fails or leak_category is absent.
+  useEffect(() => {
+    if (
+      (result.correctness !== "mistake" && result.correctness !== "blunder") ||
+      result.leak_category == null
+    ) {
+      return;
+    }
+    let cancelled = false;
+    matchCard(result.leak_category, result.rationale_tags)
+      .then((res) => {
+        if (!cancelled) setCard(res.card);
+      })
+      .catch(() => {
+        /* non-blocking — feedback renders regardless */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [result.correctness, result.leak_category, result.rationale_tags]);
 
   return (
     <div
@@ -74,6 +99,9 @@ export default function FeedbackPanel({
             prefixes above plus this note keep that honest until Phase 3. */}
         <p className="studytest-hint">EV values are approximate (proxy, not solver-exact).</p>
       </details>
+      {/* N8 — point-of-need concept card, below the tiers; absent when no
+          card matches (thin leaks) or the fetch hasn't resolved/failed. */}
+      {card && <ConceptCardView card={card} />}
       <button
         ref={nextRef}
         type="button"

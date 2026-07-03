@@ -1,0 +1,112 @@
+[
+  {
+    "id": "rfi-position-discipline",
+    "version": 1,
+    "title": "Position Sets Your Opening Range",
+    "summary": "Your first-in raising range should widen steadily from tight in early position to very wide on the button. Memorize each position's range floor — the weakest hand you still open — and everything stronger is an auto-include.",
+    "body": "Most of your preflop profit comes from hands played in position (CO/BTN/SB steals); most losses come from hands played early and out of position, so open ranges should tighten toward UTG and widen toward the button. As a live-play memory aid, learn the range floor for each seat: UTG/UTG+1 opens roughly 10-12% (pairs 77+, suited broadways, AKo/AQo/AJo, ATs+); LJ/HJ widens to 15-20% (add 66/55, KQo/KJo, more suited aces and connectors); CO opens 25-28% (add small pairs, JTo-QJo, more suited connectors); BTN opens 40-45% (nearly any pair, most suited hands, many offsuit broadways); SB opens 35-40% when folded to, raising or folding rather than limping.\n\nNever open-limp as the first player in — raise or fold. This one rule, applied consistently, is worth more than any single range adjustment.",
+    "leak_categories": [100, 101, 102, 103, 104],
+    "rationale_tags": [],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "vs-rfi-fold-discipline",
+    "version": 1,
+    "title": "Don't Over-Fold to an Open",
+    "summary": "Facing a raise, folding a hand the chart plays gives up EV for nothing in return — the continuing range (call or 3-bet) exists because those hands are profitable against a realistic opening range.",
+    "body": "When facing an open, every hand above your continuing range's floor should call, 3-bet, or occasionally both — not fold. The Big Blind especially gets a steep pot-odds discount (already 1bb in), needing only about 30% equity to continue against a standard 3bb open, so folding hands that clear that bar is a pure leak, not caution.\n\nFrom the blinds, defend wider against later-position opens (BTN, SB) and tighter against early-position opens, since the raiser's range strength scales with their position. The fix is mechanical: know your continuing range's floor for each seat you face, and don't let a big bet size or an aggressive image talk you into folding a hand that's above it.",
+    "leak_categories": [112],
+    "rationale_tags": ["over_fold"],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "vs-rfi-loose-call",
+    "version": 1,
+    "title": "Tighten Your Continuing Range",
+    "summary": "Calling an open with a hand below your range's edge loses money outright against a realistic opening range — pot odds don't rescue a hand that can't profitably continue.",
+    "body": "Not every hand that 'sees a flop cheaply' should call an open. Outside the Big Blind's wide, discounted defense, calling ranges need real equity and playability against the opener's range — weak offsuit hands, and hands that need to hit a big flop with poor implied odds, should fold instead of limping along.\n\nThis leak shows up most from the blinds and from cold-calling out of position: a hand that isn't strong enough to 3-bet and isn't strong enough to profitably call is a fold, not a flat. Respect the range floor for the position you're calling from, and use tighter continuing ranges out of position, where postflop skill can't bail out a marginal preflop decision.",
+    "leak_categories": [112],
+    "rationale_tags": ["loose_call"],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "vs-rfi-3bet-value",
+    "version": 1,
+    "title": "3-Bet for Value Instead of Just Calling",
+    "summary": "Flat-calling a hand the chart wants to 3-bet leaves value on the table — 3-betting builds the pot with the better hand and can win it outright preflop, skipping rake entirely.",
+    "body": "Live opponents at $1/$2-$2/$3 rarely bluff-3-bet and often call 3-bets too wide, which makes 3-betting for value more profitable than the passive flat. Premium hands (QQ+, AK, and position-dependent additions like JJ/AQs from later seats) should re-raise rather than call — a flat under-realizes the hand's equity and lets the opener see a cheap flop with a capped range.\n\n3-betting also wins the pot preflop against folds, which is rake-free in most live rooms that only rake postflop pots. The fix: know your value 3-bet range by position and use it — don't let a strong hand default to 'just call' when the chart says raise.",
+    "leak_categories": [112],
+    "rationale_tags": ["under_aggressive"],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "vs-rfi-3bet-discipline",
+    "version": 1,
+    "title": "Don't 3-Bet Too Wide",
+    "summary": "Re-raising a hand outside the position-appropriate value/bluff range isn't backed by enough equity or fold equity — live opponents call 3-bets wide, so a light 3-bet often just builds a bigger pot you'll lose.",
+    "body": "3-betting is highest-value when it's either a clear value hand or a bluff that satisfies real criteria: it blocks the opener's continuing range, has good equity when called, or plays poorly multiway (ace-blocker hands like A5s-A2s are the standard live bluff 3-bet, not random suited connectors). Because live opponents rarely fold to 3-bets and rarely 4-bet bluff, a 3-bet that isn't backed by real value or a qualifying bluff just inflates the pot against a range you don't beat.\n\nThe fix: keep 3-bet bluffs rare and blocker-driven, lean on a merged, value-heavy range rather than a wide polarized one, and reserve aggression for hands the chart actually assigns to the 3-bet mix at this position.",
+    "leak_categories": [112],
+    "rationale_tags": ["over_aggressive"],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "blind-defense-pot-odds",
+    "version": 1,
+    "title": "Defend Your Blinds With Pot Odds, Not Fear",
+    "summary": "The Big Blind gets a built-in discount from the blind already posted, which means it can profitably continue wider than any other position — don't over-fold it away.",
+    "body": "Facing a 3bb open, calling 2bb to win a 4.5bb pot needs only about 30% equity — a bar most pairs, suited aces, suited broadways, and offsuit hands with real playability clear easily. Defense frequency should scale with the opener's position: tighter against early-position opens (their range is genuinely strong), progressively wider against CO, BTN, and especially SB opens (their ranges are much weaker).\n\nThe Small Blind is the trickiest seat — it acts last preflop but first every postflop street, so lean toward 3-bet-or-fold rather than flatting, since playing every street out of position erodes the pot-odds discount that justified continuing in the first place.",
+    "leak_categories": [110],
+    "rationale_tags": [],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "live-sizing-standard",
+    "version": 1,
+    "title": "Size Up for Live Opponents",
+    "summary": "Live players call wider than online regulars, so bigger opens and iso-raises extract more value per combo and thin the field — sizing shouldn't vary by hand strength, which is a live tell.",
+    "body": "Standard live opens run 4-5bb from early/middle position and 3-4bb from CO/BTN/SB — noticeably larger than typical online 2-2.5bb opens — because live calling ranges are wider and the extra size gets paid more often. Against limpers, iso-raise using roughly 4bb plus 1bb per limper already in (adding 1-2bb more when raising out of position), which both prices out the field and grows the pot with an edge.\n\nThe one sizing rule that matters most: never size a raise up or down based on hand strength — a bigger bet with premiums and a smaller one with speculative hands is an easily-read live tell that costs far more than the marginal EV it might gain.",
+    "leak_categories": [160],
+    "rationale_tags": [],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "vs-3bet-response",
+    "version": 1,
+    "title": "Facing a 3-Bet: Decide Before the Table Does",
+    "summary": "Your continuing range against a 3-bet should be narrower out of position than in it, and live 3-bets are usually strong — most low-stakes players don't bluff-3-bet enough to justify loose continues.",
+    "body": "When facing a 3-bet, the three live options are 4-bet for value (AA-QQ, AK), call with hands that play well postflop (JJ-TT down to suited broadways when in position), or fold everything else — and the split should shift with position: in position you can continue wider because you'll see how the hand develops before acting; out of position, tighten the calling range sharply, since speculative hands like small pairs and suited connectors need near-perfect postflop play to realize their equity when the initiative and position both belong to the 3-bettor.\n\nBecause most live 3-bettors under-bluff, resist the urge to 'look up' a light 3-bet with a marginal hand — fold JJ/TT/AQ to a tight opponent's 3-bet without much hesitation, and save the loose calls for known aggressive villains.",
+    "leak_categories": [120, 121],
+    "rationale_tags": [],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "vs-limpers-iso-raise",
+    "version": 1,
+    "title": "Punish Limpers, Don't Join Them",
+    "summary": "Live tables see 2-4 limpers an orbit — the fix is to iso-raise with hands that want to play heads-up against a capped range, never to become the first limper yourself.",
+    "body": "An open-limp as the first player to act is a leak at any of these stakes: raise or fold, always. Once someone else has limped, iso-raise with hands strong enough to play heads-up profitably (pairs 77+, suited broadways, ATs+) using roughly 4bb plus 1bb per limper already in the pot, adding another 1-2bb if you're raising from out of position.\n\nReserve over-limping behind for speculative hands (small pairs, weak suited connectors) in genuinely multiway spots with deep stacks, where implied odds — not isolation odds — are the point; don't over-limp a hand that's strong enough to isolate.",
+    "leak_categories": [150],
+    "rationale_tags": [],
+    "drill_mode": "leak_focus",
+    "source_doc": "01"
+  },
+  {
+    "id": "exploit-adjustments",
+    "version": 1,
+    "title": "Play Their Tendencies, Not Just Your Cards",
+    "summary": "At soft live stakes, opponents deviate from balanced play so predictably that exploiting a known tendency is higher EV than defaulting to a balanced baseline — identify the archetype, then deviate on purpose.",
+    "body": "Four recurring archetypes cover most live opponents: the calling station (loose-passive — never folds, so widen value and cut bluffs entirely), the nit (tight-passive — folds too much, so widen steals and narrow your value range against their raises), the LAG (loose-aggressive — opens and 3-bets wide, so tighten your continuing range and 4-bet light for value), and the passive fish (limps and calls without pressure — isolate aggressively and size up since folds are rare).\n\nThe discipline that matters: know the baseline chart-correct play first, then apply one specific, evidence-based deviation per archetype rather than a vague 'be more aggressive' impulse — exploitation without a clear read is just guessing with extra steps.",
+    "leak_categories": [300, 301, 302, 303],
+    "rationale_tags": [],
+    "drill_mode": "exploit",
+    "source_doc": "01"
+  }
+]
