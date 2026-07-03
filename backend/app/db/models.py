@@ -23,6 +23,8 @@ class DrillAttempt(SQLModel, table=True):
     __tablename__ = "drill_attempt"
 
     id: int | None = Field(default=None, primary_key=True)
+    # Ownership seam: '' = the local user (no accounts yet, sentinel only).
+    owner_id: str = Field(default="")
     spot_signature: str = Field(index=True)
     leak_category: int | None = Field(default=None)
     chosen_action: str
@@ -40,6 +42,9 @@ class SRSItemRow(SQLModel, table=True):
 
     __tablename__ = "srs_item"
 
+    # Composite PK (owner_id, signature): owner_id first so the identity key for
+    # session.get() is ("", sig). '' = the local user (ownership seam, 0006).
+    owner_id: str = Field(default="", primary_key=True)
     signature: str = Field(primary_key=True)
     node_context: str
     position: str

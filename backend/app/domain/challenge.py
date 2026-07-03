@@ -74,10 +74,19 @@ def _rfi_entries() -> dict[Position, Entry]:
 
 
 def _rfi_grids() -> dict[Position, dict[str, str]]:
-    """Per-seat range_grid: {hand_class: 'raise'|'fold'} (RFI has no mixed content)."""
+    """Per-seat range_grid: {hand_class: 'raise'|'fold'} (RFI has no mixed content).
+
+    `range_grid()` (N5) returns per-hand action-frequency dicts, not a single
+    label; collapse to the dominant action here since flip/edge scoring only
+    needs "which action does this seat play" (RFI has no partial-frequency
+    mixing, so this is a lossless simplification, not a re-score).
+    """
     global _RFI_GRIDS
     if _RFI_GRIDS is None:
-        _RFI_GRIDS = {pos: range_grid(entry) for pos, entry in _rfi_entries().items()}
+        _RFI_GRIDS = {
+            pos: {hand: max(mix, key=mix.get) for hand, mix in range_grid(entry).items()}
+            for pos, entry in _rfi_entries().items()
+        }
     return _RFI_GRIDS
 
 

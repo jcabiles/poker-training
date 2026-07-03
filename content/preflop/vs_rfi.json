@@ -12,7 +12,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "77-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs", "frequency": 1.0 }
       ],
-      "sizing_bb": 10.0
+      "sizing_bb": 10.0,
+      "rationale": "UTG's range is the strongest at the table, so HJ 3-bets only genuine value (QQ+, AK) plus the A5s blocker bluff and calls a tight set of pairs and suited broadways — dominated offsuit hands and thin suited hands don't have enough equity to continue profitably against a range this strong."
     },
     {
       "node_context": "vs_RFI",
@@ -22,7 +23,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "66-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, T9s", "frequency": 1.0 }
       ],
-      "sizing_bb": 10.0
+      "sizing_bb": 10.0,
+      "rationale": "CO's extra seat of position over HJ lets the calling range widen down to 66 and add T9s: the players who could squeeze behind CO have already folded, so speculative suited hands can realize more of their equity in position against UTG's tight range."
     },
     {
       "node_context": "vs_RFI",
@@ -32,7 +34,8 @@
         { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "66-TT, AJs, ATs, KQs, KJs, QJs, JTs, AQo", "frequency": 1.0 }
       ],
-      "sizing_bb": 9.0
+      "sizing_bb": 9.0,
+      "rationale": "HJ opens wider than UTG, so CO's continuing range loosens to match: the 3-bet threshold drops to JJ/AQs and the call range picks up AQo, since a looser opener makes offsuit broadway hands profitable to continue with in position."
     },
     {
       "node_context": "vs_RFI",
@@ -42,7 +45,8 @@
         { "action": "raise", "combos": "TT+, AQs, AKs, AKo, A5s, A4s", "frequency": 1.0 },
         { "action": "call", "combos": "22-99, AJs, ATs, A9s, KJs, KTs, QJs, QTs, JTs, T9s, 98s, AQo, AJo, KQo", "frequency": 1.0 }
       ],
-      "sizing_bb": 8.0
+      "sizing_bb": 8.0,
+      "rationale": "CO's open is wide enough that BTN can 3-bet down to TT and call with any pair down to 22 plus offsuit broadways like AJo/KQo — BTN's positional advantage lets these speculative and dominated-adjacent hands realize their equity postflop that they couldn't from an earlier seat."
     },
     {
       "node_context": "vs_RFI",
@@ -52,7 +56,8 @@
         { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "22-TT, AJs, ATs, KJs, QJs, JTs, T9s, AQo", "frequency": 1.0 }
       ],
-      "sizing_bb": 9.0
+      "sizing_bb": 9.0,
+      "rationale": "HJ's open is tighter than CO's, so BTN's continuing range shrinks accordingly: the 3-bet threshold rises to JJ+ and the weakest suited connectors drop out of the call range, since a stronger opening range makes those speculative calls less profitable even in position."
     },
     {
       "node_context": "vs_RFI",
@@ -62,7 +67,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo", "frequency": 1.0 },
         { "action": "call", "combos": "99-JJ, AQs, AJs, KQs", "frequency": 1.0 }
       ],
-      "sizing_bb": 9.0
+      "sizing_bb": 9.0,
+      "rationale": "Facing the tightest possible open, BTN's continuing range is its narrowest vs-RFI spot: only QQ+/AK 3-bet for value and a handful of pairs plus AQs/AJs/KQs call, because UTG's range is strong enough that even BTN's positional edge doesn't rescue weaker holdings."
     }
   ]
 }

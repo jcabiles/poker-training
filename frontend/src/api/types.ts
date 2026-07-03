@@ -44,6 +44,15 @@ export interface ActionEval {
   ev_bb: number;
 }
 
+// N1 tiered teaching feedback: verdict -> reasoning -> deep-dive, composed
+// backend-side by the TieredFeedbackProvider wrapper (never parsed from
+// `explanation`, which is kept for backward compat).
+export interface FeedbackTiers {
+  verdict: string;
+  reasoning: string;
+  deep_dive: string;
+}
+
 export interface EvaluationResult {
   per_action: ActionEval[];
   best_action: ActionEval;
@@ -56,11 +65,13 @@ export interface EvaluationResult {
   leak_category?: number | null;
   coverage: string;
   is_mixed: boolean;
+  authored_rationale?: string | null; // content-pack rationale prose, when present
+  tiers?: FeedbackTiers | null;
 }
 
 export interface NextDrillResponse {
   spot: Spot;
-  grid: Record<string, string>; // handclass -> raise|call|fold|mixed
+  grid: Record<string, Record<string, number>>; // handclass -> {action: freq}, freqs sum to ~1.0
 }
 
 export interface Decision {
@@ -125,4 +136,36 @@ export interface QuizResult {
   delta?: number | null;
   explanation: string;
   leak_category: number;
+}
+
+// N8 — point-of-need concept cards. leak_category + rationale_tags key the
+// match (see backend/app/services/concept_cards.py); drill_mode is where
+// "drill this" navigates via hash routing (#/drill/<mode>).
+export interface ConceptCard {
+  id: string;
+  version: number;
+  title: string;
+  summary: string;
+  body: string;
+  leak_categories: number[];
+  rationale_tags: string[];
+  drill_mode: Mode;
+  source_doc: string;
+}
+
+export interface CardMatchResponse {
+  card: ConceptCard | null;
+}
+
+// N7 — read-only "today's plan" surfacing of the SM-2 due queue.
+export interface DuePlanItem {
+  signature: string;
+  due_date: string;
+  last_grade?: number | null;
+  label: string;
+}
+
+export interface ReviewPlanResponse {
+  due_count: number;
+  items: DuePlanItem[];
 }

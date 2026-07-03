@@ -1,0 +1,57 @@
+[
+  {
+    "id": "cbet-range-advantage",
+    "version": 1,
+    "title": "Bet When Your Range Beats Theirs",
+    "summary": "The core postflop question is 'who has the advantage here?' — on boards where the preflop raiser's range connects better (high, dry textures), c-bet often and small; on boards that favor the caller (low, connected), check more.",
+    "body": "Range advantage looks at whose entire range of possible hands has more equity on this specific board, not just the two cards in your hand. High, dry boards like K-7-2 rainbow favor the preflop raiser, whose tight opening range is full of A-x, K-x, and pairs that connect well — c-bet these often, and small (25-33% pot), since the whole range can bet profitably.\n\nLow, connected boards like 8-7-6 favor the wider calling range (usually the Big Blind), which contains more two-pair and straight combinations — check more here, especially out of position. Being in position adds a second layer on top of range advantage: an in-position player can c-bet 15-25% more often than the same range would out of position, because acting last lets bets extract information for free.",
+    "leak_categories": [200],
+    "rationale_tags": [],
+    "drill_mode": "postflop",
+    "source_doc": "02"
+  },
+  {
+    "id": "board-texture-wetness",
+    "version": 1,
+    "title": "Classify the Board Before You Decide",
+    "summary": "Every flop sits somewhere between dry/static (few draws, values are fixed) and wet/dynamic (many draws, ranges collide) — that classification, not just your hand, should drive your sizing and continuation frequency.",
+    "body": "Dry boards (K-7-2 rainbow) have few possible draws and favor the preflop raiser's tight range — bet small and often, since little changes on future streets. Wet boards (J-T-9 two-tone) have many live draws and reward polarized, larger sizing (55-75%+ pot) with strong hands and real equity, while medium-strength hands should often check instead of betting into danger.\n\nTwo special cases deserve their own rule rather than defaulting to 'wet': paired boards (Q-Q-6) have fewer strong combos in either range, so bet frequently but small; monotone boards (A-T-4 same suit) should see a sharp cut in betting frequency — check most hands and only value-bet real flushes or strong redraws, since one missed flush card changes nothing about who has the advantage.",
+    "leak_categories": [210],
+    "rationale_tags": [],
+    "drill_mode": "postflop",
+    "source_doc": "02"
+  },
+  {
+    "id": "vs-cbet-mdf",
+    "version": 1,
+    "title": "Defend by the Math, Not by Feel",
+    "summary": "Minimum Defense Frequency (MDF) sets a floor for how often you must continue against a bet so that no bluff is automatically profitable — use it as a sanity check, then adjust for real equity and live tendencies.",
+    "body": "MDF = Pot / (Pot + Bet): against a 33%-pot c-bet you need to defend roughly 75% of your range, against a 66%-pot bet roughly 60%, and against a pot-size bet roughly 50%. Treat MDF as a range-wide floor, not a per-hand rule — the actual decision to continue should be driven by your hand's real equity against the bettor's likely range (top pair or better, a strong draw, or good implied odds), with pot odds telling you the equity threshold a call needs to clear.\n\nLive opponents almost never bluff at the frequency MDF assumes, so folding somewhat more than MDF against a specific opponent who clearly under-bluffs is fine — but folding drastically more than that turns you into an easy target once anyone at the table notices.",
+    "leak_categories": [201],
+    "rationale_tags": [],
+    "drill_mode": "vs_cbet",
+    "source_doc": "02"
+  },
+  {
+    "id": "vs-check-raise-respect",
+    "version": 1,
+    "title": "Respect the Check-Raise, Then Loosen With Stakes",
+    "summary": "A flop check-raise at these stakes almost always means a real hand — default to folding anything less than a strong made hand or a genuine draw, while paired boards deserve a wider continuing range since check-raises there are more common and less scary.",
+    "body": "At $1/$2, a check-raise is rarely a bluff — solver data shows raise frequencies dropping to single digits on wet, polarized boards (5-9%) even though they run higher on paired boards (roughly 24%), where trips and two-pair are distributed across both ranges and cheaper to represent. The practical default facing a raise as the original bettor: continue with sets, two pair, strong draws (combo draws, OESD plus flush draw), and fold weaker made hands and thin value without hesitation.\n\nAs stakes rise toward $2/$3 and beyond, some opponents start check-raising more dynamically — including real semi-bluffs and protection raises with vulnerable strong hands — so the fold-heavy default should loosen once a specific opponent shows that tendency, rather than applying it as a blanket rule forever.",
+    "leak_categories": [202],
+    "rationale_tags": [],
+    "drill_mode": "vs_check_raise",
+    "source_doc": "06"
+  },
+  {
+    "id": "equity-rule-of-4-and-2",
+    "version": 1,
+    "title": "The Rule of 4 and 2: Fast Equity From Outs",
+    "summary": "Count your outs, then multiply — outs x 4 on the flop (two cards to come) or outs x 2 on the turn (one card to come) gives a quick, close-enough equity estimate without a calculator.",
+    "body": "With two cards left to see, multiply your outs by roughly 4 to estimate your winning percentage (a flush draw's 9 outs is about 36% equity); with one card left, multiply by roughly 2 (that same draw is about 18% on the turn alone). The rule is accurate up to about 15 outs on the flop — above that it overstates equity (20 outs is closer to 67%, not 80%), so use the flop version only when the money is going in on the flop, and use the turn version for single-street decisions.\n\nThis quick estimate is what every pot-odds and MDF calculation depends on: an imprecise read on your own equity produces systematic errors in calling and betting decisions even when the rest of the math is done correctly.",
+    "leak_categories": [211],
+    "rationale_tags": [],
+    "drill_mode": "random",
+    "source_doc": "02"
+  }
+]

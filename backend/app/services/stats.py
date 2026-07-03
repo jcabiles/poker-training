@@ -36,7 +36,7 @@ def _name(cat: int) -> str:
 
 
 def leak_stats(session: Session) -> list[dict]:
-    rows = list(session.exec(select(DrillAttempt)))
+    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
     by: dict[int, list[DrillAttempt]] = defaultdict(list)
     for r in rows:
         if r.leak_category is not None:
@@ -65,20 +65,42 @@ def _accuracy(items: list[DrillAttempt]) -> float:
     return sum(1 for i in items if i.correctness in _GOOD) / len(items)
 
 
+def _local_date(dt: datetime) -> date:
+    """Normalize a DrillAttempt.created_at to the local calendar day.
+
+    created_at is written as datetime.now(UTC) (models.py:_utcnow), but SQLite
+    round-trips can drop tzinfo, so naive values are treated as UTC before
+    converting to local time.
+    """
+    aware = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+    return aware.astimezone().date()
+
+
 def summary(session: Session, today: date | None = None) -> dict:
-    # DrillAttempt.created_at is stamped in UTC; compare the streak in UTC too so
-    # "today" matches the stored dates (avoids a UTC-vs-local date-boundary gap).
-    today = today or datetime.now(UTC).date()
-    rows = list(session.exec(select(DrillAttempt)))
+    # due_date (SRSItemRow) is written as a local date by record_attempt
+    # (review.py:70, date.today()); created_at (DrillAttempt) is written UTC
+    # (models.py:_utcnow, datetime.now(UTC)). summary() normalizes both to
+    # local calendar days so the due count and streak agree with what the
+    # user sees "today" in their own timezone.
+    today = today or date.today()
+    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
     ordered = sorted(rows, key=lambda r: r.created_at)
 
-    days = {r.created_at.date() for r in rows}
+    days = {_local_date(r.created_at) for r in rows}
     streak, d = 0, today
     while d in days:
         streak += 1
         d -= timedelta(days=1)
 
-    due = len(list(session.exec(select(SRSItemRow).where(SRSItemRow.due_date <= today))))
+    due = len(
+        list(
+            session.exec(
+                select(SRSItemRow)
+                .where(SRSItemRow.owner_id == "")
+                .where(SRSItemRow.due_date <= today)
+            )
+        )
+    )
     trend = round(_accuracy(ordered[-20:]) - _accuracy(ordered[-40:-20]), 3)
 
     return {
@@ -105,7 +127,11 @@ def hand_error_weights(session: Session) -> dict[str, float]:
         there's no signal to rank on -> every qualifying class gets 1.0.
     """
     rows = list(
-        session.exec(select(DrillAttempt).where(DrillAttempt.leak_category.in_(_RFI_CATEGORIES)))
+        session.exec(
+            select(DrillAttempt)
+            .where(DrillAttempt.owner_id == "")
+            .where(DrillAttempt.leak_category.in_(_RFI_CATEGORIES))
+        )
     )
 
     losses_by_class: dict[str, list[float]] = defaultdict(list)

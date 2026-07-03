@@ -6,9 +6,12 @@ import { RANK_ORDER, handClass } from "../lib/poker";
 const LEGEND: [string, string][] = [
   ["action-raise", "raise"],
   ["action-call", "call"],
-  ["action-mixed", "mixed"],
   ["action-fold", "fold"],
 ];
+
+// N5: fixed stacking order so a hand's segments render consistently
+// (mixed frequencies no longer collapse to one label — see grading.py:range_grid).
+const ACTION_ORDER = ["raise", "call", "fold"];
 
 const COLLAPSED_KEY = "rangeGrid.collapsed";
 const TITLE_ID = "range-grid-title";
@@ -35,7 +38,8 @@ export default function RangeGrid({
   revealed = false,
 }: {
   spot: Spot;
-  grid: Record<string, string>;
+  /** handclass -> {action: freq}; freqs sum to ~1.0 (may be a single entry). */
+  grid: Record<string, Record<string, number>>;
   /** CW-6: true only for the Test-mode post-grade reveal. That mount always
    * starts expanded (ignoring the persisted collapse preference — Study mode
    * may have left it collapsed) and plays a one-shot reveal animation. The
@@ -86,17 +90,33 @@ export default function RangeGrid({
               {RANK_ORDER.map((r2, j) => {
                 const cls =
                   i === j ? r1 + r2 : i < j ? r1 + r2 + "s" : RANK_ORDER[j] + RANK_ORDER[i] + "o";
-                const action = grid[cls] ?? "fold";
+                const mix = grid[cls] ?? { fold: 1 };
+                const segments = ACTION_ORDER.filter((a) => (mix[a] ?? 0) > 0).map((a) => ({
+                  action: a,
+                  freq: mix[a],
+                }));
                 const isHero = cls === hero;
+                const mixLabel = segments
+                  .map((s) => `${s.action} ${Math.round(s.freq * 100)}%`)
+                  .join(", ");
                 return (
                   <div
                     key={`${i}-${j}`}
                     role="cell"
-                    className={`cell action-${action}${isHero ? " hero" : ""}`}
-                    title={`${cls}: ${action}`}
-                    aria-label={`${cls}: ${action}${isHero ? ", your hand" : ""}`}
+                    className={`cell${isHero ? " hero" : ""}`}
+                    title={`${cls}: ${mixLabel}`}
+                    aria-label={`${cls}: ${mixLabel}${isHero ? ", your hand" : ""}`}
                   >
-                    {cls}
+                    <div className="cell-segments" aria-hidden="true">
+                      {segments.map((s) => (
+                        <span
+                          key={s.action}
+                          className={`cell-segment action-${s.action}`}
+                          style={{ flex: `${s.freq} 0 0%` }}
+                        />
+                      ))}
+                    </div>
+                    <span className="cell-label">{cls}</span>
                   </div>
                 );
               })}

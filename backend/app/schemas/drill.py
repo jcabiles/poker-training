@@ -14,7 +14,7 @@ from app.domain.spot import Spot
 
 class NextDrillResponse(BaseModel):
     spot: Spot
-    grid: dict[str, str] = {}  # handclass -> raise|call|fold|mixed, for grid coloring
+    grid: dict[str, dict[str, float]] = {}  # handclass -> {action: freq}, for grid coloring
 
 
 class GradeRequest(BaseModel):

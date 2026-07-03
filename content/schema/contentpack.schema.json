@@ -119,7 +119,7 @@
       "type": "object"
     },
     "NodeContext": {
-      "description": "Strategic node tags \u2014 drive provider lookup and leak mapping.\n\nPostflop contexts (CBET, VS_CBET, ...) are reserved for Phase 2.",
+      "description": "Strategic node tags \u2014 drive provider lookup and leak mapping.\n\nCBET is the Phase 2a postflop node (flop c-bet, HU SRP). VS_CBET and later\npostflop contexts are reserved for 2b+.",
       "enum": [
         "RFI",
         "vs_RFI",
@@ -127,7 +127,10 @@
         "vs_4bet",
         "blind_defense",
         "squeeze",
-        "vs_limpers"
+        "vs_limpers",
+        "cbet",
+        "vs_cbet",
+        "vs_check_raise"
       ],
       "title": "NodeContext",
       "type": "string"

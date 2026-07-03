@@ -2,9 +2,12 @@ from app.domain.action import Decision
 from app.domain.evaluation import Correctness
 from app.domain.leaks import LeakCategory
 from app.domain.postflop import (
+    _CAT_VALUE,
+    _cbet_fold_equity_value,
     _hand_category,
     _merits,
     _merits_vs_cbet,
+    cbet_fold_pct,
     grade_cbet,
     grade_vs_cbet,
     grade_vs_check_raise,
@@ -442,3 +445,41 @@ def test_ace_high_board_scored_below_other_high_boards():
     ace_adv = range_advantage(NodeContext.CBET, Position.BTN, Position.BB, ace_high)
     assert king_adv == "hero"
     assert ace_adv != "hero"  # ace-high doesn't clear the "hero" bar the K-high board does
+
+
+# --- N2: interim fold-equity EV (doc-08 §3.2) grounds grade_cbet's `value` term ---
+
+
+def test_cbet_fold_pct_matches_doc06_cited_textures():
+    paired_dry = classify(["Qh", "Qc", "6d"])  # doc-06 §2/§4: 37% fold
+    monotone = classify(["Qd", "Jd", "Td"])  # doc-06 §2: 37% fold
+    wet_two_tone = classify(["Kh", "Jh", "7d"])  # doc-06 §2: 62% fold
+    assert cbet_fold_pct(paired_dry) == 0.37
+    assert cbet_fold_pct(monotone) == 0.37
+    assert cbet_fold_pct(wet_two_tone) == 0.62
+
+
+def test_grade_cbet_value_is_grounded_in_real_equity_not_flat_category_guess():
+    # Pure air (two live overcards, no pair/draw) on a low wet board actually
+    # retains real equity vs a wide continuing range -- doc-08 §1.3's headline
+    # finding that flat category buckets misprice hands. The old flat
+    # `_CAT_VALUE["air"] == 0.0` floor must no longer be what feeds `_merits`
+    # once a real villain_range/board is available to compute equity from.
+    spot = _cbet_spot(
+        ("As", "Kd"), ["9h", "8h", "6c"], hero_pos=Position.CO, villain_pos=Position.BTN
+    )
+    tex = classify(spot.board)
+    value = _cbet_fold_equity_value(spot, spot.board, tex, spot.villain_range)
+    assert value is not None
+    assert value != _CAT_VALUE["air"]
+
+
+def test_grade_cbet_falls_back_to_category_value_without_a_villain_range():
+    # No villain_range/pot context (e.g. a bare unit-test spot) -> `_merits`
+    # keeps using the flat category lookup, so existing direct-call tests of
+    # `_merits`/`_merits_vs_cbet` (which never pass `value_override`) stay valid.
+    spot = _cbet_spot(("As", "Kd"), ["9h", "8h", "6c"])
+    tex = classify(spot.board)
+    assert _cbet_fold_equity_value(spot, spot.board, tex, None) is not None  # "*" fallback range
+    spot_no_pot = spot.model_copy(update={"pot_bb": 0.0})
+    assert _cbet_fold_equity_value(spot_no_pot, spot_no_pot.board, tex, None) is None

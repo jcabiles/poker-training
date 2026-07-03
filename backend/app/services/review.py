@@ -42,9 +42,10 @@ def record_attempt(
     sig = spot.srs_signature or spot_signature(spot)
     quality = quality_from_correctness(correctness)
     street, tex, sprb, facedb = _postflop_archetype(spot)
-    row = session.get(SRSItemRow, sig)
+    row = session.get(SRSItemRow, ("", sig))  # composite PK (owner_id, signature)
     if row is None:
         row = SRSItemRow(
+            owner_id="",  # '' = the local user (ownership seam)
             signature=sig,
             node_context=spot.node_context[0].value if spot.node_context else "",
             position=spot.hero.position.value,
@@ -79,6 +80,9 @@ def due_items(session: Session, today: date | None = None) -> list[SRSItemRow]:
     today = today or date.today()
     return list(
         session.exec(
-            select(SRSItemRow).where(SRSItemRow.due_date <= today).order_by(SRSItemRow.due_date)
+            select(SRSItemRow)
+            .where(SRSItemRow.owner_id == "")  # local user only (ownership seam)
+            .where(SRSItemRow.due_date <= today)
+            .order_by(SRSItemRow.due_date)
         )
     )

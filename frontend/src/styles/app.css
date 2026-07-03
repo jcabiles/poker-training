@@ -11,11 +11,11 @@
   margin-bottom: calc(var(--space) * 2);
 }
 .topbar h1 {
-  font-size: 20px;
+  font-size: var(--text-lg);
   margin: 0;
 }
 .tag {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted);
   font-weight: 400;
 }
@@ -38,10 +38,10 @@
   color: var(--felt-text);
   border-radius: var(--radius);
   padding: calc(var(--space) * 2);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-felt);
 }
 .ctx {
-  font-size: 13px;
+  font-size: var(--text-md);
   opacity: 0.9;
   margin-bottom: var(--space);
 }
@@ -51,10 +51,10 @@
   flex-wrap: wrap;
 }
 .seat {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--felt-chip-bg);
   border-radius: 8px;
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: var(--text-md);
 }
 .seat .pos {
   font-weight: 600;
@@ -75,7 +75,7 @@
 }
 .herometa {
   margin-top: var(--space);
-  font-size: 13px;
+  font-size: var(--text-md);
   opacity: 0.95;
 }
 
@@ -90,17 +90,17 @@
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
   color: var(--suit-black);
 }
 .card.red {
   color: var(--suit-red);
 }
 .card .r {
-  font-size: 22px;
+  font-size: var(--text-xl);
 }
 .card .s {
-  font-size: 20px;
+  font-size: var(--text-lg);
 }
 
 /* Decisions */
@@ -115,7 +115,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 16px;
-  font-size: 15px;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 .btn:hover {
@@ -131,7 +131,7 @@
   border-color: var(--primary);
 }
 kbd {
-  font-size: 11px;
+  font-size: var(--text-xs);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 4px;
@@ -146,6 +146,7 @@ kbd {
   border-radius: var(--radius);
   padding: calc(var(--space) * 2);
   margin-top: calc(var(--space) * 2);
+  box-shadow: var(--shadow-panel);
 }
 .good-bg {
   background: var(--good-bg);
@@ -172,8 +173,44 @@ kbd {
 .badge.warn {
   background: var(--warn);
 }
+.badge.neutral {
+  background: var(--muted);
+}
 .why {
   margin: var(--space) 0;
+}
+
+/* N1 tiered feedback: verdict (prominent) -> reasoning -> deep-dive (collapsed).
+   Token values only; the global :focus-visible ring covers the <summary>. */
+.tier-verdict {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.chosen-eval {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  color: var(--muted);
+}
+.tier-reasoning {
+  margin: var(--space-2) 0;
+  font-size: var(--text-md);
+}
+.tier-deepdive {
+  margin: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+.tier-deepdive summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+.deepdive-text {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-md);
+  color: var(--muted);
 }
 .mix {
   list-style: none;
@@ -189,6 +226,36 @@ kbd {
   margin-left: 6px;
 }
 
+/* N8 — point-of-need concept card: title + summary always visible below the
+   tiers, full body collapsed behind <details> (same convention as
+   .tier-deepdive above; the global :focus-visible ring covers the button and
+   <summary>). Token values only. */
+.concept-card {
+  margin: var(--space-4) 0 0;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.concept-card-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.concept-card-summary {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  color: var(--muted);
+}
+.concept-card details summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+.concept-card-body {
+  margin: var(--space-2) 0;
+  font-size: var(--text-md);
+}
+
 /* Rationale tags (CW-5): the "why" behind the verdict — node type, range
    advantage, hand category, board texture — as scannable chips. */
 .rationale {
@@ -200,7 +267,7 @@ kbd {
   margin: var(--space) 0;
 }
 .rationale-chip {
-  font-size: 12px;
+  font-size: var(--text-sm);
   background: var(--bg);
   color: var(--muted);
   border: 1px solid var(--border);
@@ -216,7 +283,7 @@ kbd {
   padding: var(--space);
 }
 .gridtitle {
-  font-size: 13px;
+  font-size: var(--text-md);
   color: var(--muted);
   margin-bottom: var(--space);
 }
@@ -232,7 +299,7 @@ kbd {
   border-radius: var(--radius);
   padding: 6px var(--space);
   margin-bottom: var(--space);
-  font-size: 13px;
+  font-size: var(--text-md);
   font-weight: 600;
   cursor: pointer;
 }
@@ -251,13 +318,33 @@ kbd {
 }
 .cell {
   aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
+  position: relative;
+  overflow: hidden;
   background: var(--bg);
   color: var(--muted);
   border-radius: 2px;
+}
+/* N5: proportional per-action frequency segments (freq-mix grid cells). A
+   pure single-action hand renders one segment at 100% width, i.e. identical
+   to the old flat-color cell. */
+.cell-segments {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.cell-segment {
+  height: 100%;
+}
+.cell-label {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-2xs);
+  color: var(--act-on);
+  pointer-events: none;
 }
 .cell.pair {
   color: var(--text);
@@ -272,7 +359,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted);
   margin-top: var(--space);
 }
@@ -328,7 +415,7 @@ kbd {
   margin-bottom: 0;
 }
 .mode-group-label {
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
@@ -349,7 +436,7 @@ kbd {
   gap: var(--space);
 }
 .studytest-hint {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--muted);
 }
 
@@ -372,10 +459,10 @@ kbd {
   min-width: 64px;
 }
 .statstrip .stat b {
-  font-size: 20px;
+  font-size: var(--text-lg);
 }
 .statstrip .stat span {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted);
 }
 .statstrip .leaks {
@@ -386,13 +473,13 @@ kbd {
   margin-left: auto;
 }
 .lk-title {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 .lk {
-  font-size: 12px;
+  font-size: var(--text-sm);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -404,16 +491,21 @@ kbd {
 
 /* Feedback mixed note */
 .mixed {
-  font-size: 13px;
+  font-size: var(--text-md);
   font-style: italic;
   margin: 4px 0;
 }
 
-/* Range-grid action coloring */
+/* Range-grid action coloring — also used by the legend's static swatches
+   (`.cell.sample.action-*`, no children, so the flat background applies
+   directly). Actual grid cells color their `.cell-segment` children instead
+   (see N5 proportional-mix rules above `.cell.pair`). */
 .cell.action-raise { background: var(--act-raise); color: var(--act-on); }
 .cell.action-call { background: var(--act-call); color: var(--act-on); }
 .cell.action-fold { background: var(--act-fold); color: var(--act-on); }
-.cell.action-mixed { background: var(--act-mixed); color: var(--act-on); }
+.cell-segment.action-raise { background: var(--act-raise); }
+.cell-segment.action-call { background: var(--act-call); }
+.cell-segment.action-fold { background: var(--act-fold); }
 .cell.hero {
   outline: 3px solid var(--text);
   outline-offset: -3px;
@@ -428,9 +520,9 @@ kbd {
 
 /* Betting-line summary on the table */
 .line {
-  font-size: 13px;
+  font-size: var(--text-md);
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--felt-line-bg);
   border-radius: 6px;
   padding: 4px 8px;
   margin-bottom: var(--space);
@@ -461,7 +553,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: var(--text-base);
   width: 120px;
 }
 .input:focus-visible {
@@ -471,7 +563,7 @@ kbd {
 /* Villain archetype badge (exploit drills) */
 .villain {
   display: inline-block;
-  font-size: 13px;
+  font-size: var(--text-md);
   font-weight: 700;
   text-transform: capitalize;
   background: var(--warn);
@@ -479,4 +571,37 @@ kbd {
   border-radius: 999px;
   padding: 3px 10px;
   margin-bottom: var(--space);
+}
+
+/* N7 — home/curriculum hub */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+.home-section-title {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space);
+}
+.home-due-count {
+  margin: 0 0 var(--space);
+}
+.home-due-list {
+  margin-bottom: calc(var(--space) * 2);
+}
+.home-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space);
+  list-style: none;
+  padding: 0;
+  margin: var(--space) 0 0;
+}
+.home-path-node {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+  text-align: left;
 }

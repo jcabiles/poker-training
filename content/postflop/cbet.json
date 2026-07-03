@@ -1,0 +1,29 @@
+{
+  "id": "postflop-cbet",
+  "version": 1,
+  "domain": "postflop",
+  "description": "Authored rationale for the flop c-bet decision (HU single-raised pot, hero = preflop aggressor in position vs BB). Keyed by opener/caller pairing; texture/hand-category scoring itself is unchanged (backend/app/domain/postflop.py::grade_cbet). Source: docs/research/02-postflop-strategy.md §2-3, 06-postflop-reference-tables.md.",
+  "entries": [
+    {
+      "node_context": "cbet",
+      "position": "BTN",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "As the preflop aggressor acting last, BTN keeps both the range and positional edge into the flop: BTN's wide opening range plus being in position lets it c-bet a broad mix of hands, sizing small on dry/high boards where BB's calling range struggles to continue and bigger on wet boards where BTN still holds the stronger top-end."
+    },
+    {
+      "node_context": "cbet",
+      "position": "CO",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "CO's opening range is a notch tighter than BTN's, so the range edge into the flop is a little smaller, but the in-position c-bet is still the default: c-bet frequency stays high on dry/high boards where CO's tighter range still out-flops BB's calling range, and comes down on low, connected, wet boards where BB's continue range catches up."
+    },
+    {
+      "node_context": "cbet",
+      "position": "UTG",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "UTG opens the strongest, narrowest range of the three pairings, so its range advantage is largest on high, dry boards (loaded with the pairs and broadways UTG opens) but thins out fastest on low, connected boards where BB's much wider calling range hits harder — size and frequency should track that texture split more aggressively than from CO/BTN."
+    }
+  ]
+}

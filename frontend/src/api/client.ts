@@ -1,4 +1,5 @@
 import type {
+  CardMatchResponse,
   Decision,
   EvaluationResult,
   LeakStat,
@@ -8,6 +9,7 @@ import type {
   QuizItem,
   QuizKind,
   QuizResult,
+  ReviewPlanResponse,
   Spot,
   StatsSummary,
 } from "./types";
@@ -53,4 +55,20 @@ export async function quizGrade(answer: QuizAnswer): Promise<QuizResult> {
       body: JSON.stringify(answer),
     }),
   );
+}
+
+// N7 — today's-plan (SM-2 due queue), fire-and-forget/best-effort like stats.
+export async function getPlan(): Promise<ReviewPlanResponse> {
+  return json(await fetch(`${BASE}/review/plan`));
+}
+
+// N8 — point-of-need concept-card lookup. Callers should treat this as
+// fire-and-forget/non-blocking: feedback must render even if this fails.
+export async function matchCard(
+  leakCategory: number,
+  tags: string[],
+): Promise<CardMatchResponse> {
+  const params = new URLSearchParams({ leak_category: String(leakCategory) });
+  if (tags.length > 0) params.set("tags", tags.join(","));
+  return json(await fetch(`${BASE}/cards/match?${params.toString()}`));
 }

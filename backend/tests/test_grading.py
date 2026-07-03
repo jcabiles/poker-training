@@ -9,7 +9,7 @@ from app.domain.content.models import ActionRange, Entry
 from app.domain.content.registry import build_index as _build_index
 from app.domain.content.registry import load_preflop_packs as _load
 from app.domain.evaluation import Correctness
-from app.domain.grading import grade, leak_category_for
+from app.domain.grading import grade, leak_category_for, range_grid
 from app.domain.hand_rank import hand_rank
 from app.domain.leaks import LeakCategory
 from app.domain.providers import get_provider as _get_provider
@@ -108,6 +108,20 @@ def test_mixed_top_action_optimal_alt_acceptable():
     assert called.correctness == Correctness.ACCEPTABLE  # call played at 0.4
 
 
+# --- N5: range_grid returns per-action frequency mix, not a collapsed label ---
+def test_range_grid_mixed_handclass_returns_per_action_freqs():
+    grid = range_grid(_mixed_entry())
+    mix = grid["A5s"]
+    assert mix == {"raise": 0.6, "call": 0.4}
+    assert abs(sum(mix.values()) - 1.0) < 1e-6
+
+
+def test_range_grid_pure_handclass_returns_single_entry():
+    grid = range_grid(rfi_entry(Position.CO, "22+, A2s+, AKo"))
+    assert grid["AA"] == {"raise": 1.0}
+    assert grid["72o"] == {"fold": 1.0}
+
+
 # --- leak mapping ---
 def test_leak_category_mapping():
     co = make_rfi_spot(position=Position.CO)
@@ -203,6 +217,9 @@ def test_thin_value_iso_vs_station_is_optimal():
     assert res.correctness == Correctness.OPTIMAL
     assert "exploit" in res.rationale_tags
     assert res.leak_category == int(LeakCategory.CALLING_STATION_EXPLOIT)
+    # N1: the exploit adjustment also reaches the tiered reasoning surface
+    assert res.tiers is not None
+    assert "station" in res.tiers.reasoning.lower()
 
 
 def test_3bet_bluff_vs_station_worse_than_baseline():
@@ -234,7 +251,11 @@ def test_exploit_explanation_carries_rationale():
     )
     res = _asyncio.run(p.optimal(spot))
     assert "exploit" in res.rationale_tags
-    assert "station" in res.explanation.lower()
+    assert "station" in res.explanation.lower()  # flat explanation kept for backward compat
+    # N1: the authored rationale now ALSO lands in the reasoning tier (the
+    # user-facing surface), sourced from authored_rationale — not re-parsed prose.
+    assert res.tiers is not None
+    assert "station" in res.tiers.reasoning.lower()
 
 
 def test_marginal_offchart_call_is_not_a_blunder():

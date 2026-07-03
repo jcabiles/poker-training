@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getLeaks, getNext, getSummary, grade } from "./api/client";
+import { getLeaks, getNext, getPlan, getSummary, grade } from "./api/client";
 import type {
   ActionType,
   EvaluationResult,
   LeakStat,
   Mode,
+  ReviewPlanResponse,
   Spot,
   StatsSummary,
 } from "./api/types";
 import DecisionBar from "./components/DecisionBar";
 import FeedbackPanel from "./components/FeedbackPanel";
+import Home from "./components/Home";
 import ModeGroup from "./components/ModeGroup";
 import PokerTable from "./components/PokerTable";
 import QuizPanel from "./components/QuizPanel";
@@ -18,10 +20,10 @@ import RangeGrid from "./components/RangeGrid";
 import StatsStrip from "./components/StatsStrip";
 import StudyTestToggle, { type StudyTestMode } from "./components/StudyTestToggle";
 import { legalDecisions } from "./lib/decisions";
-
-type View = "drill" | "texture" | "equity";
+import { formatHash, parseHash, type View } from "./lib/hashRoute";
 
 const VIEWS: { id: View; label: string }[] = [
+  { id: "home", label: "Home" },
   { id: "drill", label: "Practice" },
   { id: "texture", label: "Texture quiz" },
   { id: "equity", label: "Equity quiz" },
@@ -64,14 +66,16 @@ function writeStudyTestMode(mode: StudyTestMode): void {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>("drill");
+  // N6: view + drill mode live in the URL hash (deep-link/reload restore).
+  const [route, setRoute] = useState(() => parseHash(window.location.hash));
+  const { view, mode } = route;
   const [spot, setSpot] = useState<Spot | null>(null);
-  const [grid, setGrid] = useState<Record<string, string>>({});
+  const [grid, setGrid] = useState<Record<string, Record<string, number>>>({});
   const [result, setResult] = useState<EvaluationResult | null>(null);
-  const [mode, setMode] = useState<Mode>("random");
   const [studyTestMode, setStudyTestMode] = useState<StudyTestMode>(() => readStudyTestMode());
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [leaks, setLeaks] = useState<LeakStat[]>([]);
+  const [plan, setPlan] = useState<ReviewPlanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshStats = useCallback(async () => {
@@ -96,14 +100,54 @@ export default function App() {
     }
   }, []);
 
+  // Hash is the source of truth: hashchange (tabs, mode buttons, back/forward,
+  // manual edits) syncs state. Non-drill hashes carry no mode segment, so keep
+  // the previous drill mode while on a quiz view.
   useEffect(() => {
-    loadNext("random");
+    const onHashChange = () => {
+      setRoute((prev) => {
+        const next = parseHash(window.location.hash);
+        return next.view === "drill" ? next : { view: next.view, mode: prev.mode };
+      });
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  // Fetches on mount with the deep-linked mode (single fetch, no random-then-
+  // deep-linked race) and again whenever the mode changes via the hash.
+  useEffect(() => {
+    loadNext(mode);
+  }, [mode, loadNext]);
+
+  useEffect(() => {
     refreshStats();
-  }, [loadNext, refreshStats]);
+  }, [refreshStats]);
+
+  // N7 — today's plan is fetched only while home is active; fire-and-forget
+  // (best-effort like stats) so home still renders with a graceful
+  // placeholder (Home treats `plan === null` as an empty due queue) if this fails.
+  useEffect(() => {
+    if (view !== "home") return;
+    let cancelled = false;
+    getPlan()
+      .then((p) => {
+        if (!cancelled) setPlan(p);
+      })
+      .catch(() => {
+        if (!cancelled) setPlan(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [view]);
 
   const selectMode = (m: Mode) => {
-    setMode(m);
-    loadNext(m);
+    if (m === mode) {
+      loadNext(m); // re-clicking the active mode still deals a fresh spot
+      return;
+    }
+    window.location.hash = formatHash("drill", m);
   };
 
   const selectStudyTestMode = (m: StudyTestMode) => {
@@ -180,14 +224,18 @@ export default function App() {
           <button
             key={v.id}
             className={"btn" + (v.id === view ? " btn-primary" : "")}
-            onClick={() => setView(v.id)}
+            onClick={() => {
+              window.location.hash = formatHash(v.id, mode);
+            }}
           >
             {v.label}
           </button>
         ))}
       </div>
 
-      {view === "drill" ? (
+      {view === "home" ? (
+        <Home plan={plan} leaks={leaks} />
+      ) : view === "drill" ? (
         <>
           <div className="mode-groups">
             <ModeGroup

@@ -20,9 +20,39 @@
   --suit-black: #1a1d23;
   --accent-cell: #2f6fed;
 
-  --radius: 10px;
-  --space: 8px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  /* Type scale — named steps covering every font-size app.css uses. */
+  --text-2xs: 9px; /* grid-cell glyphs */
+  --text-xs: 11px; /* kbd hints, micro labels */
+  --text-sm: 12px; /* tags, chips, section labels */
+  --text-md: 13px; /* secondary copy, panel titles */
+  --text-base: 15px; /* body copy, buttons, inputs */
+  --text-lg: 20px; /* headings, stat numbers */
+  --text-xl: 22px; /* card-rank emphasis */
+
+  /* Space ramp — base unit unchanged (8px); named steps added for future use. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space: var(--space-2); /* alias, was a flat 8px value */
+
+  /* Radius ramp — existing --radius:10px becomes the --radius-lg step. */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+  --radius: var(--radius-lg); /* alias, was a flat 10px value */
+
+  /* Elevation model — distinct levels for felt (base surface) → panel →
+     card → overlay (highest, for future modals/popovers). */
+  --shadow-felt: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.16);
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --shadow: var(--shadow-panel); /* alias, was a flat single-level value */
 }
 
 [data-theme="dark"] {
@@ -45,7 +75,11 @@
   --suit-red: #c1372c;
   --suit-black: #11151b;
   --accent-cell: #4a90ff;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-felt: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.6);
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.75);
+  --shadow: var(--shadow-panel);
 }
 
 * {
@@ -56,7 +90,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: var(--text-base) / 1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 :focus-visible {
@@ -72,4 +106,11 @@ body {
   --act-fold: #585f6b;
   --act-mixed: #8a6410;
   --act-on: #ffffff;
+}
+
+/* Dark scrims for chips/labels laid on top of the (always-dark) felt surface
+   in both themes; theme-independent like the action colors above. */
+:root {
+  --felt-chip-bg: rgba(0, 0, 0, 0.2);
+  --felt-line-bg: rgba(0, 0, 0, 0.18);
 }
