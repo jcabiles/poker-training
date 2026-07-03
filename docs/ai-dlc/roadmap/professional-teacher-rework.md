@@ -118,7 +118,7 @@ and *partly* real new work (baseline preflop + all postflop are templated tautol
       loads its drill; `verify.sh` + build green. **Appetite:** ~1 epic. **No-gos:** no branching skill-tree (single path);
       no new SRS storage; onboarding/placement is N-Next, not here.
 
-- [ ] **N8 — Concept cards (point-of-need, ~10–15).** ICE 8·6·4 (benefits from N1/N3).
+- [x] **N8 — Concept cards (point-of-need, ~10–15).** *(done 2026-07-03: 15 doc-grounded cards + leak/tag matcher in services + /cards/match endpoint + FeedbackPanel point-of-need render with hash-route drill-this; refuter pass, live-probed against real grader outputs)* ICE 8·6·4 (benefits from N1/N3).
       **Problem:** research docs 01–08 are **invisible in-app**; a missed rep explains nothing conceptual; no leak→card map
       exists and `leak_category` alone is too coarse to key one (e.g. `VS_RFI=112` = call/3bet/fold together).
       **Outcome-link:** primary (teach the concept) + enabling (stranger learns).

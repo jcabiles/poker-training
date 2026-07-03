@@ -1,4 +1,5 @@
 import type {
+  CardMatchResponse,
   Decision,
   EvaluationResult,
   LeakStat,
@@ -53,4 +54,15 @@ export async function quizGrade(answer: QuizAnswer): Promise<QuizResult> {
       body: JSON.stringify(answer),
     }),
   );
+}
+
+// N8 — point-of-need concept-card lookup. Callers should treat this as
+// fire-and-forget/non-blocking: feedback must render even if this fails.
+export async function matchCard(
+  leakCategory: number,
+  tags: string[],
+): Promise<CardMatchResponse> {
+  const params = new URLSearchParams({ leak_category: String(leakCategory) });
+  if (tags.length > 0) params.set("tags", tags.join(","));
+  return json(await fetch(`${BASE}/cards/match?${params.toString()}`));
 }

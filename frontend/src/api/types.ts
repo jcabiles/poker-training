@@ -137,3 +137,22 @@ export interface QuizResult {
   explanation: string;
   leak_category: number;
 }
+
+// N8 — point-of-need concept cards. leak_category + rationale_tags key the
+// match (see backend/app/services/concept_cards.py); drill_mode is where
+// "drill this" navigates via hash routing (#/drill/<mode>).
+export interface ConceptCard {
+  id: string;
+  version: number;
+  title: string;
+  summary: string;
+  body: string;
+  leak_categories: number[];
+  rationale_tags: string[];
+  drill_mode: Mode;
+  source_doc: string;
+}
+
+export interface CardMatchResponse {
+  card: ConceptCard | null;
+}
