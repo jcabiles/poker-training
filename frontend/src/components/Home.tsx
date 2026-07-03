@@ -15,16 +15,15 @@ interface PathNode {
 }
 
 // N7 — single ordered learning path (no branching skill tree; see roadmap
-// §N7 no-gos). Several preflop nodes share the "random" drill mode because
-// `/drill/next` has no per-node-context filter for preflop families — that's
-// a backend-filtering change out of scope here (this slice is read-only path
-// surfacing over the existing 8 drill modes).
+// §N7 no-gos). Each preflop node deals its own family via a per-node-context
+// `/drill/next` mode (backend _FAMILY_CTX); postflop/exploit nodes use their
+// existing modes.
 const LEARNING_PATH: PathNode[] = [
-  { title: "RFI", mode: "random", leakCategories: [100, 101, 102, 103, 104] },
-  { title: "vs RFI", mode: "random", leakCategories: [112] },
-  { title: "Blind defense", mode: "random", leakCategories: [110] },
-  { title: "vs Limpers", mode: "random", leakCategories: [150] },
-  { title: "vs 3-bet", mode: "random", leakCategories: [120, 121] },
+  { title: "RFI", mode: "rfi", leakCategories: [100, 101, 102, 103, 104] },
+  { title: "vs RFI", mode: "vs_rfi", leakCategories: [112] },
+  { title: "Blind defense", mode: "blind_defense", leakCategories: [110] },
+  { title: "vs Limpers", mode: "vs_limpers", leakCategories: [150] },
+  { title: "vs 3-bet", mode: "vs_3bet", leakCategories: [120, 121] },
   { title: "C-bet", mode: "postflop", leakCategories: [200] },
   { title: "Facing c-bet", mode: "vs_cbet", leakCategories: [201] },
   { title: "Facing check-raise", mode: "vs_check_raise", leakCategories: [202] },

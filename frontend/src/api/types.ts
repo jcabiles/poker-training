@@ -103,7 +103,13 @@ export type Mode =
   | "challenge"
   | "postflop"
   | "vs_cbet"
-  | "vs_check_raise";
+  | "vs_check_raise"
+  // preflop learning-path families (home-hub path nodes)
+  | "rfi"
+  | "vs_rfi"
+  | "blind_defense"
+  | "vs_limpers"
+  | "vs_3bet";
 
 // --- Foundational quizzes (Phase 2a) ---
 export type QuizKind = "texture" | "equity";
