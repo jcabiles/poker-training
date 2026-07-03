@@ -12,7 +12,8 @@
         { "action": "raise", "combos": "66+, A9s+, KTs+, QTs+, JTs, ATo+, KJo+, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "22-55, 54s, 65s, 76s, 87s, 98s", "frequency": 1.0 }
       ],
-      "sizing_bb": 5.0
+      "sizing_bb": 5.0,
+      "rationale": "Never limp behind — isolate to play heads-up in position with hands that dominate a weak limping range (66+, suited aces/Broadways, ATo+), sizing up to punish the dead money; the small pairs and suited connectors instead over-limp, taking cheap multiway flops where their set/straight implied odds beat trying to isolate (doc 01 §9)."
     },
     {
       "node_context": "vs_limpers",
@@ -22,7 +23,8 @@
         { "action": "raise", "combos": "55+, A7s+, K9s+, Q9s+, J9s+, T9s, 98s, 87s, A9o+, KJo+, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "22-44, 54s, 65s, 76s, A2s, A3s, A4s, K8s, Q8s, J8s", "frequency": 1.0 }
       ],
-      "sizing_bb": 5.0
+      "sizing_bb": 5.0,
+      "rationale": "The Button is the best seat to isolate from, so you widen the iso considerably (55+, suited gappers, offsuit Broadways) because guaranteed position lets you realize equity against a capped limper; the tiny pairs and weak suited hands over-limp instead, keeping the pot small and multiway where their implied odds — not raw equity — pay off (doc 01 §9)."
     },
     {
       "node_context": "vs_limpers",
@@ -32,7 +34,8 @@
         { "action": "raise", "combos": "77+, ATs+, KTs+, QJs, AJo+, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "22-66, 54s, 65s, 76s, 87s, 98s", "frequency": 1.0 }
       ],
-      "sizing_bb": 6.0
+      "sizing_bb": 6.0,
+      "rationale": "With two limpers the pot likely goes multiway even after a raise, so you tighten the isolation to hands that fare well against several callers (77+, suited aces/Broadways) and size larger (4bb + 1bb per limper); more speculative pairs and connectors shift to over-limping, since 3-way-plus pots reward set-mining and drawing over thin isolation (doc 01 §9, §11)."
     }
   ]
 }

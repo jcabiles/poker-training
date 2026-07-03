@@ -12,7 +12,8 @@
         { "action": "raise", "combos": "KK+, AKs", "frequency": 1.0 },
         { "action": "call", "combos": "QQ, JJ, AKo, AQs", "frequency": 1.0 }
       ],
-      "sizing_bb": 22.0
+      "sizing_bb": 22.0,
+      "rationale": "UTG opened the tightest range at the table, so a BTN 3-bet has you dominated by the value half of most ranges — you 4-bet only the hands that beat a calling 4-bet (KK+, AKs) and flat QQ/JJ/AKo/AQs to keep the pot controlled from out of position; everything below folds because live players under-3-bet-bluff, so their 3-bets are rarely light (doc 01 §6)."
     },
     {
       "node_context": "vs_3bet",
@@ -22,7 +23,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "99-JJ, AQs, AJs, KQs", "frequency": 1.0 }
       ],
-      "sizing_bb": 22.0
+      "sizing_bb": 22.0,
+      "rationale": "You opened CO and the BTN 3-bets from position, so you're out of position for the whole hand and defend a tighter merged range — 4-bet QQ+/AK plus the A5s wheel-blocker as the lone bluff — and flat only 99–JJ, AQs, AJs, KQs, hands with enough equity to continue but not to stack off; against a pool that rarely 3-bet-bluffs, the rest folds rather than call off dominated (doc 01 §6)."
     },
     {
       "node_context": "vs_3bet",
@@ -32,7 +34,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "TT, JJ, AQs, AJs, KQs", "frequency": 1.0 }
       ],
-      "sizing_bb": 22.0
+      "sizing_bb": 22.0,
+      "rationale": "An SB 3-bet is uncapped and out of position, but at these stakes its range is value-heavy, so you re-value: 4-bet QQ+/AK (A5s as a blocker-bluff) and flat TT–JJ, AQs, AJs, KQs — enough equity and playability to continue in position while folding the dominated hands a value-heavy 3-bet range crushes outright (doc 01 §6, §8)."
     },
     {
       "node_context": "vs_3bet",
@@ -42,7 +45,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo, A5s, A4s", "frequency": 1.0 },
         { "action": "call", "combos": "22-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, T9s, AQo", "frequency": 1.0 }
       ],
-      "sizing_bb": 21.0
+      "sizing_bb": 21.0,
+      "rationale": "On the BTN you're in position for every street, so you continue widest against a BB 3-bet: 4-bet QQ+/AK with A5s/A4s wheel-bluffs, then flat the whole pocket-pair and suited Broadway/connector region plus AQo (22–JJ, suited Broadways, JTs, T9s, AQo) because position lets you realize their implied-odds equity cheaply — the spot to defend deep, not fold (doc 01 §6)."
     },
     {
       "node_context": "vs_3bet",
@@ -52,7 +56,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "22-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, AQo", "frequency": 1.0 }
       ],
-      "sizing_bb": 21.0
+      "sizing_bb": 21.0,
+      "rationale": "Same in-position edge as versus the BB, but the SB's 3-bet range is a touch stronger and out of position, so you trim to one wheel-bluff (A5s) and drop the weakest suited connector (T9s); you still flat the wide pocket-pair and suited-Broadway block that plays profitably in position against a value-skewed 3-bettor (doc 01 §6, §8)."
     }
   ]
 }

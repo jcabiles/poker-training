@@ -14,7 +14,8 @@
         { "action": "call", "combos": "22-99, A2s, A3s, A6s, A7s, A8s, A9s, ATs, AJs, K9s, KTs, KJs, KQs, Q9s, QTs, QJs, J9s, JTs, T8s, T9s, 98s, 87s, 76s, 65s, 54s, A9o, ATo, AJo, AQo, KTo, KJo, KQo, QJo, JTo", "frequency": 1.0 },
         { "action": "call", "combos": "A5s, A4s", "frequency": 0.5 }
       ],
-      "sizing_bb": 11.0
+      "sizing_bb": 11.0,
+      "rationale": "Closing the action from the BB you get roughly 30% pot odds, so you defend very wide against the BTN's steal: flat the whole suited/connected region plus most pairs and offsuit Broadways, 3-bet TT+/AQs/AK for value, and split A5s/A4s 50/50 between value-3-bet and call — the wheel aces block AA/AK and carry enough equity to profitably do both (doc 01 §8)."
     },
     {
       "node_context": "blind_defense",
@@ -24,7 +25,8 @@
         { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
         { "action": "call", "combos": "22-TT, ATs, AJs, A9s, KTs, KJs, KQs, QTs, QJs, JTs, T9s, 98s, 87s, 76s, 65s, AQo, KQo", "frequency": 1.0 }
       ],
-      "sizing_bb": 10.0
+      "sizing_bb": 10.0,
+      "rationale": "The CO opens tighter than the BTN, so you shade your BB defense down a notch — a narrower value 3-bet (JJ+/AQs/AK, one wheel bluff) and a flat that drops the weakest connectors — while still calling wide on your ~30% pot odds, because over-folding the BB surrenders blinds you've already partly invested (doc 01 §8)."
     },
     {
       "node_context": "blind_defense",
@@ -34,7 +36,8 @@
         { "action": "raise", "combos": "QQ+, AKs, AKo", "frequency": 1.0 },
         { "action": "call", "combos": "99-JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs, TT", "frequency": 1.0 }
       ],
-      "sizing_bb": 10.0
+      "sizing_bb": 10.0,
+      "rationale": "UTG's open is the strongest at the table, so 3-betting light gets punished — you 3-bet only QQ+/AK for value and flat a tight, high-equity band (99–JJ, AQs–ATs, suited Broadways, JTs) that flops well enough to continue; small pairs and suited gappers fold because their implied odds collapse against such a strong, uncapped range (doc 01 §8)."
     },
     {
       "node_context": "blind_defense",
@@ -43,7 +46,8 @@
       "actions": [
         { "action": "raise", "combos": "55+, A8s+, KTs+, QTs+, J9s+, T9s, AJo+, KQo, A5s, A4s", "frequency": 1.0 }
       ],
-      "sizing_bb": 11.0
+      "sizing_bb": 11.0,
+      "rationale": "From the SB you'd play every postflop street out of position, so flatting is a losing proposition — you go 3-bet-or-fold with a merged range (55+, suited Broadways/aces, J9s+, T9s, plus A5s/A4s blockers) wide enough to punish a BTN steal but strong enough to play a raised pot OOP; everything else folds rather than call into positional disadvantage (doc 01 §8)."
     },
     {
       "node_context": "blind_defense",
@@ -52,7 +56,8 @@
       "actions": [
         { "action": "raise", "combos": "77+, ATs+, KJs+, QJs, AQo+, A5s", "frequency": 1.0 }
       ],
-      "sizing_bb": 10.0
+      "sizing_bb": 10.0,
+      "rationale": "Same 3-bet-or-fold logic as versus the BTN, tightened because the CO opens a stronger range: you lift the pair threshold to 77+ and the suited-ace floor to ATs, keeping A5s as the lone blocker-bluff — merged rather than polarized so you're never flatting out of position against a range that already dominates you (doc 01 §8)."
     }
   ]
 }
