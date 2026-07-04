@@ -62,7 +62,7 @@ export default function DecisionBar({
             btnRefs.current[i] = el;
           }}
           type="button"
-          className={"btn" + (d.primary ? " btn-primary" : "")}
+          className={"btn decision-btn" + (d.primary ? " btn-primary" : "")}
           disabled={disabled}
           tabIndex={i === activeSafe ? 0 : -1}
           aria-label={`${d.label} (shortcut ${d.key})`}

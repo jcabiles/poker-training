@@ -209,21 +209,21 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>
-          Poker Training <span className="tag">preflop + flop · heuristic</span>
-        </h1>
+        <div className="brand">
+          <h1>Poker Training</h1>
+          <span className="tag">preflop + flop · heuristic</span>
+        </div>
         <button className="btn" onClick={toggleTheme}>
           Theme
         </button>
       </header>
 
-      <StatsStrip summary={summary} leaks={leaks} />
-
-      <div className="modes">
+      <nav className="nav-tabs" aria-label="Sections">
         {VIEWS.map((v) => (
           <button
             key={v.id}
-            className={"btn" + (v.id === view ? " btn-primary" : "")}
+            className={"nav-tab" + (v.id === view ? " active" : "")}
+            aria-current={v.id === view ? "page" : undefined}
             onClick={() => {
               window.location.hash = formatHash(v.id, mode);
             }}
@@ -231,7 +231,9 @@ export default function App() {
             {v.label}
           </button>
         ))}
-      </div>
+      </nav>
+
+      <StatsStrip summary={summary} leaks={leaks} />
 
       {view === "home" ? (
         <Home plan={plan} leaks={leaks} />

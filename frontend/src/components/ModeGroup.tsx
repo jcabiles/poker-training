@@ -26,7 +26,7 @@ export default function ModeGroup({
         {modes.map((m) => (
           <button
             key={m.id}
-            className={"btn" + (m.id === activeMode ? " btn-primary" : "")}
+            className={"btn mode-chip" + (m.id === activeMode ? " btn-primary" : "")}
             onClick={() => onSelect(m.id)}
           >
             {m.label}

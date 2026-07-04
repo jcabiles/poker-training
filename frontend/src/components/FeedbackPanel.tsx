@@ -60,9 +60,11 @@ export default function FeedbackPanel({
       aria-live="polite"
       aria-atomic="true"
     >
-      <span className={"badge " + tone}>
-        {(result.correctness ?? "").toUpperCase()} · ≈−{result.ev_loss_bb}bb
-      </span>
+      {/* T6 tier 0 — verdict row: tone badge + EV-loss stat (mono, tabular). */}
+      <div className="verdict-row">
+        <span className={"badge " + tone}>{(result.correctness ?? "").toUpperCase()}</span>
+        <span className="verdict-ev num">≈−{result.ev_loss_bb}bb</span>
+      </div>
       {result.is_mixed && (
         <p className="mixed">Mixed spot — more than one action is defensible here.</p>
       )}
@@ -71,8 +73,9 @@ export default function FeedbackPanel({
       <p className="tier-verdict">{result.tiers?.verdict ?? result.explanation}</p>
       {result.chosen_eval && (
         <p className="chosen-eval">
-          Your action: played {Math.round(result.chosen_eval.frequency * 100)}% here · EV ≈
-          {result.chosen_eval.ev_bb}bb
+          Your action: played{" "}
+          <span className="num">{Math.round(result.chosen_eval.frequency * 100)}%</span> here · EV{" "}
+          <span className="num">≈{result.chosen_eval.ev_bb}</span>bb
         </p>
       )}
       {/* N1 tier 2 — reasoning: why, composed from tags + authored rationale. */}
@@ -87,17 +90,21 @@ export default function FeedbackPanel({
             <li key={i}>
               <b>
                 {a.action}
-                {a.size_bb ? ` ${a.size_bb}bb` : ""}
-              </b>{" "}
-              {Math.round(a.frequency * 100)}% · EV ≈{a.ev_bb}bb
+                {a.size_bb ? <span className="num"> {a.size_bb}bb</span> : ""}
+              </b>
+              <span className="num mix-freq">{Math.round(a.frequency * 100)}%</span>
+              <span className="mix-ev">
+                EV <span className="num">≈{a.ev_bb}</span>bb
+              </span>
               {a.action === result.best_action.action &&
-                a.size_bb === result.best_action.size_bb && <span className="best"> best</span>}
+                a.size_bb === result.best_action.size_bb && <span className="best">best</span>}
             </li>
           ))}
         </ul>
         {/* N2/CW-2b: EVs are a heuristic proxy, not solver-exact -- the "≈"
             prefixes above plus this note keep that honest until Phase 3. */}
-        <p className="studytest-hint">EV values are approximate (proxy, not solver-exact).</p>
+        {/* T6: own class — .studytest-hint is StudyTestToggle's (hazard 6). */}
+        <p className="ev-disclaimer">EV values are approximate (proxy, not solver-exact).</p>
       </details>
       {/* N8 — point-of-need concept card, below the tiers; absent when no
           card matches (thin leaks) or the fetch hasn't resolved/failed. */}

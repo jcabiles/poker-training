@@ -1,24 +1,80 @@
-/* Design tokens — the ONLY place raw colors live. Components reference var(). */
+/* Self-hosted fonts (OFL — see /fonts/README.md). Fraunces is a variable
+   font (wght 100–900, optical sizing auto); Source Sans 3 ships as static
+   instances. font-display: swap keeps text visible on the fallback stacks
+   while (or if never) the woff2 loads. */
+@font-face {
+  font-family: "Fraunces";
+  src: url("/fonts/Fraunces-VF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/SourceSans3-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/SourceSans3-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/SourceSans3-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  /* Declared as the 700–800 range so the one Bold file covers any bold-range
+     request without the browser stacking synthetic bold on top of it (the
+     app's heaviest weight in use is 700 — grid labels are mono/700). */
+  font-family: "Source Sans 3";
+  src: url("/fonts/SourceSans3-Bold.woff2") format("woff2");
+  font-weight: 700 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Design tokens — the ONLY place raw colors live. Components reference var().
+
+   Palette: "refined card-room" — deep felt greens, brass/cream accents,
+   ivory card stock. Light theme = the same room by day: cream paper,
+   green ink, bronze hardware. All ratios below are WCAG-verified; the
+   tight ones are annotated — nudge with care. */
 :root {
-  --bg: #f7f8fa;
-  --surface: #ffffff;
-  --text: #1a1d23;
-  --muted: #5b6573;
-  --border: #d7dbe0;
-  --primary: #1457c8;
-  --primary-text: #ffffff;
-  --good: #1a7f4b;
-  --good-bg: #e6f5ec;
-  --bad: #b22f24;
-  --bad-bg: #fbe9e7;
-  --warn: #8a5a00;
-  --warn-bg: #fbf1dc;
-  --felt: #1f6f54;
-  --felt-text: #eafff6;
-  --card-bg: #ffffff;
-  --suit-red: #c1372c;
-  --suit-black: #1a1d23;
-  --accent-cell: #2f6fed;
+  --bg: #f4efe1; /* warm cream paper */
+  --surface: #fcfaf2; /* ivory panel */
+  --text: #1c241e; /* deep green ink */
+  --muted: #5b6357; /* sage gray — 5.4:1 on --bg */
+  --border: #cfc7b0; /* parchment line — 1.6:1 on --surface */
+  --primary: #8a6828; /* dark bronze — 4.5:1 vs --bg, 3.2:1 vs --felt (focus ring) */
+  --primary-text: #fbf8ec; /* cream — 4.8:1 on bronze, ≥5.6:1 on all badge tones */
+  --good: #21714b;
+  --good-bg: #e3efdd;
+  --bad: #b03a26;
+  --bad-bg: #f9e7de;
+  --warn: #7d5a10;
+  --warn-bg: #f3e9cf;
+  --felt: #0c2519; /* felt stays night-deep in daylight — keeps --primary ring ≥3:1 on it */
+  --felt-text: #eaf2e0;
+  --card-bg: #f9f4e4; /* ivory card stock */
+  --suit-red: #b03327; /* 5.7:1 on card stock */
+  --suit-black: #232921;
+  --accent-cell: #a67f35; /* hero-cell brass — --act-on ink 5.3:1 on it (only ink that
+     renders there; .cell.hero's primary-text color is dead pre-N5 CSS) */
+
+  /* Font families — family names live ONLY here; everything else references
+     the tokens. Display serif is for headings/section titles and is never
+     used below --text-base (15px); small sizes stay on the body family. */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   /* Type scale — named steps covering every font-size app.css uses. */
   --text-2xs: 9px; /* grid-cell glyphs */
@@ -46,39 +102,58 @@
   --radius-pill: 999px;
   --radius: var(--radius-lg); /* alias, was a flat 10px value */
 
+  /* Layout sizes — fixed dimensions previously hardcoded in app.css,
+     tokenized in T3 (values unchanged). */
+  --content-width: 1080px; /* .app shell max-width */
+  --sidebar-w: 360px; /* .layout right column (range grid) */
+  --card-w: 52px; /* playing-card face */
+  --card-h: 72px;
+
   /* Elevation model — distinct levels for felt (base surface) → panel →
-     card → overlay (highest, for future modals/popovers). */
-  --shadow-felt: 0 1px 2px rgba(0, 0, 0, 0.1);
-  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.12);
-  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.16);
-  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.24);
+     card → overlay (highest, for future modals/popovers). Light theme
+     casts soft warm-umber shadows (cream room, not gray office). */
+  --shadow-felt: 0 1px 2px rgba(62, 52, 30, 0.1);
+  --shadow-panel: 0 1px 3px rgba(62, 52, 30, 0.14);
+  --shadow-card: 0 2px 6px rgba(62, 52, 30, 0.16), 0 6px 16px rgba(62, 52, 30, 0.08);
+  --shadow-overlay: 0 10px 28px rgba(62, 52, 30, 0.28);
   --shadow: var(--shadow-panel); /* alias, was a flat single-level value */
+
+  /* Motion — subtle card-room: state changes breathe, nothing travels.
+     Two durations only (T8): micro state changes and panel/tier reveals.
+     Every use in app.css sits inside a prefers-reduced-motion:
+     no-preference block — these tokens never animate for reduce users. */
+  --dur-1: 120ms; /* hover/focus/active micro-transitions */
+  --dur-2: 200ms; /* panel + disclosure reveals */
+  --ease-1: ease-out;
 }
 
 [data-theme="dark"] {
-  --bg: #0f1217;
-  --surface: #161b22;
-  --text: #e6e9ee;
-  --muted: #9aa4b2;
-  --border: #2a313b;
-  --primary: #4a90ff;
-  --primary-text: #0b1220;
-  --good: #46c98a;
-  --good-bg: #10271d;
-  --bad: #ff6b5e;
-  --bad-bg: #2a1512;
-  --warn: #e3b341;
-  --warn-bg: #2a2410;
-  --felt: #15543f;
-  --felt-text: #eafff6;
-  --card-bg: #eef1f6;
-  --suit-red: #c1372c;
-  --suit-black: #11151b;
-  --accent-cell: #4a90ff;
-  --shadow-felt: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.6);
-  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.75);
+  /* Primary theme — the room at night. Green-black surfaces (never neutral
+     gray, never pure #000), one brass voice, cream text. */
+  --bg: #0e1512; /* room black-green */
+  --surface: #18211c; /* raised panel */
+  --text: #f3efe2; /* warm cream — 3.2:1 over --act-fold (hero outline floor) */
+  --muted: #a9b1a2; /* sage — 7.5:1 on --surface */
+  --border: #39443c; /* 1.6:1 on --surface */
+  --primary: #c9a45c; /* brass — 3.7:1 vs --felt (focus ring on the table) */
+  --primary-text: #171c14; /* engraved near-black — 7.4:1 on brass */
+  --good: #66c992;
+  --good-bg: #142a1e;
+  --bad: #ef8672;
+  --bad-bg: #301813;
+  --warn: #d9b45e;
+  --warn-bg: #2b2412;
+  --felt: #1b563e; /* deep felt green */
+  --felt-text: #eaf2e0; /* 7.5:1 on felt */
+  --card-bg: #f4eede; /* same ivory stock as light theme — cards are physical */
+  --suit-red: #ad3125; /* 5.6:1 on card stock */
+  --suit-black: #20261f;
+  --accent-cell: #c9a45c; /* hero-cell brass = --primary; --act-on ink 8.3:1 on it */
+  /* Dark-room shadows: deep green-black, soft and wide — not harsh #000. */
+  --shadow-felt: 0 1px 2px rgba(3, 9, 6, 0.4);
+  --shadow-panel: 0 1px 3px rgba(3, 9, 6, 0.55);
+  --shadow-card: 0 2px 6px rgba(3, 9, 6, 0.5), 0 8px 20px rgba(3, 9, 6, 0.3);
+  --shadow-overlay: 0 12px 32px rgba(2, 7, 5, 0.65);
   --shadow: var(--shadow-panel);
 }
 
@@ -90,27 +165,38 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: var(--text-base) / 1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: var(--text-base) / 1.5 var(--font-body);
 }
 
 :focus-visible {
   outline: 3px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
-/* Range-grid action colors (theme-independent; white text reads on all four). */
+/* Range-grid action colors (theme-independent — they must clear 3:1 against
+   BOTH themes' bg/surface, and --act-on must clear 4.5:1 on all of them at
+   the 9px cell-label size). Label ink is near-black (chip-inlay engraving),
+   not white: brass-adjacent mid-tone chips + white text is the classic AA
+   failure. Verified: on/raise 4.6, on/call 5.0, on/fold 5.3, on/accent-cell
+   5.3 (light) / 8.3 (dark). Luminance steps raise < call < fold
+   (L 0.20 / 0.22 / 0.23) but the spread is small — the two-theme 3:1
+   constraint caps it, so for color-blind users the redundant cues are the
+   segment PROPORTIONS and the grid legend, not tone. Don't rely on hue.
+   T8 darkened fold a step (#8d8879 → #8a8574): dark --text/fold and
+   fold/light-bg both move 3.08 → 3.21 (the two tightest floors), and the
+   stone chip sits quieter next to raise/call. */
 :root {
-  --act-raise: #b23a2a;
-  --act-call: #2c8a52;
-  --act-fold: #585f6b;
-  --act-mixed: #8a6410;
-  --act-on: #ffffff;
+  --act-raise: #c85a31; /* terracotta chip */
+  --act-call: #43905a; /* felt-green chip */
+  --act-fold: #8a8574; /* stone chip */
+  --act-on: #0a0d0b; /* label ink — near-black green, NOT white */
 }
 
 /* Dark scrims for chips/labels laid on top of the (always-dark) felt surface
-   in both themes; theme-independent like the action colors above. */
+   in both themes; theme-independent like the action colors above. Green-black
+   rather than pure black; darkening only raises --felt-text contrast. */
 :root {
-  --felt-chip-bg: rgba(0, 0, 0, 0.2);
-  --felt-line-bg: rgba(0, 0, 0, 0.18);
+  --felt-chip-bg: rgba(4, 11, 8, 0.28);
+  --felt-line-bg: rgba(4, 11, 8, 0.24);
 }

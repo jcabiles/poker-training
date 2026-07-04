@@ -31,7 +31,7 @@ export default function StatsStrip({
         {leaks.length === 0 && <span className="lk muted">none yet</span>}
         {leaks.slice(0, 3).map((l) => (
           <span key={l.category} className="lk">
-            {l.name} · {Math.round(l.accuracy * 100)}%
+            {l.name} · <span className="num">{Math.round(l.accuracy * 100)}%</span>
           </span>
         ))}
       </div>

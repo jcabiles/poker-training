@@ -40,7 +40,7 @@ export default function PokerTable({ spot }: { spot: Spot }) {
       </div>
       {line && <div className="line">{line}</div>}
       {spot.villain_type && (
-        <div className="villain">🎯 Villain: {spot.villain_type.replace(/_/g, " ")}</div>
+        <div className="villain">Villain: {spot.villain_type.replace(/_/g, " ")}</div>
       )}
       <div className="seats">
         {villains.map((p, i) => (

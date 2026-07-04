@@ -74,12 +74,13 @@ export default function Home({
         {dueCount > 0 ? (
           <>
             <p className="home-due-count">
-              <b>{dueCount}</b> due for review
+              <b className="home-due-num">{dueCount}</b>
+              <span className="home-due-word">due for review</span>
             </p>
             <ul className="mix home-due-list">
               {dueItems.map((item) => (
                 <li key={item.signature}>
-                  {item.label} <span className="studytest-hint">due {item.due_date}</span>
+                  {item.label} <span className="home-due-date">due {item.due_date}</span>
                 </li>
               ))}
             </ul>
@@ -92,7 +93,7 @@ export default function Home({
             </button>
           </>
         ) : (
-          <p>
+          <p className="home-empty">
             Nothing due —{" "}
             <button
               type="button"
@@ -107,7 +108,7 @@ export default function Home({
 
       <section className="panel home-section">
         <h2 className="home-section-title">Learning path</h2>
-        <p className="studytest-hint">
+        <p className="home-path-key">
           solid ≥{Math.round(MASTERY_ACCURACY_THRESHOLD * 100)}% · {MASTERY_ATTEMPTS_THRESHOLD}+
           reps
         </p>
@@ -121,8 +122,8 @@ export default function Home({
                   className="btn home-path-node"
                   onClick={() => goTo(formatHash("drill", node.mode))}
                 >
-                  <span>{node.title}</span>
-                  <span className={`badge ${MASTERY_TONE[mastery]}`}>{mastery}</span>
+                  <span className="home-path-title">{node.title}</span>
+                  <span className={`badge mastery ${MASTERY_TONE[mastery]}`}>{mastery}</span>
                 </button>
               </li>
             );

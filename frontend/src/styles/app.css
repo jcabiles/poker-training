@@ -1,28 +1,87 @@
+/* T3 note: remaining off-ramp px literals (2/3/6/10/14/36px pads, gaps and
+   minor margins) are intentional exact values with no token equivalent —
+   kept as-is rather than rounded to the nearest --space-* step. */
 .app {
-  max-width: 1080px;
+  max-width: var(--content-width);
   margin: 0 auto;
-  padding: calc(var(--space) * 2);
+  padding: var(--space-6) var(--space-4);
 }
 
+/* T4 shell — masthead: brand mark left, theme control right; the nav rail
+   below carries the single hairline, so the topbar itself stays ruleless. */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: calc(var(--space) * 2);
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
-.topbar h1 {
-  font-size: var(--text-lg);
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.brand::before {
+  /* brass diamond pip — the room's mark; decorative (empty content, invisible
+     to AT). Sized off the space ramp; no motion. */
+  content: "";
+  align-self: center;
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  background: var(--primary);
+  transform: rotate(45deg);
+}
+.brand h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: 0.2px;
   margin: 0;
 }
 .tag {
+  font-family: var(--font-body); /* serif floor: never inherit Fraunces below 15px */
   font-size: var(--text-sm);
   color: var(--muted);
   font-weight: 400;
 }
 
+/* T4 — primary view rail. Plain <button>s (keeps the drill keydown guard's
+   focused-BUTTON check and the hash writes intact, App.tsx). Active tab =
+   brass underline + text-color step: shape cue + color cue, never color-only.
+   2px border-width: no border-width token ramp exists (matches the app's
+   1px/3px border literals). */
+.nav-tabs {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+.nav-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; /* underline sits on the rail hairline */
+  padding: var(--space-2) var(--space-1) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.nav-tab:hover {
+  color: var(--text);
+}
+.nav-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+}
+
 .layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr var(--sidebar-w);
   gap: calc(var(--space) * 2);
   align-items: start;
 }
@@ -32,111 +91,230 @@
   }
 }
 
-/* Table */
+/* Table — T5. The felt is the room's centerpiece: a faint lamp glow over the
+   action area plus a darkened edge vignette give the surface depth, built
+   ONLY from existing tokens (--felt, --felt-text, --felt-chip-bg) via
+   color-mix / transparent stops — no new colors, no image textures. Shared
+   with QuizPanel (hazard 6): every rule below is checked against the quiz's
+   felt usage (short .ctx labels, .cards, .board, .herometa) and stays benign. */
 .felt {
-  background: var(--felt);
+  background:
+    radial-gradient(
+      120% 85% at 50% 30%,
+      color-mix(in srgb, var(--felt-text) 6%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(140% 130% at 50% 45%, transparent 55%, var(--felt-chip-bg) 100%),
+    var(--felt);
   color: var(--felt-text);
-  border-radius: var(--radius);
-  padding: calc(var(--space) * 2);
-  box-shadow: var(--shadow-felt);
+  border-radius: calc(var(--radius) * 2); /* generous table curve — 2× the lg step */
+  padding: var(--space-4) var(--space-6);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--felt-text) 10%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--felt-text) 6%, transparent),
+    var(--shadow-felt);
 }
 .ctx {
-  font-size: var(--text-md);
-  opacity: 0.9;
-  margin-bottom: var(--space);
+  font-size: var(--text-sm);
+  letter-spacing: 0.3px;
+  color: color-mix(in srgb, var(--felt-text) 88%, var(--felt)); /* ≥6:1 on felt both themes */
+  margin-bottom: var(--space-2);
 }
 .seats {
   display: flex;
-  gap: var(--space);
+  gap: var(--space-2);
   flex-wrap: wrap;
+  justify-content: center;
 }
+/* Villain seats as engraved position chips: dark scrim puck, hairline rim,
+   position engraved above a mono stack count. */
 .seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   background: var(--felt-chip-bg);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: var(--text-md);
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--felt-text) 14%, transparent);
+  text-align: center;
 }
 .seat .pos {
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.8px;
 }
+.seat .stack {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--felt-text) 82%, var(--felt)); /* ≥5:1 on the scrimmed chip */
+}
+/* Pot line set like a stencil marking on the baize: letterspaced caps with
+   short flanking hairlines (decorative pseudos — empty content, invisible
+   to AT). Margin trimmed vs. the old 16px — density budget (refuter R4). */
 .pot {
-  text-align: center;
-  margin: calc(var(--space) * 2) 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  font-size: var(--text-sm);
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--felt-text) 90%, var(--felt));
+}
+.pot::before,
+.pot::after {
+  content: "";
+  flex: 0 0 var(--space-8);
+  height: 1px;
+  background: color-mix(in srgb, var(--felt-text) 28%, transparent);
 }
 .hero {
   text-align: center;
 }
 .cards {
   display: flex;
-  gap: var(--space);
+  gap: var(--space-2);
   justify-content: center;
 }
+/* Held-hand tilt: hole cards sit at ±2° like cards laid on baize — static
+   transforms, no motion (T8 owns transitions). Board cards (.board) stay
+   square. Bleeds to QuizPanel's two hero cards: same read, benign. */
+.cards .card:first-child {
+  transform: rotate(-2deg);
+}
+.cards .card:last-child {
+  transform: rotate(2deg);
+}
 .herometa {
-  margin-top: var(--space);
-  font-size: var(--text-md);
-  opacity: 0.95;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  letter-spacing: 0.3px;
+  color: color-mix(in srgb, var(--felt-text) 88%, var(--felt));
 }
 
-/* Cards */
+/* Cards — T5. Ivory card stock as a physical object: faint top-lit falloff
+   toward the bottom edge (same-hue mix of --card-bg with --suit-black), a
+   hairline stock edge, serif ranks (Fraunces at 22px — above the 15px serif
+   floor). No pips, no ornament. */
 .card {
-  background: var(--card-bg);
-  border-radius: 8px;
-  width: 52px;
-  height: 72px;
+  background: linear-gradient(
+    170deg,
+    var(--card-bg) 62%,
+    color-mix(in srgb, var(--card-bg) 95%, var(--suit-black))
+  );
+  border-radius: var(--radius-md);
+  width: var(--card-w);
+  height: var(--card-h);
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  line-height: 1.05;
   font-weight: 700;
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--suit-black) 12%, transparent),
+    var(--shadow-card);
   color: var(--suit-black);
 }
 .card.red {
   color: var(--suit-red);
 }
 .card .r {
+  font-family: var(--font-display);
   font-size: var(--text-xl);
+  font-weight: 700;
 }
 .card .s {
   font-size: var(--text-lg);
 }
 
-/* Decisions */
+/* Decisions — T5. The focal action row of the screen. Base .btn stays
+   app-wide-compatible (T4 tuned the shell's usage); the drill-only treatment
+   lives on .decision-btn, layered on top. QuizPanel's .decisionbar keeps
+   plain .btn children (T7's surface) — container changes below are benign
+   there (gap/wrap only). */
 .decisionbar {
   display: flex;
-  gap: var(--space);
-  margin-top: calc(var(--space) * 2);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
 }
 .btn {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 16px;
+  padding: 10px var(--space-4);
   font-size: var(--text-base);
   cursor: pointer;
 }
 .btn:hover {
   border-color: var(--primary);
 }
-.btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
+/* (:disabled treatment lives in the T8 states section at the end of the
+   file — it must out-cascade the equal-specificity variants above.) */
 .btn-primary {
   background: var(--primary);
   color: var(--primary-text);
   border-color: var(--primary);
 }
+/* Full-width tactile console buttons: equal shares of the row, 48px tall
+   (well past the 24px floor — this is the app's core interaction), label +
+   engraved key hint centered. Primary = the room's single brass voice.
+   :active nudge is a static state change, not a transition (T8 owns motion). */
+.decision-btn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: calc(var(--space-8) + var(--space-4)); /* 48px */
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+.decision-btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--surface), var(--primary) 6%);
+}
+.decision-btn.btn-primary {
+  font-weight: 700;
+  border-color: color-mix(in srgb, var(--primary) 80%, var(--text));
+  box-shadow: var(--shadow-card);
+}
+.decision-btn.btn-primary:not(:disabled):hover {
+  /* mixes toward --text: lighter brass at night, deeper bronze by day */
+  background: color-mix(in srgb, var(--primary) 88%, var(--text));
+}
+.decision-btn:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow: var(--shadow-felt);
+}
 kbd {
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1);
   margin-left: 6px;
   opacity: 0.8;
+}
+/* Key hints on button surfaces: full opacity + currentColor ring so the
+   hint inherits the button ink's AA ratio (the generic 0.8-opacity kbd
+   fails 4.5:1 on brass). Covers DecisionBar and FeedbackPanel's Next. */
+.decision-btn kbd,
+.btn-primary kbd {
+  opacity: 1;
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+.decision-btn kbd {
+  margin-left: 0; /* the flex gap owns spacing */
 }
 
 /* Panels / feedback */
@@ -160,8 +338,8 @@ kbd {
 .badge {
   display: inline-block;
   font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: var(--space-1) 10px;
+  border-radius: var(--radius-pill);
   color: var(--primary-text);
 }
 .badge.good {
@@ -180,37 +358,108 @@ kbd {
   margin: var(--space) 0;
 }
 
-/* N1 tiered feedback: verdict (prominent) -> reasoning -> deep-dive (collapsed).
-   Token values only; the global :focus-visible ring covers the <summary>. */
-.tier-verdict {
-  margin: var(--space-2) 0 var(--space-1);
-  font-size: var(--text-base);
-  font-weight: 700;
+/* T6 — teaching surfaces. The feedback panel is the teacher's voice; the four
+   tiers must READ as a hierarchy: verdict (instant: badge + EV-loss stat) →
+   chosen-eval (compact stat line) → reasoning (the lesson, set for reading) →
+   deep-dive (collapsed mono ledger). Token values only; the global
+   :focus-visible ring covers the <summary> disclosures. */
+
+/* Disciplined mono for data (refuter R3): every numeric datum — EV bb,
+   frequency %, ev_loss — wears .num; prose around it stays on --font-body. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
+
+/* Feedback surface — .feedback was an unclaimed hook (contracts §d). Tone
+   -bg classes stay shared with QuizPanel; the tone-colored top rule is
+   feedback-scoped so the quiz panels keep their plain hairline border. */
+.panel.feedback {
+  border-top: 3px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+}
+.feedback.good-bg {
+  border-top-color: var(--good);
+}
+.feedback.warn-bg {
+  border-top-color: var(--warn);
+}
+.feedback.bad-bg {
+  border-top-color: var(--bad);
+}
+
+/* Tier 0 — verdict row: the instant read. Badge carries the word, the mono
+   stat carries the cost; baseline-locked so they read as one statement. */
+.verdict-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.feedback .badge {
+  font-size: var(--text-sm);
+  letter-spacing: 0.8px;
+  padding: var(--space-1) var(--space-3);
+}
+.verdict-ev {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+/* Tier 1 — verdict sentence as a lesson headline: the display serif's only
+   appearance inside the panel body (20px — above the 15px serif floor). */
+.tier-verdict {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  max-width: 52ch;
+}
+/* Chosen-eval: compact stat line — muted sentence, numbers step up to ink. */
 .chosen-eval {
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
   font-size: var(--text-md);
   color: var(--muted);
 }
+.chosen-eval .num {
+  color: var(--text);
+  font-weight: 600;
+}
+/* Tier 2 — reasoning IS the lesson: full body size, reading measure. */
 .tier-reasoning {
   margin: var(--space-2) 0;
-  font-size: var(--text-md);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  max-width: 62ch;
 }
+/* Tier 3 — deep dive, collapsed by default behind a small-caps summary. */
 .tier-deepdive {
-  margin: var(--space-2) 0;
+  margin: var(--space-3) 0 var(--space-2);
   border-top: 1px solid var(--border);
-  padding-top: var(--space-2);
+  padding-top: var(--space-1);
 }
-.tier-deepdive summary {
+.tier-deepdive summary,
+.concept-card summary {
   cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: 600;
+  min-height: var(--space-6); /* 24px target */
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
   color: var(--muted);
+}
+.tier-deepdive summary:hover,
+.concept-card summary:hover {
+  color: var(--text);
 }
 .deepdive-text {
   margin: var(--space-2) 0 var(--space-1);
   font-size: var(--text-md);
+  line-height: 1.55;
   color: var(--muted);
+  max-width: 62ch;
 }
 .mix {
   list-style: none;
@@ -220,44 +469,112 @@ kbd {
 .mix li {
   padding: 2px 0;
 }
+/* Per-action mix as a ledger: subgrid rows share four columns (action ·
+   freq · EV · best-tag) so the mono numerals align down the list. Scoped
+   to .feedback — Home's due-list reuses bare .mix (hazard 6). */
+.feedback .mix {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  column-gap: var(--space-4);
+  font-size: var(--text-md);
+}
+.feedback .mix li {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: baseline;
+}
+.feedback .mix b {
+  font-weight: 600;
+}
+.feedback .mix .mix-freq {
+  justify-self: end;
+}
+.feedback .mix .mix-ev {
+  justify-self: end;
+  color: var(--muted);
+}
+.feedback .mix .mix-ev .num {
+  color: var(--text);
+}
 .best {
   color: var(--good);
   font-weight: 700;
-  margin-left: 6px;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+/* EV-approximate disclaimer — split off .studytest-hint (triple-reuse
+   hazard 6); a footnote, not a hint. */
+.ev-disclaimer {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--muted);
+}
+/* Breathing room before the focused Next button. */
+.feedback > .btn-primary {
+  margin-top: var(--space-3);
 }
 
-/* N8 — point-of-need concept card: title + summary always visible below the
-   tiers, full body collapsed behind <details> (same convention as
-   .tier-deepdive above; the global :focus-visible ring covers the button and
-   <summary>). Token values only. */
+/* N8/T6 — point-of-need concept card as a refined study card: an ivory
+   bookplate inset on the tone-tinted panel, spined with a brass rule and a
+   brass "Concept" eyebrow (CSS-generated, decorative). Title + summary
+   always visible; full body behind the same <details> convention as the
+   deep dive (summary styling shared above). Token values only. */
 .concept-card {
   margin: var(--space-4) 0 0;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-felt);
+}
+.concept-card::before {
+  content: "Concept";
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--primary); /* brass ≥4.5:1 on --surface both themes (T2) */
+  margin-bottom: var(--space-1);
 }
 .concept-card-title {
+  /* Display serif at exactly --text-base (15px) — the floor for the serif;
+     nothing smaller ever uses --font-display. */
+  font-family: var(--font-display);
   margin: 0 0 var(--space-1);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
 }
 .concept-card-summary {
   margin: 0 0 var(--space-2);
   font-size: var(--text-md);
+  line-height: 1.55;
   color: var(--muted);
-}
-.concept-card details summary {
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--muted);
+  max-width: 62ch;
 }
 .concept-card-body {
   margin: var(--space-2) 0;
   font-size: var(--text-md);
+  line-height: 1.55;
+  max-width: 62ch;
+}
+/* Drill-this: subordinate chip-sized action, still a ≥24px target. */
+.concept-card .btn {
+  margin-top: var(--space-1);
+  min-height: var(--space-6);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-md);
+  font-weight: 600;
 }
 
-/* Rationale tags (CW-5): the "why" behind the verdict — node type, range
-   advantage, hand category, board texture — as scannable chips. */
+/* Rationale tags (CW-5/T6): the "why" behind the verdict — node type, range
+   advantage, hand category, board texture — as scannable chips. Each chip
+   leads with the room's brass diamond pip (decorative, echoes the brand
+   mark) on an ivory pill that layers over the tone-tinted panel. */
 .rationale {
   display: flex;
   flex-wrap: wrap;
@@ -267,40 +584,52 @@ kbd {
   margin: var(--space) 0;
 }
 .rationale-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--text-sm);
-  background: var(--bg);
-  color: var(--muted);
+  background: var(--surface);
+  color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 10px;
 }
+.rationale-chip::before {
+  content: "";
+  flex: none;
+  width: var(--space-1);
+  height: var(--space-1);
+  background: var(--primary);
+  transform: rotate(45deg);
+}
 
-/* Range grid */
+/* Range grid — T7: the solver chart as a precision instrument. The 13×13
+   matrix sits on an engraved mat: hairline rules are the grid's own
+   background showing through the 1px gaps + 1px frame padding — zero new
+   elements, so the frozen ARIA nesting .grid > .gridrow > .cell (hazard 3)
+   is untouched. Every cell is fully covered by its frequency segments
+   (fold fallback in RangeGrid.tsx), so the mat color reads only as rules. */
 .gridwrap {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space);
 }
-.gridtitle {
-  font-size: var(--text-md);
-  color: var(--muted);
-  margin-bottom: var(--space);
-}
 .gridtoggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  min-height: 36px;
+  min-height: 36px; /* ≥24px target */
   background: transparent;
   color: var(--text);
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 6px var(--space);
-  margin-bottom: var(--space);
-  font-size: var(--text-md);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
   cursor: pointer;
 }
 .gridtoggle:hover {
@@ -311,10 +640,26 @@ kbd {
   color: var(--muted);
   margin-left: var(--space);
 }
+/* Chart caption — the node context, set as an engraved eyebrow (the room's
+   label idiom: xs caps, letterspaced, muted). */
+.gridtitle {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin: var(--space-1) 0 var(--space-2);
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(13, 1fr);
   gap: 1px;
+  padding: 1px;
+  /* the ruled hairlines: label ink washed into the page color — dark
+     engraved lines in both themes (decorative, no contrast mandate) */
+  background: color-mix(in srgb, var(--act-on) 35%, var(--bg));
+  border-radius: var(--radius-sm);
+  overflow: hidden; /* the mat's radius crops the corner cells square-crisp */
 }
 .cell {
   aspect-ratio: 1;
@@ -322,7 +667,6 @@ kbd {
   overflow: hidden;
   background: var(--bg);
   color: var(--muted);
-  border-radius: 2px;
 }
 /* N5: proportional per-action frequency segments (freq-mix grid cells). A
    pure single-action hand renders one segment at 100% width, i.e. identical
@@ -335,6 +679,8 @@ kbd {
 .cell-segment {
   height: 100%;
 }
+/* Hand-class glyphs: instrument lettering — mono, bold, engraved ink.
+   Frozen at --act-on / --text-2xs (T2's 4.5:1-at-9px contract). */
 .cell-label {
   position: absolute;
   inset: 0;
@@ -342,31 +688,59 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  font-weight: 700;
   color: var(--act-on);
   pointer-events: none;
 }
-.cell.pair {
-  color: var(--text);
-  font-weight: 600;
+/* "Your hand" marker (hazard 7 fix): an inset ink-and-brass ring drawn by
+   ::after — NOT `outline`, so :focus-visible keeps sole ownership of
+   outlines and the brass focus ring can never swallow the marker. The
+   var(--text) layer carries the ≥3:1 guarantee over every segment chip in
+   both themes (T2 floor, T8-raised: 3.2:1 over --act-fold, dark); the 1px brass inlay
+   is decorative and keeps it visually distinct from the plain focus ring. */
+.cell.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px var(--text),
+    inset 0 0 0 3px var(--accent-cell);
 }
-.cell.hero {
-  background: var(--accent-cell);
-  color: var(--primary-text);
-  font-weight: 700;
-}
+/* Legend — chip samples, keyed like the chart's caption. */
 .gridlegend {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--text-sm);
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: var(--muted);
-  margin-top: var(--space);
+  margin-top: var(--space-2);
+}
+.gridlegend .num {
+  /* hand-class token ("AKs") — case is data (s/o suffix), never uppercased */
+  text-transform: none;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
 }
 .cell.sample {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   aspect-ratio: auto;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--act-on) 35%, transparent);
+}
+.cell.sample.sample-hero {
+  background: var(--bg);
+  box-shadow:
+    inset 0 0 0 2px var(--text),
+    inset 0 0 0 3px var(--accent-cell);
 }
 
 /* ARIA table semantics (CW-7): one role="row" wrapper per rank row. Kept out
@@ -378,13 +752,16 @@ kbd {
 }
 
 /* Test-mode grid reveal (CW-6): plays once when the answer grid mounts after
-   grading. prefers-reduced-motion users get an instant, static appearance. */
+   grading. prefers-reduced-motion users get an instant, static appearance.
+   T8: retimed onto the motion tokens; the `reveal` keyframes are shared with
+   the feedback/quiz-result/error-banner and disclosure reveals (see the T8
+   motion section at the end of the file). */
 @media (prefers-reduced-motion: no-preference) {
   .gridwrap.reveal {
-    animation: gridReveal 220ms ease-out;
+    animation: reveal var(--dur-2) var(--ease-1);
   }
 }
-@keyframes gridReveal {
+@keyframes reveal {
   from {
     opacity: 0;
     transform: translateY(-4px);
@@ -395,11 +772,12 @@ kbd {
   }
 }
 
-/* Mode selector */
+/* Mode selector rows — since T4 the top-level view nav is .nav-tabs; .modes
+   is ModeGroup's button row only. */
 .modes {
   display: flex;
   gap: var(--space);
-  margin-bottom: calc(var(--space) * 2);
+  flex-wrap: wrap;
 }
 
 /* Mode groups (Practice view only): preflop spot-selection vs postflop
@@ -411,8 +789,14 @@ kbd {
   gap: calc(var(--space) * 1.5);
   margin-bottom: calc(var(--space) * 2);
 }
-.mode-group .modes {
-  margin-bottom: 0;
+/* Mode buttons as chips: visually subordinate to the .nav-tabs rail (they
+   pick a drill flavor, not a destination). Overrides .btn — same specificity,
+   later in the file. */
+.mode-chip {
+  min-height: var(--space-6); /* ≥24px target incl. padding + border */
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-md);
+  border-radius: var(--radius-pill);
 }
 .mode-group-label {
   font-size: var(--text-sm);
@@ -423,7 +807,9 @@ kbd {
   margin: 0 0 6px;
 }
 
-/* Study / Test toggle (CW-6) */
+/* Study / Test toggle (CW-6/T6) — a segmented pill control: recessed track
+   on --bg, the active segment in the room's brass. aria-pressed markup is
+   frozen; this is presentation only. */
 .studytest {
   display: flex;
   align-items: center;
@@ -433,7 +819,32 @@ kbd {
 }
 .studytest-toggle {
   display: flex;
-  gap: var(--space);
+  gap: var(--space-1);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+}
+.studytest-toggle .btn {
+  min-height: var(--space-6); /* 24px target */
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--radius-pill);
+}
+.studytest-toggle .btn:hover {
+  color: var(--text);
+  border-color: transparent;
+}
+/* Active segment — after the :hover rule so brass wins on hover too. */
+.studytest-toggle .btn-primary,
+.studytest-toggle .btn-primary:hover {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
 }
 .studytest-hint {
   font-size: var(--text-sm);
@@ -459,11 +870,20 @@ kbd {
   min-width: 64px;
 }
 .statstrip .stat b {
+  /* ledger numerals: display serif at 20px — above the 15px serif floor */
+  font-family: var(--font-display);
   font-size: var(--text-lg);
+  font-weight: 600;
 }
 .statstrip .stat span {
   font-size: var(--text-xs);
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.statstrip .stat + .stat {
+  border-left: 1px solid var(--border);
+  padding-left: var(--space-4);
 }
 .statstrip .leaks {
   display: flex;
@@ -478,54 +898,70 @@ kbd {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+/* Leak chips — T7: proper markers, still a quiet ledger (T4). Each named
+   leak leads with a small diamond pip (the room's pip idiom) in the bad
+   tone — an accent, not an alarm; the no-leaks chip drops the pip. */
 .lk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--text-sm);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-2);
+}
+.lk::before {
+  content: "";
+  flex: none;
+  width: var(--space-1);
+  height: var(--space-1);
+  background: var(--bad);
+  transform: rotate(45deg);
 }
 .lk.muted {
   color: var(--muted);
+}
+.lk.muted::before {
+  content: none;
 }
 
 /* Feedback mixed note */
 .mixed {
   font-size: var(--text-md);
   font-style: italic;
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 /* Range-grid action coloring — also used by the legend's static swatches
    (`.cell.sample.action-*`, no children, so the flat background applies
    directly). Actual grid cells color their `.cell-segment` children instead
-   (see N5 proportional-mix rules above `.cell.pair`). */
+   (see N5 proportional-mix rules above `.cell.hero`). */
 .cell.action-raise { background: var(--act-raise); color: var(--act-on); }
 .cell.action-call { background: var(--act-call); color: var(--act-on); }
 .cell.action-fold { background: var(--act-fold); color: var(--act-on); }
 .cell-segment.action-raise { background: var(--act-raise); }
 .cell-segment.action-call { background: var(--act-call); }
 .cell-segment.action-fold { background: var(--act-fold); }
-.cell.hero {
-  outline: 3px solid var(--text);
-  outline-offset: -3px;
-  font-weight: 800;
-}
+/* (.cell.hero's marker lives with the grid rules above — ::after ring,
+   hazard-7 fix; the old `outline` version is gone on purpose.) */
 .gridlegend .lgi {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-right: 10px;
+  gap: var(--space-1);
 }
 
-/* Betting-line summary on the table */
+/* Betting-line summary on the table — same chip idiom as .seat (scrim puck
+   + hairline rim). felt-text on the scrimmed felt stays ≥7:1 both themes. */
 .line {
   font-size: var(--text-md);
   font-weight: 600;
+  letter-spacing: 0.2px;
   background: var(--felt-line-bg);
-  border-radius: 6px;
-  padding: 4px 8px;
-  margin-bottom: var(--space);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--felt-text) 12%, transparent);
+  border-radius: 6px; /* between --radius-sm(4) and --radius-md(8); no token — exact value kept */
+  padding: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-2);
   display: inline-block;
 }
 
@@ -537,71 +973,357 @@ kbd {
   margin: var(--space) 0;
 }
 
-/* Single-column layout (postflop: no range grid) */
+/* Single-column layout (postflop: no range grid). T8: cap the lone column at
+   content-width minus the absent grid sidebar and center it, so the felt
+   reads composed instead of stretching the full content width. */
 .layout-single {
   grid-template-columns: 1fr;
+  max-width: calc(var(--content-width) - var(--sidebar-w));
+  margin-inline: auto;
+  width: 100%;
 }
 
-/* Quizzes */
+/* Quizzes — T7: same room standard as the drill. Shares .felt/.ctx/.board/
+   .cards/.herometa with PokerTable (T5's treatment, inherited — hazard 6);
+   everything below is .quizpanel- or .quiz-result-scoped so the shared
+   classes stay untouched. */
+.quiz-spacer {
+  /* was an inline style on QuizPanel's second .ctx row (T3) */
+  margin-top: var(--space);
+}
+/* The question, asked in the room's serif voice — at --text-base exactly,
+   the serif floor (never below). */
 .quizpanel .prompt {
   margin: calc(var(--space) * 2) 0 var(--space);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
   font-weight: 600;
+}
+/* Answer buttons: tactile like the drill console, sized subordinate to it. */
+.quizpanel .decisionbar .btn {
+  font-weight: 600;
+  min-height: var(--space-8); /* 32px — past the 24px floor */
+  box-shadow: var(--shadow-felt);
+}
+.quizpanel .decisionbar .btn:not(.btn-primary):not(:disabled):hover {
+  background: color-mix(in srgb, var(--surface), var(--primary) 6%);
+}
+.quizpanel .decisionbar .btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--text));
 }
 .input {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 12px;
+  padding: 10px var(--space-3);
   font-size: var(--text-base);
   width: 120px;
 }
 .input:focus-visible {
   border-color: var(--primary);
 }
+.input::placeholder {
+  color: var(--muted);
+}
+/* Numeric entry reads like the instrument it feeds (refuter R3). */
+.quizpanel .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+/* Quiz result — T6's feedback voice (tone top-rule, badge scale, reading
+   measure), quiz-scoped: base .panel/.badge and the tone -bg classes are
+   shared app-wide and stay untouched. */
+.panel.quiz-result {
+  border-top: 3px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+}
+.quiz-result.good-bg {
+  border-top-color: var(--good);
+}
+.quiz-result.bad-bg {
+  border-top-color: var(--bad);
+}
+.quiz-result .verdict-row {
+  flex-wrap: wrap;
+  margin-bottom: var(--space-1);
+}
+.quiz-result .badge {
+  font-size: var(--text-sm);
+  letter-spacing: 0.8px;
+  padding: var(--space-1) var(--space-3);
+}
+.quiz-result .why {
+  font-size: var(--text-md);
+  line-height: 1.55;
+  max-width: 62ch;
+}
+.quiz-result > .btn-primary {
+  margin-top: var(--space-2);
+}
 
-/* Villain archetype badge (exploit drills) */
+/* Villain archetype badge (exploit drills) — read-the-player marker set as a
+   letterspaced caps pill. --primary-text on --warn ≥4.8:1 both themes (T2). */
 .villain {
   display: inline-block;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: 700;
-  text-transform: capitalize;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
   background: var(--warn);
   color: var(--primary-text);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 10px;
-  margin-bottom: var(--space);
+  margin-bottom: var(--space-2);
 }
 
-/* N7 — home/curriculum hub */
+/* N7 — home/curriculum hub. T4: the private-room entry. One focal point —
+   the due-count numeral; the path scans as a numbered course beside it.
+   Two columns ≥821px so "today's plan" and the path read in one glance. */
 .home {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--space) * 2);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .home {
+    grid-template-columns: 1fr;
+  }
+}
+.home-section {
+  margin-top: 0; /* .panel's stacked-flow margin; the grid gap owns rhythm here */
+  padding: var(--space-6);
 }
 .home-section-title {
+  font-family: var(--font-display);
   font-size: var(--text-lg);
-  margin: 0 0 var(--space);
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
 }
 .home-due-count {
-  margin: 0 0 var(--space);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
 }
+.home-due-num {
+  /* the hub's focal numeral — 2× the largest type step (no larger token
+     exists); large-text AA: brass ≥4.5:1 on --surface both themes */
+  font-family: var(--font-display);
+  font-size: calc(var(--text-xl) * 2);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--primary);
+}
+.home-due-word {
+  color: var(--muted);
+}
+/* Due queue rows — styled via .home-due-list only (.mix is shared with
+   FeedbackPanel; equal specificity, these later rules win for Home). */
 .home-due-list {
-  margin-bottom: calc(var(--space) * 2);
+  margin: 0 0 var(--space-4);
+}
+.home-due-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+.home-due-date {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+/* Empty due-queue — a calm note, not a collapse: the "Nothing due —" phrase
+   and its next action sit on one composed line (T8; the button IS the
+   empty-state's next step, .btn supplies its states). */
+.home-empty {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--muted);
+}
+.home-path-key {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
 }
 .home-path {
+  counter-reset: pathstep;
   display: flex;
   flex-direction: column;
-  gap: var(--space);
+  gap: var(--space-2);
   list-style: none;
   padding: 0;
-  margin: var(--space) 0 0;
+  margin: var(--space-3) 0 0;
+}
+.home-path li {
+  counter-increment: pathstep;
 }
 .home-path-node {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space);
+  gap: var(--space-3);
   text-align: left;
+  padding: var(--space-2) var(--space-3);
+}
+.home-path-node::before {
+  /* numbered course steps — mono ledger digits */
+  content: counter(pathstep, decimal-leading-zero);
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.home-path-node .badge {
+  margin-left: auto;
+}
+
+/* Mastery badges — NEW .mastery class; base .badge is shared with
+   FeedbackPanel + QuizPanel (T6/T7 own those) and stays untouched.
+   Tone-tinted fills with tone ink (all pairs ≥5:1 both themes); state is
+   also written out as text, never color-only. */
+.badge.mastery {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px var(--space-2);
+}
+.badge.mastery.good {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.badge.mastery.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.badge.mastery.neutral {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* ============================== T8 — states ==============================
+   Interaction-state and status-state treatments. This section sits LAST on
+   purpose: several rules must out-cascade equal-specificity variants above
+   (.btn:hover, .decision-btn.btn-primary, .studytest-toggle .btn-primary). */
+
+/* Error banner — the room's tone voice for failures (App.tsx + QuizPanel
+   render a bare `.panel.bad-bg`; the :not() guards keep FeedbackPanel and
+   quiz results on their own T6/T7 treatments). Same top-rule idiom as the
+   feedback panel, led by the room's diamond pip in the bad tone. */
+.panel.bad-bg:not(.feedback):not(.quiz-result) {
+  border-top: 3px solid var(--bad);
+  padding: var(--space-4) var(--space-6);
+}
+.panel.bad-bg:not(.feedback):not(.quiz-result)::before {
+  /* decorative pip (empty content, invisible to AT) — echoes .brand/.lk */
+  content: "";
+  display: inline-block;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin-right: var(--space-3);
+  background: var(--bad);
+  transform: rotate(45deg);
+}
+
+/* Disabled controls: settled, not ghosted — the fill recedes toward the page,
+   ink drops to --muted (≥5.4:1 on the recessed fill, both themes — readable
+   but clearly parked), elevation and hover affordances go away. Replaces the
+   old 0.5-opacity fade. The extra .quizpanel selector out-ranks that
+   surface's (0,3,0) box-shadow rule. */
+.btn:disabled,
+.quizpanel .decisionbar .btn:disabled {
+  background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+  color: var(--muted);
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  box-shadow: none;
+  cursor: default;
+}
+.btn:disabled kbd {
+  /* key hints stay engraved on parked consoles, in the muted ink */
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+  opacity: 1;
+}
+
+/* Active (pressed) states — the app-wide press is the decision console's 1px
+   settle, extended to every button-shaped control. A static position jump:
+   under reduced motion it stays an instant state change (fine); under
+   no-preference the transition block below eases it. */
+.btn:not(:disabled):active,
+.gridtoggle:active {
+  transform: translateY(1px);
+}
+.nav-tab:not(.active):active {
+  /* pressing a tab previews the underline it's about to earn */
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+.tier-deepdive summary:active,
+.concept-card summary:active {
+  color: var(--text);
+}
+.gridtoggle:active {
+  background: var(--bg);
+  border-color: var(--border);
+}
+.input:hover {
+  border-color: color-mix(in srgb, var(--border) 50%, var(--muted));
+}
+
+/* ============================== T8 — motion ==============================
+   The whole motion vocabulary: 120ms paint-only micro-transitions on
+   interactive controls, 200ms `reveal` (opacity + 4px settle, keyframes
+   above with the grid rules) on panels and disclosures. Everything lives
+   inside this one no-preference block — reduce users get instant state
+   changes and instant, static appearances. No layout properties animate;
+   transform is transitioned only for the 1px press settle. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn,
+  .gridtoggle {
+    transition:
+      background-color var(--dur-1) var(--ease-1),
+      border-color var(--dur-1) var(--ease-1),
+      color var(--dur-1) var(--ease-1),
+      box-shadow var(--dur-1) var(--ease-1),
+      transform var(--dur-1) var(--ease-1);
+  }
+  .nav-tab {
+    transition:
+      color var(--dur-1) var(--ease-1),
+      border-bottom-color var(--dur-1) var(--ease-1);
+  }
+  .tier-deepdive summary,
+  .concept-card summary {
+    transition: color var(--dur-1) var(--ease-1);
+  }
+  .input {
+    transition: border-color var(--dur-1) var(--ease-1);
+  }
+  /* Teaching panels + error banners settle in as they mount. */
+  .panel.feedback,
+  .panel.quiz-result,
+  .panel.bad-bg:not(.feedback):not(.quiz-result) {
+    animation: reveal var(--dur-2) var(--ease-1);
+  }
+  /* Disclosure contents (deep dive, concept-card body) settle on open —
+     CSS-only, keyed off the [open] attribute; summaries stay put. */
+  .tier-deepdive[open] > :not(summary),
+  .concept-card details[open] > :not(summary) {
+    animation: reveal var(--dur-2) var(--ease-1);
+  }
 }
