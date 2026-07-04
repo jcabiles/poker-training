@@ -605,32 +605,33 @@ kbd {
   transform: rotate(45deg);
 }
 
-/* Range grid */
+/* Range grid — T7: the solver chart as a precision instrument. The 13×13
+   matrix sits on an engraved mat: hairline rules are the grid's own
+   background showing through the 1px gaps + 1px frame padding — zero new
+   elements, so the frozen ARIA nesting .grid > .gridrow > .cell (hazard 3)
+   is untouched. Every cell is fully covered by its frequency segments
+   (fold fallback in RangeGrid.tsx), so the mat color reads only as rules. */
 .gridwrap {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space);
 }
-.gridtitle {
-  font-size: var(--text-md);
-  color: var(--muted);
-  margin-bottom: var(--space);
-}
 .gridtoggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  min-height: 36px;
+  min-height: 36px; /* ≥24px target */
   background: transparent;
   color: var(--text);
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 6px var(--space);
-  margin-bottom: var(--space);
-  font-size: var(--text-md);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
   cursor: pointer;
 }
 .gridtoggle:hover {
@@ -641,10 +642,26 @@ kbd {
   color: var(--muted);
   margin-left: var(--space);
 }
+/* Chart caption — the node context, set as an engraved eyebrow (the room's
+   label idiom: xs caps, letterspaced, muted). */
+.gridtitle {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin: var(--space-1) 0 var(--space-2);
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(13, 1fr);
   gap: 1px;
+  padding: 1px;
+  /* the ruled hairlines: label ink washed into the page color — dark
+     engraved lines in both themes (decorative, no contrast mandate) */
+  background: color-mix(in srgb, var(--act-on) 35%, var(--bg));
+  border-radius: var(--radius-sm);
+  overflow: hidden; /* the mat's radius crops the corner cells square-crisp */
 }
 .cell {
   aspect-ratio: 1;
@@ -652,7 +669,6 @@ kbd {
   overflow: hidden;
   background: var(--bg);
   color: var(--muted);
-  border-radius: var(--radius-xs);
 }
 /* N5: proportional per-action frequency segments (freq-mix grid cells). A
    pure single-action hand renders one segment at 100% width, i.e. identical
@@ -665,6 +681,8 @@ kbd {
 .cell-segment {
   height: 100%;
 }
+/* Hand-class glyphs: instrument lettering — mono, bold, engraved ink.
+   Frozen at --act-on / --text-2xs (T2's 4.5:1-at-9px contract). */
 .cell-label {
   position: absolute;
   inset: 0;
@@ -672,27 +690,59 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
+  font-weight: 700;
   color: var(--act-on);
   pointer-events: none;
 }
-.cell.hero {
-  background: var(--accent-cell);
-  color: var(--primary-text);
-  font-weight: 700;
+/* "Your hand" marker (hazard 7 fix): an inset ink-and-brass ring drawn by
+   ::after — NOT `outline`, so :focus-visible keeps sole ownership of
+   outlines and the brass focus ring can never swallow the marker. The
+   var(--text) layer carries the ≥3:1 guarantee over every segment chip in
+   both themes (T2 floor: 3.1:1 over --act-fold, dark); the 1px brass inlay
+   is decorative and keeps it visually distinct from the plain focus ring. */
+.cell.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px var(--text),
+    inset 0 0 0 3px var(--accent-cell);
 }
+/* Legend — chip samples, keyed like the chart's caption. */
 .gridlegend {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--text-sm);
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: var(--muted);
-  margin-top: var(--space);
+  margin-top: var(--space-2);
+}
+.gridlegend .num {
+  /* hand-class token ("AKs") — case is data (s/o suffix), never uppercased */
+  text-transform: none;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
 }
 .cell.sample {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   aspect-ratio: auto;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--act-on) 35%, transparent);
+}
+.cell.sample.sample-hero {
+  background: var(--bg);
+  box-shadow:
+    inset 0 0 0 2px var(--text),
+    inset 0 0 0 3px var(--accent-cell);
 }
 
 /* ARIA table semantics (CW-7): one role="row" wrapper per rank row. Kept out
@@ -847,15 +897,32 @@ kbd {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+/* Leak chips — T7: proper markers, still a quiet ledger (T4). Each named
+   leak leads with a small diamond pip (the room's pip idiom) in the bad
+   tone — an accent, not an alarm; the no-leaks chip drops the pip. */
 .lk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--text-sm);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   padding: 2px var(--space-2);
 }
+.lk::before {
+  content: "";
+  flex: none;
+  width: var(--space-1);
+  height: var(--space-1);
+  background: var(--bad);
+  transform: rotate(45deg);
+}
 .lk.muted {
   color: var(--muted);
+}
+.lk.muted::before {
+  content: none;
 }
 
 /* Feedback mixed note */
@@ -875,16 +942,12 @@ kbd {
 .cell-segment.action-raise { background: var(--act-raise); }
 .cell-segment.action-call { background: var(--act-call); }
 .cell-segment.action-fold { background: var(--act-fold); }
-.cell.hero {
-  outline: 3px solid var(--text);
-  outline-offset: -3px;
-  font-weight: 800;
-}
+/* (.cell.hero's marker lives with the grid rules above — ::after ring,
+   hazard-7 fix; the old `outline` version is gone on purpose.) */
 .gridlegend .lgi {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  margin-right: 10px;
 }
 
 /* Betting-line summary on the table — same chip idiom as .seat (scrim puck
@@ -914,14 +977,33 @@ kbd {
   grid-template-columns: 1fr;
 }
 
-/* Quizzes */
+/* Quizzes — T7: same room standard as the drill. Shares .felt/.ctx/.board/
+   .cards/.herometa with PokerTable (T5's treatment, inherited — hazard 6);
+   everything below is .quizpanel- or .quiz-result-scoped so the shared
+   classes stay untouched. */
 .quiz-spacer {
   /* was an inline style on QuizPanel's second .ctx row (T3) */
   margin-top: var(--space);
 }
+/* The question, asked in the room's serif voice — at --text-base exactly,
+   the serif floor (never below). */
 .quizpanel .prompt {
   margin: calc(var(--space) * 2) 0 var(--space);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
   font-weight: 600;
+}
+/* Answer buttons: tactile like the drill console, sized subordinate to it. */
+.quizpanel .decisionbar .btn {
+  font-weight: 600;
+  min-height: var(--space-8); /* 32px — past the 24px floor */
+  box-shadow: var(--shadow-felt);
+}
+.quizpanel .decisionbar .btn:not(.btn-primary):not(:disabled):hover {
+  background: color-mix(in srgb, var(--surface), var(--primary) 6%);
+}
+.quizpanel .decisionbar .btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--text));
 }
 .input {
   background: var(--surface);
@@ -934,6 +1016,45 @@ kbd {
 }
 .input:focus-visible {
   border-color: var(--primary);
+}
+.input::placeholder {
+  color: var(--muted);
+}
+/* Numeric entry reads like the instrument it feeds (refuter R3). */
+.quizpanel .input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+/* Quiz result — T6's feedback voice (tone top-rule, badge scale, reading
+   measure), quiz-scoped: base .panel/.badge and the tone -bg classes are
+   shared app-wide and stay untouched. */
+.panel.quiz-result {
+  border-top: 3px solid var(--border);
+  padding: var(--space-4) var(--space-6);
+}
+.quiz-result.good-bg {
+  border-top-color: var(--good);
+}
+.quiz-result.bad-bg {
+  border-top-color: var(--bad);
+}
+.quiz-result .verdict-row {
+  flex-wrap: wrap;
+  margin-bottom: var(--space-1);
+}
+.quiz-result .badge {
+  font-size: var(--text-sm);
+  letter-spacing: 0.8px;
+  padding: var(--space-1) var(--space-3);
+}
+.quiz-result .why {
+  font-size: var(--text-md);
+  line-height: 1.55;
+  max-width: 62ch;
+}
+.quiz-result > .btn-primary {
+  margin-top: var(--space-2);
 }
 
 /* Villain archetype badge (exploit drills) — read-the-player marker set as a

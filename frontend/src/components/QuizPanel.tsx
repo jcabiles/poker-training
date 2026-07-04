@@ -111,12 +111,26 @@ export default function QuizPanel({ kind }: { kind: QuizKind }) {
       )}
 
       {res && (
-        <div className={`panel ${res.correct ? "good-bg" : "bad-bg"}`}>
-          <span className={`badge ${res.correct ? "good" : "bad"}`}>
-            {res.correctness.toUpperCase()}
-          </span>{" "}
-          expected <strong>{res.expected}</strong>, you said <strong>{res.your_answer}</strong>
-          {res.delta != null && <> (off by {res.delta}pp)</>}
+        <div className={`panel quiz-result ${res.correct ? "good-bg" : "bad-bg"}`}>
+          <div className="verdict-row">
+            <span className={`badge ${res.correct ? "good" : "bad"}`}>
+              {res.correctness.toUpperCase()}
+            </span>
+            <span>
+              expected{" "}
+              <strong className={res.kind === "equity" ? "num" : undefined}>{res.expected}</strong>,
+              you said{" "}
+              <strong className={res.kind === "equity" ? "num" : undefined}>
+                {res.your_answer}
+              </strong>
+              {res.delta != null && (
+                <>
+                  {" "}
+                  (off by <span className="num">{res.delta}</span>pp)
+                </>
+              )}
+            </span>
+          </div>
           <p className="why">{res.explanation}</p>
           <button className="btn btn-primary" onClick={load}>
             Next ▸

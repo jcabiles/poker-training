@@ -130,7 +130,12 @@ export default function RangeGrid({
             </span>
           ))}
         </div>
-        <div className="gridlegend">your hand: {hero}</div>
+        <div className="gridlegend">
+          <span className="cell sample sample-hero" aria-hidden="true" />
+          <span>
+            your hand: <span className="num">{hero}</span>
+          </span>
+        </div>
       </div>
     </div>
   );
