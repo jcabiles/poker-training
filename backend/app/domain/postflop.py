@@ -26,7 +26,7 @@ from app.domain.evaluation import (
     ProviderKind,
 )
 from app.domain.leaks import LeakCategory
-from app.domain.spot import ActionType, NodeContext, Position, Spot
+from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Spot
 from app.domain.texture import Texture, classify
 
 # --- N3: authored postflop rationale (content path) ---
@@ -134,10 +134,15 @@ def range_advantage(
 
 
 def _villain_pos(spot: Spot) -> Position:
+    """The live opponent's position: prefer `spot.facing` (always set by the
+    builders), else the first non-hero player still IN the hand — never a
+    FOLDED seat, so enriched 9-seat player lists can't mis-pick the villain."""
+    if spot.facing is not None:
+        return spot.facing
     for p in spot.players:
-        if not p.is_hero:
+        if not p.is_hero and p.status == PlayerStatus.IN:
             return p.position
-    return spot.facing or Position.BB
+    return Position.BB
 
 
 def _hand_category(hole: tuple[str, str], board: list[str]) -> str:

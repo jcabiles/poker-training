@@ -7,6 +7,7 @@ from app.domain.postflop import (
     _hand_category,
     _merits,
     _merits_vs_cbet,
+    _villain_pos,
     cbet_fold_pct,
     grade_cbet,
     grade_vs_cbet,
@@ -22,6 +23,7 @@ from app.domain.spot import (
     LegalAction,
     NodeContext,
     PlayerState,
+    PlayerStatus,
     Position,
     Spot,
     Stakes,
@@ -159,6 +161,61 @@ def test_unmade_oesd_is_still_draw():
 
 
 POST_LOSS_FLOOR = 0.6
+
+
+# --- game-table T1: _villain_pos hardening (folded seats must never be picked) ---
+
+
+def _with_folded_seats(spot, hero_pos, villain_pos):
+    """Enriched player list: FOLDED seats BEFORE the real (IN) villain, plus
+    facing cleared, so the villain can only be found via the status filter."""
+    players = [
+        PlayerState(position=Position.LJ, stack_bb=100, status=PlayerStatus.FOLDED),
+        PlayerState(position=Position.HJ, stack_bb=100, status=PlayerStatus.FOLDED),
+        PlayerState(position=hero_pos, stack_bb=100, is_hero=True),
+        PlayerState(position=Position.UTG, stack_bb=100, status=PlayerStatus.FOLDED),
+        PlayerState(position=villain_pos, stack_bb=100),
+    ]
+    return spot.model_copy(update={"players": players, "facing": None})
+
+
+def test_villain_pos_prefers_facing():
+    spot = _cbet_spot(("Ah", "Qc"), ["As", "Kd", "2c"])
+    # a non-hero IN seat precedes the facing villain — facing must still win
+    players = [
+        PlayerState(position=Position.CO, stack_bb=100),
+        PlayerState(position=Position.BTN, stack_bb=100, is_hero=True),
+        PlayerState(position=Position.BB, stack_bb=100),
+    ]
+    assert _villain_pos(spot.model_copy(update={"players": players})) == Position.BB
+
+
+def test_villain_pos_skips_folded_seats_without_facing():
+    spot = _with_folded_seats(
+        _cbet_spot(("Ah", "Qc"), ["As", "Kd", "2c"]), Position.BTN, Position.BB
+    )
+    assert spot.facing is None
+    assert _villain_pos(spot) == Position.BB  # not LJ/HJ/UTG (all FOLDED)
+
+
+def test_grade_cbet_unaffected_by_folded_seats():
+    base = _cbet_spot(("Ah", "Qc"), ["As", "Kd", "2c"])
+    enriched = _with_folded_seats(base, Position.BTN, Position.BB)
+    decision = Decision(action=ActionType.BET, size_bb=SMALL)
+    a = grade_cbet(base, base.hero_range, base.villain_range, decision)
+    b = grade_cbet(enriched, enriched.hero_range, enriched.villain_range, decision)
+    assert b.best_action == a.best_action
+    assert b.correctness == a.correctness
+    assert b.per_action == a.per_action
+
+
+def test_grade_vs_check_raise_unaffected_by_folded_seats():
+    base = _vscr_spot(("Ad", "Th"), ["As", "Kd", "2c"], faced=SMALL)
+    enriched = _with_folded_seats(base, Position.BTN, Position.BB)
+    a = grade_vs_check_raise(base, base.hero_range, base.villain_range, None)
+    b = grade_vs_check_raise(enriched, enriched.hero_range, enriched.villain_range, None)
+    assert b.best_action == a.best_action
+    assert b.per_action == a.per_action
 
 
 # --- Phase 2b: facing a c-bet (defense) ---
