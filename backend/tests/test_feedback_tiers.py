@@ -37,9 +37,15 @@ def test_preflop_tiers_carry_chosen_freq_and_ev():
     spot = make_rfi_spot(hole_cards=("Ah", "Ks"), position=Position.CO)
     res = _run(p.evaluate(spot, Decision(action=ActionType.RAISE, size_bb=2.5)))
     _assert_tiers_distinct(res)
-    # chosen-action freq + EV surface in the verdict tier (≈ EV convention)
-    assert f"{round(res.chosen_eval.frequency * 100)}%" in res.tiers.verdict
-    assert f"≈{res.chosen_eval.ev_bb}bb" in res.tiers.verdict
+    # game-table F2.6: numeric detail moved out of the verdict — the chosen
+    # action's freq + EV (≈ convention) now surface via the deep-dive tier
+    # (and the FE's structured EV block), while the verdict stays a short
+    # plain-language lede with no EV/frequency numerals.
+    assert f"{round(res.chosen_eval.frequency * 100)}%" in res.tiers.deep_dive
+    assert f"≈{res.chosen_eval.ev_bb}bb" in res.tiers.deep_dive
+    assert "≈" not in res.tiers.verdict
+    assert "%" not in res.tiers.verdict
+    assert len(res.tiers.verdict) <= 120
 
 
 def test_preflop_mistake_reasoning_is_non_tautological():
@@ -118,6 +124,35 @@ def test_postflop_cbet_authored_rationale_reaches_tiers():
     assert res.authored_rationale
     assert "is the play" not in res.authored_rationale
     assert res.authored_rationale in res.tiers.reasoning
+
+
+# --- game-table F2.7/R3: authored rationale is the reasoning lede in all 3 branches ---
+
+
+def test_authored_rationale_leads_preflop_shape_branch():
+    p = get_provider()
+    entry = _IDX[(NodeContext.RFI, Position.CO, None, 0, None)]
+    res = _run(p.optimal(build_spot(entry, random.Random(1))))
+    assert res.authored_rationale
+    assert res.tiers.reasoning.startswith(res.authored_rationale)
+
+
+def test_authored_rationale_leads_postflop_tag_branch():
+    p = get_provider()
+    res = _run(p.evaluate(make_cbet_spot(), Decision(action=ActionType.CHECK)))
+    assert res.authored_rationale
+    assert res.tiers.reasoning.startswith(res.authored_rationale)
+    assert "c-bet" in res.tiers.reasoning  # tag-derived mechanism template still follows
+
+
+def test_exploit_villain_sentence_leads_exploit_branch():
+    p = get_provider()
+    entry = _IDX[(NodeContext.VS_RFI, Position.BTN, Position.CO, 0, VillainType.CALLING_STATION)]
+    res = _run(p.optimal(build_spot(entry, random.Random(1))))
+    assert res.authored_rationale
+    assert res.tiers.reasoning.startswith(f"Versus a calling station: {res.authored_rationale}")
+    # authored prose is consumed by the lede — not repeated later in the tier
+    assert res.tiers.reasoning.count(res.authored_rationale) == 1
 
 
 def test_not_found_tiers_degrade_gracefully():

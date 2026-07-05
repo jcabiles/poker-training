@@ -10,7 +10,7 @@ from app.domain.scenarios import (
     sample_rfi_spot,
     sample_spot,
 )
-from app.domain.spot import ActionType, NodeContext, Position
+from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Street
 
 
 def test_sample_rfi_is_valid():
@@ -139,6 +139,172 @@ def test_depth_variety_yields_multiple_buckets():
     rng = random.Random(5)
     depths = {sample_spot(rng).effective_stack_bb for _ in range(30)}
     assert len(depths) >= 2
+
+
+# --- game-table T2: 9-seat enrichment + explicit preflop FOLD history ---
+
+_ALL_SEATS = [
+    Position.UTG,
+    Position.UTG1,
+    Position.UTG2,
+    Position.LJ,
+    Position.HJ,
+    Position.CO,
+    Position.BTN,
+    Position.SB,
+    Position.BB,
+]
+
+
+def _entry(ctx, pos, facing=None, limper_count=None):
+    action = ActionType.CALL if ctx == NodeContext.BLIND_DEFENSE else ActionType.RAISE
+    return Entry(
+        node_context=ctx,
+        position=pos,
+        facing=facing,
+        limper_count=limper_count,
+        actions=[ActionRange(action=action, combos="22+", frequency=1.0)],
+    )
+
+
+_T2_ENTRIES = [
+    _entry(NodeContext.RFI, Position.CO),
+    _entry(NodeContext.VS_RFI, Position.CO, facing=Position.UTG),
+    _entry(NodeContext.BLIND_DEFENSE, Position.BB, facing=Position.BTN),
+    _entry(NodeContext.VS_3BET, Position.CO, facing=Position.BTN),
+    _entry(NodeContext.VS_4BET, Position.BTN, facing=Position.CO),
+    _entry(NodeContext.VS_LIMPERS, Position.BTN, limper_count=2),
+]
+
+
+def _statuses(spot):
+    return {p.position: p.status for p in spot.players}
+
+
+def _fold_positions(spot):
+    return [h.position for h in spot.action_history if h.action == ActionType.FOLD]
+
+
+def test_build_spot_emits_all_nine_seats_once_each():
+    for entry in _T2_ENTRIES:
+        spot = build_spot(entry, random.Random(42))
+        assert len(spot.players) == 9
+        assert [p.position for p in spot.players] == _ALL_SEATS  # one seat per position
+        assert sum(1 for p in spot.players if p.is_hero) == 1
+        # every FOLDED seat has exactly one FOLD history entry, and vice versa
+        folded = [p.position for p in spot.players if p.status == PlayerStatus.FOLDED]
+        assert sorted(_fold_positions(spot)) == sorted(folded)
+        # hero and the aggressor faced are always still in the hand
+        assert _statuses(spot)[entry.position] == PlayerStatus.IN
+        if entry.facing:
+            assert _statuses(spot)[entry.facing] == PlayerStatus.IN
+
+
+def test_vs_rfi_statuses_match_authored_action():
+    # vs_RFI CO vs UTG: UTG opened (IN), UTG1/UTG2/LJ/HJ folded to hero, seats
+    # behind hero (BTN + blinds) have not acted yet -> IN.
+    entry = _entry(NodeContext.VS_RFI, Position.CO, facing=Position.UTG)
+    spot = build_spot(entry, random.Random(1))
+    st = _statuses(spot)
+    assert st[Position.UTG] == PlayerStatus.IN
+    for pos in (Position.UTG1, Position.UTG2, Position.LJ, Position.HJ):
+        assert st[pos] == PlayerStatus.FOLDED
+    for pos in (Position.CO, Position.BTN, Position.SB, Position.BB):
+        assert st[pos] == PlayerStatus.IN
+    # canonical order, chronologically after the open
+    assert _fold_positions(spot) == [Position.UTG1, Position.UTG2, Position.LJ, Position.HJ]
+    open_idx = next(i for i, h in enumerate(spot.action_history) if h.action == ActionType.RAISE)
+    fold_idxs = [i for i, h in enumerate(spot.action_history) if h.action == ActionType.FOLD]
+    assert all(i > open_idx for i in fold_idxs)
+
+
+def test_rfi_blinds_never_fold():
+    spot = build_spot(_entry(NodeContext.RFI, Position.CO), random.Random(1))
+    st = _statuses(spot)
+    assert st[Position.SB] == PlayerStatus.IN and st[Position.BB] == PlayerStatus.IN
+    assert _fold_positions(spot) == [
+        Position.UTG,
+        Position.UTG1,
+        Position.UTG2,
+        Position.LJ,
+        Position.HJ,
+    ]
+
+
+def test_blind_defense_sb_folds_only_because_it_faced_the_raise():
+    # BB defends vs BTN open: everyone folds to BTN, BTN opens, SB (facing the
+    # raise) folds -> hero BB decides. SB's FOLD entry sits AFTER the open.
+    spot = build_spot(
+        _entry(NodeContext.BLIND_DEFENSE, Position.BB, facing=Position.BTN), random.Random(1)
+    )
+    st = _statuses(spot)
+    assert st[Position.SB] == PlayerStatus.FOLDED
+    assert st[Position.BB] == PlayerStatus.IN and st[Position.BTN] == PlayerStatus.IN
+    hist = spot.action_history
+    open_idx = next(i for i, h in enumerate(hist) if h.action == ActionType.RAISE)
+    sb_fold_idx = next(
+        i for i, h in enumerate(hist) if h.action == ActionType.FOLD and h.position == Position.SB
+    )
+    assert sb_fold_idx > open_idx
+
+
+def test_vs_3bet_exactly_two_in_and_blinds_fold_facing_3bet():
+    # CO opens, BTN 3-bets, blinds fold facing the 3-bet, back on CO.
+    entry = _entry(NodeContext.VS_3BET, Position.CO, facing=Position.BTN)
+    spot = build_spot(entry, random.Random(1))
+    st = _statuses(spot)
+    assert [p for p in _ALL_SEATS if st[p] == PlayerStatus.IN] == [Position.CO, Position.BTN]
+    hist = spot.action_history
+    tbet_idx = next(
+        i for i, h in enumerate(hist) if h.action == ActionType.RAISE and h.position == Position.BTN
+    )
+    for blind in (Position.SB, Position.BB):
+        fold_idx = next(
+            i for i, h in enumerate(hist) if h.action == ActionType.FOLD and h.position == blind
+        )
+        assert fold_idx > tbet_idx  # blinds folded only once they faced the 3-bet
+
+
+def test_vs_limpers_history_interleaves_limps_and_folds_in_seat_order():
+    # BTN vs 2 limpers (UTG, LJ): UTG limps, UTG1/UTG2 fold, LJ limps, HJ/CO fold.
+    entry = _entry(NodeContext.VS_LIMPERS, Position.BTN, limper_count=2)
+    spot = build_spot(entry, random.Random(1))
+    seq = [
+        (h.position, h.action)
+        for h in spot.action_history
+        if h.action in (ActionType.CALL, ActionType.FOLD)
+    ]
+    assert seq == [
+        (Position.UTG, ActionType.CALL),
+        (Position.UTG1, ActionType.FOLD),
+        (Position.UTG2, ActionType.FOLD),
+        (Position.LJ, ActionType.CALL),
+        (Position.HJ, ActionType.FOLD),
+        (Position.CO, ActionType.FOLD),
+    ]
+    st = _statuses(spot)
+    assert st[Position.SB] == PlayerStatus.IN and st[Position.BB] == PlayerStatus.IN
+
+
+def test_spot_signature_unchanged_by_seat_enrichment():
+    """Fixed-rng regression: spot_signature must be byte-identical to the values
+    computed BEFORE the 9-seat/FOLD-history enrichment (signatures are frozen —
+    a change here orphans persisted SRS history)."""
+    from app.domain.srs import spot_signature
+
+    pinned = [
+        "0cdf437e044b0bc5",  # RFI CO
+        "8a793dd99f77ebf7",  # vs_RFI CO vs UTG
+        "fa40bf9b0275ec4e",  # blind_defense BB vs BTN
+        "315c1e5575bb68e9",  # vs_3bet CO vs BTN
+        "3e607efbc81f026c",  # vs_4bet BTN vs CO
+        "70295f999f86ee76",  # vs_limpers BTN, 2 limpers
+    ]
+    sigs = [
+        spot_signature(build_spot(entry, random.Random(42), eff_bb=100.0))
+        for entry in _T2_ENTRIES
+    ]
+    assert sigs == pinned
 
 
 # --- Phase 1c: pool isolation ---
@@ -353,6 +519,55 @@ def test_check_raise_faced_bet_bucket_valid_for_defaults():
     for _ in range(20):
         s = sample_check_raise_spot(rng)
         assert faced_bet_bucket(s) in {"small", "big"}
+
+
+# --- game-table T3: postflop builders emit 9 seats via the shared helper ---
+
+
+def test_postflop_builders_emit_nine_seats_exactly_two_in():
+    from app.domain.postflop import _villain_pos
+    from app.domain.scenarios import build_cbet_spot, build_check_raise_spot, build_vs_cbet_spot
+    from app.domain.srs import faced_bet_bucket
+
+    pairing = (Position.CO, Position.BB)
+    for build in (build_cbet_spot, build_vs_cbet_spot, build_check_raise_spot):
+        s = build(random.Random(7), pairing=pairing, eff_bb=100.0)
+        assert len(s.players) == 9
+        assert [p.position for p in s.players] == _ALL_SEATS  # one seat per position
+        in_seats = {p.position for p in s.players if p.status == PlayerStatus.IN}
+        assert in_seats == set(pairing)  # exactly the opener/caller pairing
+        # every folded seat has exactly one preflop FOLD history entry
+        folded = sorted(p.position for p in s.players if p.status == PlayerStatus.FOLDED)
+        assert sorted(_fold_positions(s)) == folded
+        # _villain_pos resolves the pairing villain, never a folded seat
+        villain = pairing[0] if s.hero.position == pairing[1] else pairing[1]
+        assert _villain_pos(s) == villain
+        # faced_bet_bucket still computes cleanly (FOLD entries filtered out)
+        assert faced_bet_bucket(s) in {"none", "small", "big"}
+
+
+def test_postflop_builders_sb_posts_then_folds_facing_the_open():
+    from app.domain.scenarios import build_cbet_spot, build_check_raise_spot, build_vs_cbet_spot
+
+    for build in (build_cbet_spot, build_vs_cbet_spot, build_check_raise_spot):
+        s = build(random.Random(3), pairing=(Position.BTN, Position.BB), eff_bb=100.0)
+        hist = s.action_history
+        sb_post = next(
+            i
+            for i, h in enumerate(hist)
+            if h.action == ActionType.POST and h.position == Position.SB
+        )
+        open_idx = next(
+            i
+            for i, h in enumerate(hist)
+            if h.action == ActionType.RAISE and h.street == Street.PREFLOP
+        )
+        sb_fold = next(
+            i
+            for i, h in enumerate(hist)
+            if h.action == ActionType.FOLD and h.position == Position.SB
+        )
+        assert sb_post < open_idx < sb_fold  # SB posted, then folded facing the open
 
 
 def test_check_raise_sample_is_deterministic_with_seed():

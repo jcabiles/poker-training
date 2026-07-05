@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { matchCard } from "../api/client";
-import type { ConceptCard as ConceptCardData, EvaluationResult } from "../api/types";
+import type { ConceptCard as ConceptCardData, Decision, EvaluationResult } from "../api/types";
 import ConceptCardView from "./ConceptCard";
 import RationaleTags from "./RationaleTags";
 
@@ -12,11 +12,17 @@ const TONE: Record<string, string> = {
   blunder: "bad",
 };
 
+function actionLabel(action: string, sizeBb?: number | null): string {
+  return sizeBb ? `${action} ${sizeBb}bb` : action;
+}
+
 export default function FeedbackPanel({
   result,
+  chosen,
   onNext,
 }: {
   result: EvaluationResult;
+  chosen: Decision | null;
   onNext: () => void;
 }) {
   const tone = TONE[result.correctness ?? "optimal"] ?? "warn";
@@ -53,6 +59,10 @@ export default function FeedbackPanel({
     };
   }, [result.correctness, result.leak_category, result.rationale_tags]);
 
+  const best = result.best_action;
+  const choseBest =
+    chosen != null && chosen.action === best.action && (chosen.size_bb ?? null) === (best.size_bb ?? null);
+
   return (
     <div
       className={"panel feedback " + tone + "-bg"}
@@ -60,25 +70,53 @@ export default function FeedbackPanel({
       aria-live="polite"
       aria-atomic="true"
     >
-      {/* T6 tier 0 — verdict row: tone badge + EV-loss stat (mono, tabular). */}
+      {/* Tier 0 — verdict badge. The numbers live in the EV block below (R4:
+          every figure renders exactly once in the panel). */}
       <div className="verdict-row">
         <span className={"badge " + tone}>{(result.correctness ?? "").toUpperCase()}</span>
-        <span className="verdict-ev num">≈−{result.ev_loss_bb}bb</span>
       </div>
+      {/* Tier 1 — short lede: what happened, in words (falls back to the flat
+          explanation for any result graded outside the tiered wrapper). */}
+      <p className="tier-verdict">{result.tiers?.verdict ?? result.explanation}</p>
       {result.is_mixed && (
         <p className="mixed">Mixed spot — more than one action is defensible here.</p>
       )}
-      {/* N1 tier 1 — verdict: what happened (falls back to the flat explanation
-          for any result graded outside the tiered wrapper). */}
-      <p className="tier-verdict">{result.tiers?.verdict ?? result.explanation}</p>
-      {result.chosen_eval && (
-        <p className="chosen-eval">
-          Your action: played{" "}
-          <span className="num">{Math.round(result.chosen_eval.frequency * 100)}%</span> here · EV{" "}
-          <span className="num">≈{result.chosen_eval.ev_bb}</span>bb
-        </p>
+      {/* EV comparison — one line per decision (replaces the old one-sentence
+          number pile and the .chosen-eval stat line). */}
+      {result.chosen_eval && chosen && (
+        <div className={"ev-compare " + tone + "-edge"}>
+          <div className={"ev-row " + tone}>
+            <span className="ev-who">You</span>
+            <span className="ev-act">{actionLabel(chosen.action, chosen.size_bb)}</span>
+            <span className="ev-nums">
+              played <span className="num">{Math.round(result.chosen_eval.frequency * 100)}%</span>{" "}
+              · EV <span className="num">≈{result.chosen_eval.ev_bb}</span>bb
+            </span>
+            {choseBest && <span className="best">best</span>}
+          </div>
+          {!choseBest && (
+            <>
+              <div className="ev-row good">
+                <span className="ev-who">Best</span>
+                <span className="ev-act">{actionLabel(best.action, best.size_bb)}</span>
+                <span className="ev-nums">
+                  played <span className="num">{Math.round(best.frequency * 100)}%</span> · EV{" "}
+                  <span className="num">≈{best.ev_bb}</span>bb
+                </span>
+              </div>
+              <div className="ev-row cost">
+                <span className="ev-who">Cost</span>
+                <span className="ev-act" />
+                <span className="ev-nums">
+                  <span className="num">≈−{result.ev_loss_bb}</span>bb given up
+                </span>
+              </div>
+            </>
+          )}
+        </div>
       )}
-      {/* N1 tier 2 — reasoning: why, composed from tags + authored rationale. */}
+      {/* N1 tier 2 — reasoning: why, composed from tags + authored rationale
+          (backend now leads with the hand-specific sentence). */}
       <RationaleTags tags={result.rationale_tags} />
       {result.tiers && <p className="tier-reasoning">{result.tiers.reasoning}</p>}
       {/* N1 tier 3 — deep dive: the full numbers, collapsed by default. */}

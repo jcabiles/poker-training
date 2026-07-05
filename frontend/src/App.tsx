@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getLeaks, getNext, getPlan, getSummary, grade } from "./api/client";
 import type {
   ActionType,
+  Decision,
   EvaluationResult,
   LeakStat,
   Mode,
@@ -72,6 +73,9 @@ export default function App() {
   const [spot, setSpot] = useState<Spot | null>(null);
   const [grid, setGrid] = useState<Record<string, Record<string, number>>>({});
   const [result, setResult] = useState<EvaluationResult | null>(null);
+  // The graded decision, kept alongside `result` so FeedbackPanel can name
+  // the chosen action (EvaluationResult.chosen_eval carries only freq + EV).
+  const [chosen, setChosen] = useState<Decision | null>(null);
   const [studyTestMode, setStudyTestMode] = useState<StudyTestMode>(() => readStudyTestMode());
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [leaks, setLeaks] = useState<LeakStat[]>([]);
@@ -91,6 +95,7 @@ export default function App() {
   const loadNext = useCallback(async (m: Mode) => {
     setError(null);
     setResult(null);
+    setChosen(null);
     try {
       const r = await getNext(m);
       setSpot(r.spot);
@@ -159,8 +164,10 @@ export default function App() {
     async (action: ActionType, sizeBb?: number | null) => {
       if (!spot || result) return;
       try {
-        const r = await grade(spot, { action, size_bb: sizeBb ?? undefined });
+        const decision: Decision = { action, size_bb: sizeBb ?? undefined };
+        const r = await grade(spot, decision);
         setResult(r);
+        setChosen(decision);
         refreshStats();
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -265,7 +272,9 @@ export default function App() {
               <section>
                 <PokerTable spot={spot} />
                 <DecisionBar spot={spot} disabled={!!result} onDecide={decide} />
-                {result && <FeedbackPanel result={result} onNext={() => loadNext(mode)} />}
+                {result && (
+                  <FeedbackPanel result={result} chosen={chosen} onNext={() => loadNext(mode)} />
+                )}
               </section>
               {showGrid && (
                 <aside>

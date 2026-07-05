@@ -24,11 +24,26 @@ from app.domain.spot import (
     LegalAction,
     NodeContext,
     PlayerState,
+    PlayerStatus,
     Position,
     Spot,
     Stakes,
     Street,
 )
+
+# Canonical 9-max preflop action order (blinds act last preflop).
+_SEAT_ORDER = [
+    Position.UTG,
+    Position.UTG1,
+    Position.UTG2,
+    Position.LJ,
+    Position.HJ,
+    Position.CO,
+    Position.BTN,
+    Position.SB,
+    Position.BB,
+]
+_BLIND_SEATS = {Position.SB, Position.BB}
 
 RFI_POSITIONS = [
     Position.UTG,
@@ -103,6 +118,36 @@ def _raise(pos: Position, amount: float) -> HistoryAction:
     )
 
 
+def _fold(pos: Position) -> HistoryAction:
+    return HistoryAction(street=Street.PREFLOP, position=pos, action=ActionType.FOLD)
+
+
+def _before(pos: Position) -> list[Position]:
+    return _SEAT_ORDER[: _SEAT_ORDER.index(pos)]
+
+
+def _between(a: Position, b: Position) -> list[Position]:
+    """Seats strictly between `a` and `b` in preflop order (a acts before b)."""
+    return _SEAT_ORDER[_SEAT_ORDER.index(a) + 1 : _SEAT_ORDER.index(b)]
+
+
+def _after(pos: Position) -> list[Position]:
+    return _SEAT_ORDER[_SEAT_ORDER.index(pos) + 1 :]
+
+
+def _nine_seats(hero: Position, folded: set[Position], eff_bb: float) -> list[PlayerState]:
+    """All 9 seats in canonical order, one per position, status IN/FOLDED."""
+    return [
+        PlayerState(
+            position=pos,
+            stack_bb=eff_bb,
+            status=PlayerStatus.FOLDED if pos in folded else PlayerStatus.IN,
+            is_hero=pos == hero,
+        )
+        for pos in _SEAT_ORDER
+    ]
+
+
 def build_spot(
     entry: Entry,
     rng: random.Random,
@@ -124,13 +169,17 @@ def build_spot(
     limper_count = entry.limper_count or 0
     history = _blinds()
 
-    players = [PlayerState(position=entry.position, stack_bb=eff_bb, is_hero=True)]
-    seen = {entry.position}
+    # Fold derivation rule: every seat that had the opportunity to act before
+    # hero's decision point and is not in the hand gets an explicit FOLD entry
+    # at its chronological slot (canonical order). Blinds fold ONLY when they
+    # faced a raise before hero's turn (e.g. SB in BB blind defense, blinds
+    # behind a non-blind 3-bettor) — never in unopened/limped pots.
+    folded: set[Position] = set()
 
-    def add(pos: Position | None) -> None:
-        if pos is not None and pos not in seen:
-            players.append(PlayerState(position=pos, stack_bb=eff_bb))
-            seen.add(pos)
+    def fold_all(seats: list[Position]) -> None:
+        for pos in seats:
+            folded.add(pos)
+            history.append(_fold(pos))
 
     if ctx == NodeContext.RFI:
         pot = 1.5
@@ -138,68 +187,72 @@ def build_spot(
             LegalAction(action=ActionType.FOLD),
             LegalAction(action=ActionType.RAISE, min_bb=entry.sizing_bb or 2.5, max_bb=eff_bb),
         ]
-        add(Position.SB)
-        add(Position.BB)
+        fold_all([p for p in _before(entry.position) if p not in _BLIND_SEATS])
     elif ctx in (NodeContext.VS_RFI, NodeContext.BLIND_DEFENSE):
         osize = _OPEN_SIZE.get(facing, 2.5)
+        fold_all([p for p in _before(facing) if p not in _BLIND_SEATS])
         history.append(_raise(facing, osize))
+        # seats between opener and hero faced the raise — incl. SB when hero=BB
+        fold_all(_between(facing, entry.position))
         pot = round(1.5 + osize, 2)
         legal = [
             LegalAction(action=ActionType.FOLD),
             LegalAction(action=ActionType.CALL, min_bb=round(osize - _posted(entry.position), 2)),
             LegalAction(action=ActionType.RAISE, min_bb=entry.sizing_bb or 9.0, max_bb=eff_bb),
         ]
-        add(facing)
-        add(Position.SB)
-        add(Position.BB)
     elif ctx == NodeContext.VS_LIMPERS:
-        for lp in _LIMP_SEATS[:limper_count]:
-            history.append(
-                HistoryAction(
-                    street=Street.PREFLOP, position=lp, action=ActionType.CALL, amount_bb=1.0
+        limpers = _LIMP_SEATS[:limper_count]
+        for pos in _before(entry.position):
+            if pos in limpers:
+                history.append(
+                    HistoryAction(
+                        street=Street.PREFLOP, position=pos, action=ActionType.CALL, amount_bb=1.0
+                    )
                 )
-            )
-            add(lp)
+            elif pos not in _BLIND_SEATS:
+                fold_all([pos])
         pot = round(1.5 + limper_count * 1.0, 2)
         legal = [
             LegalAction(action=ActionType.FOLD),
             LegalAction(action=ActionType.CALL, min_bb=round(1.0 - _posted(entry.position), 2)),
             LegalAction(action=ActionType.RAISE, min_bb=entry.sizing_bb or 5.0, max_bb=eff_bb),
         ]
-        add(Position.SB)
-        add(Position.BB)
     elif ctx == NodeContext.VS_3BET:
         osize = _OPEN_SIZE.get(entry.position, 2.5)
         tbet = round(osize * 3, 2)
-        history += [_raise(entry.position, osize), _raise(facing, tbet)]
+        fold_all([p for p in _before(entry.position) if p not in _BLIND_SEATS])
+        history.append(_raise(entry.position, osize))
+        fold_all(_between(entry.position, facing))  # faced hero's open
+        history.append(_raise(facing, tbet))
+        fold_all(_after(facing))  # faced the 3-bet — incl. blinds
         pot = round(1.5 + osize + tbet, 2)
         legal = [
             LegalAction(action=ActionType.FOLD),
             LegalAction(action=ActionType.CALL, min_bb=round(tbet - osize, 2)),
             LegalAction(action=ActionType.RAISE, min_bb=entry.sizing_bb or 22.0, max_bb=eff_bb),
         ]
-        add(facing)
-        add(Position.SB)
-        add(Position.BB)
     elif ctx == NodeContext.VS_4BET:
         osize = _OPEN_SIZE.get(facing, 2.5)
         tbet = round(osize * 3, 2)
         fbet = round(tbet * 2.3, 2)
-        history += [_raise(facing, osize), _raise(entry.position, tbet), _raise(facing, fbet)]
+        fold_all([p for p in _before(facing) if p not in _BLIND_SEATS])
+        history.append(_raise(facing, osize))
+        fold_all(_between(facing, entry.position))  # faced the open
+        history.append(_raise(entry.position, tbet))
+        fold_all(_after(entry.position))  # faced hero's 3-bet — incl. blinds
+        history.append(_raise(facing, fbet))
         pot = round(1.5 + osize + tbet + fbet, 2)
         legal = [
             LegalAction(action=ActionType.FOLD),
             LegalAction(action=ActionType.CALL, min_bb=round(fbet - tbet, 2)),
             LegalAction(action=ActionType.RAISE, min_bb=eff_bb, max_bb=eff_bb),  # jam
         ]
-        add(facing)
-        add(Position.SB)
-        add(Position.BB)
     else:
         pot = 1.5
         legal = [LegalAction(action=ActionType.FOLD)]
-        add(Position.SB)
-        add(Position.BB)
+        fold_all([p for p in _before(entry.position) if p not in _BLIND_SEATS])
+
+    players = _nine_seats(entry.position, folded, eff_bb)
 
     return Spot(
         game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
@@ -269,6 +322,44 @@ def _combos_for(entry: Entry | None, action: ActionType) -> str:
     return ", ".join(a.combos for a in entry.actions if a.action == action)
 
 
+def _hu_srp_seats(
+    hero: Position,
+    opener: Position,
+    caller: Position,
+    osize: float,
+    opener_stack: float,
+    caller_stack: float,
+    eff_bb: float,
+) -> tuple[list[PlayerState], list[HistoryAction]]:
+    """Shared fold derivation for the HU single-raised-pot postflop builders.
+
+    All 9 seats, exactly the opener/caller pairing IN; every other seat folds
+    at its chronological slot — seats before the opener fold to the unopened
+    pot, seats behind the opener (incl. SB, whose FOLD lands after its POST)
+    fold facing the open, then the caller (BB) calls.
+    """
+    history = _blinds()
+    history += [_fold(p) for p in _before(opener) if p not in _BLIND_SEATS]
+    history.append(_raise(opener, osize))
+    history += [_fold(p) for p in _after(opener) if p != caller]
+    history.append(
+        HistoryAction(
+            street=Street.PREFLOP, position=caller, action=ActionType.CALL, amount_bb=osize
+        )
+    )
+    stacks = {opener: opener_stack, caller: caller_stack}
+    players = [
+        PlayerState(
+            position=pos,
+            stack_bb=stacks.get(pos, eff_bb),
+            status=PlayerStatus.IN if pos in stacks else PlayerStatus.FOLDED,
+            is_hero=pos == hero,
+        )
+        for pos in _SEAT_ORDER
+    ]
+    return players, history
+
+
 def build_cbet_spot(
     rng: random.Random,
     pairing: tuple[Position, Position] | None = None,
@@ -293,12 +384,15 @@ def build_cbet_spot(
     small = round(0.33 * pot, 1)
     big = round(0.75 * pot, 1)
 
-    history = _blinds() + [
-        _raise(opener, osize),
-        HistoryAction(
-            street=Street.PREFLOP, position=caller, action=ActionType.CALL, amount_bb=osize
-        ),
-    ]
+    players, history = _hu_srp_seats(
+        hero=opener,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=remaining,
+        caller_stack=remaining,
+        eff_bb=eff_bb,
+    )
 
     return Spot(
         game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
@@ -306,10 +400,7 @@ def build_cbet_spot(
         board=flop,
         pot_bb=pot,
         hero=Hero(position=opener, hole_cards=(h1, h2), stack_bb=remaining),
-        players=[
-            PlayerState(position=opener, stack_bb=remaining, is_hero=True),
-            PlayerState(position=caller, stack_bb=remaining),
-        ],
+        players=players,
         effective_stack_bb=remaining,
         spr=spr,
         action_history=history,
@@ -364,13 +455,18 @@ def build_vs_cbet_spot(
     spr = round(effective / pot, 1)
     raise_size = round(3 * cbet, 1)
 
-    history = _blinds() + [
-        _raise(opener, osize),
-        HistoryAction(
-            street=Street.PREFLOP, position=caller, action=ActionType.CALL, amount_bb=osize
-        ),
-        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
-    ]
+    players, history = _hu_srp_seats(
+        hero=caller,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=villain_remaining,
+        caller_stack=hero_remaining,
+        eff_bb=eff_bb,
+    )
+    history.append(
+        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet)
+    )
 
     return Spot(
         game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
@@ -378,10 +474,7 @@ def build_vs_cbet_spot(
         board=flop,
         pot_bb=pot,
         hero=Hero(position=caller, hole_cards=(h1, h2), stack_bb=hero_remaining),
-        players=[
-            PlayerState(position=caller, stack_bb=hero_remaining, is_hero=True),
-            PlayerState(position=opener, stack_bb=villain_remaining),
-        ],
+        players=players,
         effective_stack_bb=effective,
         spr=spr,
         action_history=history,
@@ -446,11 +539,16 @@ def build_check_raise_spot(
     call_amt = round(raise_to - cbet, 2)  # INCREMENTAL amount hero owes, NOT raise_to
     raise_size = round(3 * raise_to, 2)  # a further 4-bet
 
-    history = _blinds() + [
-        _raise(opener, osize),
-        HistoryAction(
-            street=Street.PREFLOP, position=caller, action=ActionType.CALL, amount_bb=osize
-        ),
+    players, history = _hu_srp_seats(
+        hero=opener,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=hero_remaining,
+        caller_stack=villain_remaining,
+        eff_bb=eff_bb,
+    )
+    history += [
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
         HistoryAction(
             street=Street.FLOP, position=caller, action=ActionType.RAISE, amount_bb=raise_to
@@ -463,10 +561,7 @@ def build_check_raise_spot(
         board=flop,
         pot_bb=pot,
         hero=Hero(position=opener, hole_cards=(h1, h2), stack_bb=hero_remaining),
-        players=[
-            PlayerState(position=opener, stack_bb=hero_remaining, is_hero=True),
-            PlayerState(position=caller, stack_bb=villain_remaining),
-        ],
+        players=players,
         effective_stack_bb=effective,
         spr=spr,
         action_history=history,

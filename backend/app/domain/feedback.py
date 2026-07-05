@@ -87,30 +87,43 @@ def _fmt(e: ActionEval) -> str:
 
 
 def _verdict(result: EvaluationResult, decision: Decision | None) -> str:
+    """One short plain-language lede. Numeric freq/EV detail lives in the FE's
+    EV-comparison block and the deep-dive tier, not here (F2.6)."""
     if result.coverage == Coverage.NOT_FOUND:
         return "No strategy content covers this spot yet, so it was graded by a fallback."
     best = result.best_action
     if decision is None or result.chosen_eval is None:
-        return f"Best play: {_fmt(best)} — played {_pct(best.frequency)} (EV {_ev(best.ev_bb)})."
-    chosen = result.chosen_eval
+        return f"Best play: {_fmt(best)}."
     if result.correctness == Correctness.OPTIMAL:
-        return (
-            f"Optimal — {decision.action.value} is the best line: played "
-            f"{_pct(chosen.frequency)} here (EV {_ev(chosen.ev_bb)})."
-        )
+        return f"Optimal — {decision.action.value} is the best line here."
     label = (result.correctness or Correctness.ACCEPTABLE).value.capitalize()
-    return (
-        f"{label} — you chose {decision.action.value}, played {_pct(chosen.frequency)} "
-        f"here (EV {_ev(chosen.ev_bb)}); best is {_fmt(best)} (EV {_ev(best.ev_bb)}), "
-        f"giving up {_ev(result.ev_loss_bb)}."
-    )
+    return f"{label} — you chose {decision.action.value}; {_fmt(best)} earns more here."
 
 
 def _reasoning(spot: Spot, result: EvaluationResult) -> str:
+    """Authored, hand-specific rationale is always sentence 1 (the lede) — in
+    the postflop tag-branch, the preflop shape-branch, AND the exploit-villain
+    branch — with the tag-derived mechanism template following (F2.7/R3)."""
     if result.coverage == Coverage.NOT_FOUND:
         return "No reasoning is available — this spot is outside the current strategy content."
     tags = result.rationale_tags
     parts: list[str] = []
+    exploit = "exploit" in tags and spot.villain_type is not None
+    if exploit:
+        # exploit lede first: the villain-specific sentence IS the hand-specific
+        # rationale here (authored_rationale is consumed by this lede, so the
+        # branches below must not repeat it).
+        villain = spot.villain_type.value.replace("_", " ")
+        if result.authored_rationale:
+            parts.append(f"Versus a {villain}: {result.authored_rationale}")
+        else:
+            parts.append(
+                f"This is an exploit adjustment versus a {villain}, "
+                f"shifted from the baseline chart."
+            )
+    elif result.authored_rationale:
+        # N3 authored content (preflop baseline or postflop node) leads.
+        parts.append(result.authored_rationale)
     if tags and tags[0] in _NODE and len(tags) >= 4:
         node, adv, cat, wet = tags[0], tags[1], tags[2], tags[3]
         parts.append(
@@ -120,10 +133,6 @@ def _reasoning(spot: Spot, result: EvaluationResult) -> str:
             f"{_WET.get(wet, '')}".rstrip()
             + "."
         )
-        # N3: authored postflop-node rationale (content path), when available,
-        # is preferred teaching prose over the tag-derived text above.
-        if result.authored_rationale:
-            parts.append(result.authored_rationale)
     else:
         shape = next((t for t in tags if t in _PRE_SHAPE), None)
         if shape is not None:
@@ -139,20 +148,6 @@ def _reasoning(spot: Spot, result: EvaluationResult) -> str:
             parts.append(
                 f"The chart's line here is essentially pure: "
                 f"{_fmt(best)} at {_pct(best.frequency)}."
-            )
-        # N3: authored baseline (non-exploit) preflop rationale from the content
-        # pack — the exploit branch below already surfaces authored_rationale
-        # for exploit spots, so skip here to avoid double-appending.
-        if result.authored_rationale and "exploit" not in tags:
-            parts.append(result.authored_rationale)
-    if "exploit" in tags and spot.villain_type is not None:
-        villain = spot.villain_type.value.replace("_", " ")
-        if result.authored_rationale:
-            parts.append(f"Versus a {villain}: {result.authored_rationale}")
-        else:
-            parts.append(
-                f"This is an exploit adjustment versus a {villain}, "
-                f"shifted from the baseline chart."
             )
     return " ".join(parts)
 
