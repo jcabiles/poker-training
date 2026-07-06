@@ -30,7 +30,7 @@
    (`stats.py:38-39,72-73,107-109`), consumed by `/drill/next?mode=review|leak_focus|challenge` (`drill.py:150-184`) and
    `/stats/{leaks,summary}` (`stats.py:11-18`). All assume "whole DB == this one user." Additive nullable seam → each needs a
    `.where(owner_id == … or .is_(None))` when it lands (this is the real blast radius, not the schema change).
-3. **Single SQLite file + module-level global `engine`** (`session.py:9-15`, hardcoded `backend/data/poker_training.db`,
+3. **Single SQLite file + module-level global `engine`** (`session.py:9-15`, hardcoded `backend/data/poker_trainer.db`,
    `check_same_thread=False`). Fine for one local user; the ceiling on multi-user without per-tenant DB routing. No change
    needed for a nullable-column seam.
 4. **Process-global singletons** in `drill.py:55-59` (`_provider`, `_INDEX`, `_RNG` shared mutable) — concurrency/identity

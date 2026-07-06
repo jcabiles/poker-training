@@ -1,4 +1,4 @@
-# AI-DLC profile — poker-training
+# AI-DLC profile — poker-trainer
 
 stack:        mixed — Python/FastAPI backend + React/Vite/strict-TS frontend
 artifact_dir: docs/ai-dlc

@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Poker Training API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Poker Trainer API", version="0.1.0", lifespan=lifespan)
 
 # Dev: Vite (5173) -> FastAPI (8008) is cross-origin. In prod the SPA is
 # served same-origin and this is a no-op.
