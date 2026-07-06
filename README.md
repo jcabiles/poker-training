@@ -1,4 +1,4 @@
-# Poker Training — local NLHE trainer
+# Poker Trainer — local NLHE trainer
 
 A local web app to drill and train live No-Limit Texas Hold'em strategy, tailored
 for the $1/$2 → $2/$3 climb. Simplified-but-sound (not pure GTO), preflop first.

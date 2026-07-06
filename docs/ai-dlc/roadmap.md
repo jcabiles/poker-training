@@ -1,4 +1,4 @@
-# Poker Training App — Phase 0 Roadmap
+# Poker Trainer App — Phase 0 Roadmap
 
 > Living planning document. Built from four research streams (see `docs/research/`).
 > Status: **Phases 0, 1a, 1b, 1c, 2a, 2b, 2c complete & verified** — 148 backend tests green; `scripts/verify.sh` → `BACKEND VERIFY OK`; migration 0004 head. **2d investigated → deferred to Phase 3** (equity-backed range advantage; see below). Flop c-bet + vs-c-bet spots re-surface in `mode=review` via SM-2. **Next: 2e–2k (turn/river/multiway/full-hand), sequenced by dependency — see the Phase 2 section below and `contracts/postflop-turn-river.md`.**

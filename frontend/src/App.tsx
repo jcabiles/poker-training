@@ -217,7 +217,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <h1>Poker Training</h1>
+          <h1>Poker Trainer</h1>
           <span className="tag">preflop + flop · heuristic</span>
         </div>
         <button className="btn" onClick={toggleTheme}>

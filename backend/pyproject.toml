@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "poker-training-backend"
+name = "poker-trainer-backend"
 version = "0.0.0"
 description = "Local NLHE training app — backend (FastAPI)"
 requires-python = ">=3.12"
