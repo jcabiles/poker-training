@@ -1,6 +1,15 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(git push origin *)",
+      "Bash(gh pr create*)"
+    ],
     "deny": [
+      "Bash(git push*main*)",
+      "Bash(git push*--delete*)",
+      "Bash(git push* :*)",
+      "Bash(git push*--force*)",
+      "Bash(git push*-f *)",
       "Read(.env)",
       "Read(.env.*)",
       "Read(**/.env)",
@@ -29,8 +38,26 @@
     "enabled": true,
     "allowUnsandboxedCommands": false,
     "failIfUnavailable": false,
+    "excludedCommands": [
+      "gh pr create*",
+      "gh pr view*",
+      "gh pr list*",
+      "gh auth status*",
+      "git push origin*"
+    ],
     "network": {
-      "allowedDomains": ["pypi.org", "files.pythonhosted.org"]
+      "allowLocalBinding": true,
+      "allowedDomains": [
+        "pypi.org",
+        "files.pythonhosted.org",
+        "github.com",
+        "*.github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+        "localhost",
+        "127.0.0.1"
+      ]
     },
     "filesystem": {
       "allowWrite": ["."],

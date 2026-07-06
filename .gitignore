@@ -22,6 +22,8 @@ backend/data/*.sqlite3
 
 # ---- Tooling exhaust ----
 .playwright-mcp/
+# Personal per-user Claude Code overrides — never commit (may hold local grants).
+.claude/settings.local.json
 
 # ---- OS / editor ----
 .DS_Store

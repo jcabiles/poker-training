@@ -39,7 +39,7 @@ Do the simplest thing that meets the ticket's acceptance criteria — no extra f
 
 `.claude/settings.json` is a hardened sandbox config:
 - OS sandbox enabled (`allowUnsandboxedCommands: false`) — Bash and subprocesses are confined.
-- Network allowlist: `pypi.org`, `files.pythonhosted.org`. Widen `sandbox.network.allowedDomains` for new workflows — don't disable the sandbox.
+- Network allowlist: `pypi.org`, `files.pythonhosted.org`, and GitHub hosts (`github.com`, `api.github.com`, `codeload.github.com`, `objects.githubusercontent.com`) for push/PR. Widen `sandbox.network.allowedDomains` for new workflows — don't disable the sandbox.
 - Writes restricted to project dir; deny list blocks `.env`, secrets, `~/.ssh`, `~/.aws`, keychains.
 
 Restart Claude Code after editing `.claude/settings.json` to reload it.
