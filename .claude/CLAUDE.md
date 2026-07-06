@@ -26,6 +26,7 @@ Invariants: domain core `backend/app/domain/` has no web/DB imports (test-enforc
 Do the simplest thing that meets the ticket's acceptance criteria — no extra features, abstractions, or future-proofing. Touch only files your ticket names.
 
 ## Commands
+- Run dev stack: `poker-trainer` (direnv) or `./scripts/serve.sh start` — backend :8008 + frontend :5173, background; `stop`/`restart`/`status` too.
 - Backend tests + boot probe: `./scripts/verify.sh`
 - Backend lint: `cd backend && ruff check .`
 - Frontend typecheck/build: `cd frontend && npm run typecheck && npm run build`

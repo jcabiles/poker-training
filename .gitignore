@@ -25,6 +25,12 @@ backend/data/*.sqlite3
 # Personal per-user Claude Code overrides — never commit (may hold local grants).
 .claude/settings.local.json
 
+# ---- Local dev-server runtime (managed by scripts/serve.sh) ----
+.backend.pid
+.backend.log
+.frontend.pid
+.frontend.log
+
 # ---- OS / editor ----
 .DS_Store
 Thumbs.db

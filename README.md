@@ -5,13 +5,34 @@ for the $1/$2 → $2/$3 climb. Simplified-but-sound (not pure GTO), preflop firs
 
 Plan: `docs/ai-dlc/roadmap.md` · Strategy research: `docs/research/` · Spec/tickets: `docs/ai-dlc/`.
 
+## Quickstart
+After cloning, run these once — then `poker-trainer` launches the app from anywhere in the repo:
+```bash
+# 1. one-time setup (Python ≥ 3.12, Node ≥ 20)
+cd backend  && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && cd ..
+cd frontend && npm install && cd ..
+
+# 2. install direnv (the tool that exposes the `poker-trainer` command), once per machine
+brew install direnv                             # macOS; see direnv.net for other OSes
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc     # or ~/.bashrc for bash — then restart the shell
+
+# 3. trust this repo's .envrc (once per clone)
+direnv allow .
+
+# 4. run it
+poker-trainer            # start backend :8008 + frontend :5173 in the background
+poker-trainer stop       #   stop / restart / status also work
+```
+Open <http://localhost:5173>. No direnv? Use `./scripts/serve.sh start` instead — same launcher. Full details below.
+
 ## Layout
 ```
 backend/   FastAPI API + pure domain core + SQLite/Alembic
 frontend/  React + Vite
 content/   strategy content packs + JSON schema
 docs/      research, roadmap, specs, tickets
-scripts/   dev.sh, verify.sh
+bin/       poker-trainer  (global launcher, via direnv)
+scripts/   serve.sh, verify.sh
 ```
 
 ## Architecture (why it scales)
@@ -29,24 +50,13 @@ scripts/   dev.sh, verify.sh
 
 ## Setup & run
 
-**Backend** (Python ≥ 3.12):
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-```
+Install and run steps live in [Quickstart](#quickstart) above — venv + `pip install -e ".[dev]"`,
+`npm install`, direnv, then `poker-trainer` (or `./scripts/serve.sh start` without direnv).
 
-**Frontend** (Node ≥ 20):
-```bash
-cd frontend
-npm install
-```
+API health: `http://localhost:8008/api/v1/health` · interactive docs at `/docs`.
 
-**Run** (one command — backend on :8008 + frontend on :5173, backend dies on exit):
-```bash
-./scripts/dev.sh
-```
-Open `http://localhost:5173`. API health: `http://localhost:8008/api/v1/health` · interactive docs at `/docs`.
+> Override ports with `BACKEND_PORT=8123 FRONTEND_PORT=5200 poker-trainer`. Logs
+> stream to `.backend.log` / `.frontend.log` at the repo root.
 
 Or run separately (two terminals):
 ```bash

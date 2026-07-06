@@ -7,7 +7,7 @@ verify:
   test:  ./scripts/verify.sh          # backend pytest + boot probe → "BACKEND VERIFY OK"
   lint:  cd backend && ruff check .
   build: cd frontend && npm run typecheck && npm run build
-  boot:  ./scripts/dev.sh             # backend :8008 (health GET /api/v1/health) + vite :5173, foreground
+  boot:  ./scripts/serve.sh start     # backend :8008 (health GET /api/v1/health) + vite :5173, background (or: poker-trainer)
 
 hotspots:
   - frontend/src/styles/tokens.css    # design tokens — single owner per pass

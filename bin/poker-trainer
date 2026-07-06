@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Global entry point for this project's dev stack. Works whether it's found via
+# direnv's `PATH_add bin` (.envrc), a symlink in ~/.local/bin, or run directly —
+# it resolves its own real path first. Thin delegate to scripts/serve.sh: a bare
+# call defaults to "start"; any subcommand (stop/restart/status) is forwarded.
+set -euo pipefail
+
+# Resolve this script's real location, following symlinks (e.g. ~/.local/bin).
+SRC="${BASH_SOURCE[0]}"
+while [ -h "$SRC" ]; do
+  DIR="$(cd -P "$(dirname "$SRC")" && pwd)"
+  SRC="$(readlink "$SRC")"
+  [ "${SRC#/}" = "$SRC" ] && SRC="$DIR/$SRC"   # relative symlink → make absolute
+done
+HERE="$(cd -P "$(dirname "$SRC")" && pwd)"
+
+exec "$HERE/../scripts/serve.sh" "${1:-start}"
