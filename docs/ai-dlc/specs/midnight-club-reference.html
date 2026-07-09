@@ -1,0 +1,1537 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Poker Trainer — Midnight Club</title>
+<style>
+  /* ============================================================
+     MIDNIGHT CLUB — ultra-premium private members' poker club
+     Static mockup 1/5. Self-contained, no external requests.
+     ============================================================ */
+
+  :root {
+    /* --- theme-invariant tokens --- */
+
+    /* spacing scale (4/8) */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px;
+    --s6: 32px; --s7: 48px; --s8: 64px;
+
+    /* radius */
+    --r-sm: 3px; --r-md: 6px; --r-lg: 10px;
+
+    /* type */
+    --serif: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+    --sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono:  ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+    /* motion */
+    --ease-out: cubic-bezier(0.16, 0.84, 0.44, 1);
+    --ease-in:  cubic-bezier(0.5, 0, 0.75, 0);
+    --dur: 260ms;
+
+    /* the felt table is a dark object in BOTH themes (a lit stage) */
+    --felt-1:     #14241a;
+    --felt-2:     #1d3a2b;
+    --felt-3:     #245139;
+    --felt-rim:   #0b140e;
+    --stage-bg:   #070907;   /* dark frame around the felt, both themes */
+
+    /* text ON the dark stage — stays light in both themes */
+    --on-felt:     #ece7db;
+    --on-felt-2:   #b6b3a4;
+    --on-felt-3:   #86897c;
+    --on-felt-gold:#e6d29a;
+    --on-felt-gold-deep:#c9a75c;
+  }
+
+  /* ============================================================
+     THEME: NIGHT (default) — the Midnight Club after dark
+     ============================================================ */
+  :root,
+  [data-theme="night"] {
+    /* grounds & surfaces (near-black, slight green bias) */
+    --ink:        #070907;   /* deepest ground */
+    --ink-2:      #0a0e0b;   /* page background */
+    --surface:    #10150f;   /* raised card */
+    --surface-2:  #151c15;   /* raised card, higher */
+    --surface-3:  #1a231a;   /* input / chip rest */
+    --hairline:   #26301f;   /* subtle structural line */
+
+    /* gold foil (primary accent) */
+    --gold:       #c9a75c;
+    --gold-bright:#e6d29a;
+    --gold-deep:  #9a7d3c;
+    --gold-glow:  rgba(201,167,92,0.16);
+
+    /* text */
+    --text:       #ece7db;   /* primary */
+    --text-2:     #b6b3a4;   /* secondary */
+    --text-3:     #86897c;   /* muted / captions */
+    --text-ink:   #0b0f0a;   /* text on gold */
+
+    /* semantic */
+    --gain:       #7cc194;
+    --gain-dim:   #3f6b4f;
+    --loss:       #e0685c;
+    --loss-dim:   #7a3a34;
+    --suit-red:   #e0685c;
+    --suit-black: #d8d3c6;
+
+    /* atmosphere */
+    --page-glow-green: rgba(36,81,57,0.22);
+    --page-glow-gold:  rgba(201,167,92,0.05);
+    --grain-color:     rgba(255,255,255,0.012);
+    --grain-blend:     overlay;
+
+    /* elevation */
+    --shadow-1: 0 1px 0 rgba(255,255,255,0.02), 0 8px 24px -12px rgba(0,0,0,0.8);
+    --shadow-2: 0 1px 0 rgba(255,255,255,0.03), 0 24px 60px -24px rgba(0,0,0,0.9);
+
+    /* range-grid cells (raise/call/fold) */
+    --rc-raise-1: #d98a5f; --rc-raise-2: #c66f45;
+    --rc-call-1:  #6aa87e; --rc-call-2:  #4f8a63;
+    --rc-fold-bg: #182018; --rc-fold-fg: var(--text-3);
+    --rc-ink:     rgba(20,15,10,0.72);
+
+    color-scheme: dark;
+  }
+
+  /* ============================================================
+     THEME: DAY — the club at daylight (warm ivory paper room)
+     Cream grounds, ink text, darkened champagne-gold for AA,
+     the felt table kept as a rich dark object in a bright room.
+     ============================================================ */
+  [data-theme="day"] {
+    /* grounds & surfaces (warm ivory / parchment) */
+    --ink:        #efe7d6;   /* deepest ground (page edges / stage frame) */
+    --ink-2:      #f6f0e2;   /* page background — warm paper */
+    --surface:    #fdfaf1;   /* raised card */
+    --surface-2:  #f4ecda;   /* raised card, higher */
+    --surface-3:  #ede2cb;   /* input / chip rest */
+    --hairline:   #d8caa8;   /* subtle structural line */
+
+    /* gold foil — darkened for AA on light grounds */
+    --gold:       #8a6d22;   /* body/label gold, AA on cream */
+    --gold-bright:#a3821f;   /* emphasis foil (still legible on cream) */
+    --gold-deep:  #b79a55;   /* hairline / deco rules on light */
+    --gold-glow:  rgba(138,109,34,0.14);
+
+    /* text — ink on paper */
+    --text:       #241d10;   /* primary */
+    --text-2:     #5a4f39;   /* secondary */
+    --text-3:     #857a5f;   /* muted / captions */
+    --text-ink:   #2a2107;   /* text on gold buttons */
+
+    /* semantic — deepened for AA on light */
+    --gain:       #2f7d4f;
+    --gain-dim:   #a7cbb3;
+    --loss:       #b23a2f;
+    --loss-dim:   #e0b3ad;
+    --suit-red:   #b23a2f;
+    --suit-black: #241d10;
+
+    /* atmosphere — soft daylight wash, no film grain */
+    --page-glow-green: rgba(36,81,57,0.06);
+    --page-glow-gold:  rgba(138,109,34,0.05);
+    --grain-color:     rgba(120,90,30,0.02);
+    --grain-blend:     multiply;
+
+    /* elevation — soft warm shadows on paper */
+    --shadow-1: 0 1px 0 rgba(255,255,255,0.6), 0 10px 24px -14px rgba(60,45,15,0.28);
+    --shadow-2: 0 1px 0 rgba(255,255,255,0.7), 0 26px 60px -28px rgba(60,45,15,0.35);
+
+    /* range-grid cells — deepened so ink labels stay AA-readable */
+    --rc-raise-1: #d67a4a; --rc-raise-2: #b85c30;
+    --rc-call-1:  #4f9a6c; --rc-call-2:  #37784e;
+    --rc-fold-bg: #e7dcc3; --rc-fold-fg: #6c6146;
+    --rc-ink:     rgba(255,250,240,0.94);
+
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+
+  body {
+    background:
+      radial-gradient(1200px 700px at 50% -8%, var(--page-glow-green), transparent 60%),
+      radial-gradient(900px 600px at 85% 110%, var(--page-glow-gold), transparent 55%),
+      var(--ink-2);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding-bottom: 96px;
+    transition: background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+  }
+
+  /* faint film-grain / atmosphere (theme-tinted) */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0;
+    opacity: 0.5;
+    background-image:
+      repeating-linear-gradient(0deg, var(--grain-color) 0 1px, transparent 1px 3px);
+    mix-blend-mode: var(--grain-blend);
+  }
+
+  .shell { position: relative; z-index: 1; max-width: 1360px; margin: 0 auto; padding: 0 var(--s6); }
+
+  /* ---------- typography helpers ---------- */
+  .display {
+    font-family: var(--serif);
+    font-weight: 400;
+    letter-spacing: 0.005em;
+    text-wrap: balance;
+  }
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .label-xs {
+    font-family: var(--sans);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    font-weight: 600;
+  }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* diamond motif divider */
+  .deco-rule {
+    display: flex; align-items: center; gap: var(--s3);
+    color: var(--gold-deep);
+  }
+  .deco-rule::before, .deco-rule::after {
+    content: ""; height: 1px; flex: 1;
+    background: linear-gradient(90deg, transparent, var(--gold-deep), transparent);
+    opacity: 0.6;
+  }
+  .diamond {
+    width: 6px; height: 6px; transform: rotate(45deg);
+    background: var(--gold); flex: none;
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  header.masthead {
+    padding: var(--s6) 0 var(--s4);
+    position: relative;
+  }
+  .masthead-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: var(--s5);
+  }
+  .brand { display: flex; align-items: center; gap: var(--s4); }
+  .brand-crest {
+    width: 46px; height: 46px; flex: none; position: relative;
+    display: grid; place-items: center;
+  }
+  .brand-crest svg { width: 100%; height: 100%; }
+  .brand-name {
+    font-family: var(--serif);
+    font-size: 30px; line-height: 1;
+    color: var(--text);
+    letter-spacing: 0.01em;
+  }
+  .brand-name .amp { color: var(--gold); }
+  .brand-sub {
+    font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--text-3); margin-top: 6px;
+  }
+
+  .masthead-right { display: flex; align-items: center; gap: var(--s4); }
+
+  /* ---------- theme toggle (club register: Night | Day) ---------- */
+  .theme-toggle {
+    appearance: none; cursor: pointer; padding: 0; border: none; background: none;
+  }
+  .tt-track {
+    position: relative; display: inline-flex; align-items: center;
+    width: 132px; height: 40px; padding: 0;
+    border: 1px solid var(--gold-deep); border-radius: 99px;
+    background:
+      linear-gradient(180deg, rgba(201,167,92,0.06), transparent),
+      var(--surface);
+    box-shadow: var(--shadow-1), inset 0 0 0 1px rgba(201,167,92,0.05);
+    overflow: hidden;
+    transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+  }
+  .tt-opt {
+    position: relative; z-index: 2; flex: 1; text-align: center;
+    font-family: var(--sans); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    transition: color var(--dur) var(--ease-out);
+  }
+  /* the knob sits under the ACTIVE label */
+  .tt-knob {
+    position: absolute; z-index: 1; top: 3px; left: 3px;
+    width: calc(50% - 3px); height: calc(100% - 6px);
+    border-radius: 99px;
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold) 60%, var(--gold-deep));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 3px 10px -4px rgba(201,167,92,0.7);
+    transition: transform var(--dur) var(--ease-out);
+  }
+  /* night = default: knob left, "Night" reads on gold (ink), "Day" muted */
+  .tt-night { color: var(--text-ink); }
+  .tt-day   { color: var(--text-3); }
+  /* day active: knob slides right */
+  [data-theme="day"] .tt-knob { transform: translateX(100%); }
+  [data-theme="day"] .tt-night { color: var(--text-3); }
+  [data-theme="day"] .tt-day   { color: var(--text-ink); }
+  .theme-toggle:focus-visible .tt-track { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .theme-toggle:hover .tt-track { border-color: var(--gold); }
+
+  .ledger {
+    display: flex; align-items: center; gap: var(--s4);
+    padding: var(--s3) var(--s4);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md);
+    background:
+      linear-gradient(180deg, rgba(224,104,92,0.06), transparent),
+      var(--surface);
+    box-shadow: var(--shadow-1);
+    position: relative;
+  }
+  .ledger .new-tag { position: absolute; top: -9px; right: 10px; }
+  .ledger-figure {
+    font-family: var(--serif); font-size: 26px; line-height: 1;
+    color: var(--loss); font-variant-numeric: tabular-nums;
+  }
+  .ledger-meter { width: 120px; }
+  .ledger-bar {
+    height: 6px; border-radius: 99px; background: var(--surface-3);
+    overflow: hidden; border: 1px solid var(--hairline);
+  }
+  .ledger-bar > span {
+    display: block; height: 100%;
+    background: linear-gradient(90deg, var(--gold-deep), var(--loss));
+    border-radius: 99px;
+  }
+
+  .new-tag {
+    font-family: var(--sans); font-size: 9px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--text-ink);
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+    padding: 2px 7px; border-radius: 99px;
+    box-shadow: 0 1px 4px rgba(201,167,92,0.35);
+    white-space: nowrap;
+  }
+
+  /* ---------- nav / tabs ---------- */
+  nav.tabs {
+    margin-top: var(--s6);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; gap: var(--s2);
+    position: relative;
+  }
+  nav.tabs::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+    background: linear-gradient(90deg, var(--gold-deep), transparent 40%);
+    opacity: 0.4;
+  }
+  .tab {
+    appearance: none; background: none; border: none; cursor: pointer;
+    font-family: var(--serif); font-size: 17px; color: var(--text-3);
+    padding: var(--s3) var(--s4) var(--s4);
+    position: relative; transition: color var(--dur) var(--ease-out);
+    letter-spacing: 0.01em;
+  }
+  .tab:hover { color: var(--text-2); }
+  .tab[aria-selected="true"] { color: var(--gold-bright); }
+  .tab[aria-selected="true"]::after {
+    content: ""; position: absolute; left: var(--s4); right: var(--s4); bottom: -1px; height: 2px;
+    background: linear-gradient(90deg, var(--gold-deep), var(--gold), var(--gold-deep));
+    border-radius: 2px; z-index: 2;
+  }
+  .tab:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px; border-radius: var(--r-sm);
+    color: var(--gold-bright);
+  }
+
+  /* ============================================================
+     PANELS
+     ============================================================ */
+  .panel { display: none; }
+  .panel.active { display: block; animation: rise var(--dur) var(--ease-out) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  main { padding-top: var(--s6); }
+
+  /* stepped-corner card treatment (art deco) */
+  .card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.014), transparent 30%),
+      var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-1);
+    position: relative;
+  }
+  .card--deco::before, .card--deco::after {
+    content: ""; position: absolute; width: 14px; height: 14px; pointer-events: none;
+    border-color: var(--gold-deep); opacity: 0.7;
+  }
+  .card--deco::before { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; }
+  .card--deco::after  { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; }
+
+  .card-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4);
+    padding: var(--s5) var(--s5) var(--s4);
+  }
+  .card-title { font-family: var(--serif); font-size: 22px; color: var(--text); }
+
+  /* ============================================================
+     HOME
+     ============================================================ */
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr)) 1.6fr;
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-1);
+    margin-bottom: var(--s6);
+  }
+  .stat {
+    background:
+      radial-gradient(120% 140% at 50% -20%, rgba(201,167,92,0.05), transparent 60%),
+      var(--surface);
+    padding: var(--s5);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .stat-figure {
+    font-family: var(--serif); font-size: 34px; line-height: 0.9;
+    color: var(--text); font-variant-numeric: tabular-nums;
+  }
+  .stat-figure.gold { color: var(--gold-bright); }
+  .stat-figure.loss { color: var(--loss); }
+  .stat-label { color: var(--text-3); }
+  .leaks {
+    background: var(--surface);
+    padding: var(--s5); display: flex; flex-direction: column; gap: var(--s3);
+    justify-content: center;
+  }
+  .leak-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .leak-chip {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    font-family: var(--mono); font-size: 12px;
+    padding: 5px 10px; border-radius: 99px;
+    border: 1px solid var(--hairline);
+    background: var(--surface-2); color: var(--text-2);
+  }
+  .leak-chip .pct { color: var(--loss); font-variant-numeric: tabular-nums; }
+  .leak-chip .dot { width: 6px; height: 6px; border-radius: 99px; background: var(--loss); }
+
+  .home-grid {
+    display: grid; grid-template-columns: 1.15fr 1fr; gap: var(--s6);
+    align-items: start;
+  }
+
+  /* today's plan */
+  .plan-hero {
+    display: flex; align-items: baseline; gap: var(--s4);
+    padding: 0 var(--s5) var(--s4);
+  }
+  .plan-figure {
+    font-family: var(--serif); font-size: 68px; line-height: 0.85;
+    color: var(--gold-bright); font-variant-numeric: tabular-nums;
+    text-shadow: 0 2px 30px rgba(201,167,92,0.25);
+  }
+  .plan-figure-sub { color: var(--text-2); font-size: 15px; }
+  .plan-list { list-style: none; margin: 0; padding: 0 var(--s5) var(--s4); }
+  .plan-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--s3) 0; gap: var(--s4);
+    border-top: 1px solid var(--hairline);
+    transition: padding-left var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+  }
+  .plan-item:hover { padding-left: var(--s3); color: var(--gold-bright); }
+  .plan-item .name { font-size: 15px; color: inherit; display: flex; align-items: center; gap: var(--s3); }
+  .plan-item .name .pip {
+    width: 5px; height: 5px; transform: rotate(45deg); background: var(--gold-deep); flex: none;
+  }
+  .plan-item:hover .name .pip { background: var(--gold); }
+  .plan-item .due { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); letter-spacing: 0.04em; }
+
+  /* learning path */
+  .path-list { list-style: none; margin: 0; padding: var(--s2) var(--s5) var(--s5); display: flex; flex-direction: column; }
+  .path-item {
+    display: flex; align-items: center; gap: var(--s4);
+    padding: var(--s3) var(--s3);
+    border-radius: var(--r-md);
+    transition: background var(--dur) var(--ease-out);
+  }
+  .path-item:hover { background: var(--surface-2); }
+  .path-num { font-family: var(--mono); font-size: 12px; color: var(--gold-deep); width: 20px; }
+  .path-name { font-family: var(--serif); font-size: 17px; flex: 1; color: var(--text); }
+  .status {
+    font-family: var(--sans); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; border: 1px solid transparent;
+  }
+  .status.solid    { color: var(--gain); border-color: var(--gain-dim); background: rgba(124,193,148,0.07); }
+  .status.learning { color: var(--gold-bright); border-color: var(--gold-deep); background: rgba(201,167,92,0.06); }
+  .status.new      { color: var(--text-2); border-color: var(--hairline); background: var(--surface-2); }
+
+  /* CTA button */
+  .btn-gold {
+    appearance: none; cursor: pointer;
+    font-family: var(--sans); font-size: 14px; font-weight: 600; letter-spacing: 0.03em;
+    color: var(--text-ink);
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold) 60%, var(--gold-deep));
+    border: 1px solid var(--gold-deep);
+    padding: var(--s3) var(--s5); border-radius: var(--r-md);
+    box-shadow: 0 6px 18px -8px rgba(201,167,92,0.6), inset 0 1px 0 rgba(255,255,255,0.4);
+    transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), filter var(--dur) var(--ease-out);
+  }
+  .btn-gold:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 10px 26px -8px rgba(201,167,92,0.7), inset 0 1px 0 rgba(255,255,255,0.5); }
+  .btn-gold:active { transform: translateY(0); filter: brightness(0.97); }
+  .btn-gold:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; }
+
+  .btn-ghost {
+    appearance: none; cursor: pointer;
+    font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: 0.03em;
+    color: var(--text-2);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    padding: var(--s3) var(--s4); border-radius: var(--r-md);
+    transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--gold-deep); background: var(--surface-3); }
+  .btn-ghost:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .plan-foot { padding: 0 var(--s5) var(--s5); }
+
+  /* --- streak calendar + session recap (below fold) --- */
+  .home-lower { display: grid; grid-template-columns: 1fr 1.3fr; gap: var(--s6); margin-top: var(--s6); align-items: start; }
+
+  .cal-wrap { padding: var(--s5); }
+  .cal-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-top: var(--s4); }
+  .cal-cell {
+    aspect-ratio: 1; border-radius: var(--r-sm);
+    background: var(--surface-3); border: 1px solid rgba(255,255,255,0.02);
+  }
+  .cal-cell.l1 { background: rgba(201,167,92,0.18); }
+  .cal-cell.l2 { background: rgba(201,167,92,0.36); }
+  .cal-cell.l3 { background: rgba(201,167,92,0.58); }
+  .cal-cell.l4 { background: linear-gradient(180deg, var(--gold-bright), var(--gold)); box-shadow: 0 0 8px rgba(201,167,92,0.4); }
+  .cal-legend { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s4); color: var(--text-3); font-size: 11px; }
+  .cal-legend .swatch { width: 11px; height: 11px; border-radius: 2px; }
+
+  /* session recap card */
+  .recap { padding: var(--s5); position: relative; overflow: hidden; }
+  .recap::after {
+    content: ""; position: absolute; top: -40%; right: -10%; width: 320px; height: 320px;
+    background: radial-gradient(circle, rgba(201,167,92,0.12), transparent 65%);
+    pointer-events: none;
+  }
+  .recap-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); margin: var(--s5) 0; }
+  .recap-stat .k { font-family: var(--serif); font-size: 30px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .recap-stat .k.gain { color: var(--gain); }
+  .recap-mistake {
+    border: 1px solid var(--loss-dim); border-radius: var(--r-md);
+    background: rgba(224,104,92,0.05); padding: var(--s4);
+    display: flex; gap: var(--s4); align-items: flex-start;
+  }
+  .recap-mistake .badge {
+    font-family: var(--sans); font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--loss); border: 1px solid var(--loss-dim); border-radius: 99px; padding: 3px 8px; flex: none;
+    background: rgba(224,104,92,0.08);
+  }
+
+  /* ============================================================
+     PRACTICE
+     ============================================================ */
+  .chips-block { margin-bottom: var(--s5); }
+  .chips-row { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); }
+  .chip {
+    appearance: none; cursor: pointer;
+    font-family: var(--sans); font-size: 13px; font-weight: 500;
+    color: var(--text-2);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    padding: 7px 14px; border-radius: 99px;
+    transition: all var(--dur) var(--ease-out);
+  }
+  .chip:hover { color: var(--text); border-color: var(--gold-deep); }
+  .chip[aria-pressed="true"] {
+    color: var(--text-ink);
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+    border-color: var(--gold-deep);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .chip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .toggle {
+    display: inline-flex; border: 1px solid var(--hairline); border-radius: 99px;
+    background: var(--surface-2); padding: 3px; gap: 2px;
+  }
+  .toggle button {
+    appearance: none; cursor: pointer; border: none; background: none;
+    font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text-3);
+    padding: 6px 18px; border-radius: 99px;
+    transition: all var(--dur) var(--ease-out);
+  }
+  .toggle button[aria-pressed="true"] {
+    color: var(--text-ink);
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  }
+  .toggle button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .practice-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--s5); align-items: start; }
+
+  /* ---- the felt table (the stage) ---- */
+  .stage {
+    position: relative; padding: var(--s6);
+    border-radius: 18px;
+    background:
+      radial-gradient(120% 90% at 50% 30%, rgba(201,167,92,0.06), transparent 60%),
+      var(--stage-bg);
+    border: 1px solid #2c3422;
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+  }
+  /* spotlight behind the table */
+  .stage::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(60% 55% at 50% 46%, rgba(43,90,64,0.35), transparent 70%);
+    pointer-events: none;
+  }
+  .table-meta {
+    position: relative; z-index: 2;
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono); font-size: 11.5px; color: var(--on-felt-3); letter-spacing: 0.06em;
+    margin-bottom: var(--s4);
+  }
+  .table-meta .badge-live {
+    color: var(--on-felt-gold-deep); border: 1px solid var(--on-felt-gold-deep); border-radius: 99px;
+    padding: 3px 9px; font-size: 10px; letter-spacing: 0.14em;
+  }
+
+  .felt {
+    position: relative; z-index: 2;
+    aspect-ratio: 16 / 10;
+    border-radius: 999px / 620px;
+    background:
+      radial-gradient(120% 130% at 50% 30%, var(--felt-3), var(--felt-2) 45%, var(--felt-1) 100%);
+    border: 3px solid var(--felt-rim);
+    box-shadow:
+      inset 0 0 0 2px rgba(201,167,92,0.14),
+      inset 0 6px 40px rgba(0,0,0,0.5),
+      0 20px 60px -20px rgba(0,0,0,0.9);
+  }
+  .felt::after {
+    /* inner gold hairline ring (art deco) */
+    content: ""; position: absolute; inset: 26px;
+    border: 1px solid rgba(201,167,92,0.16);
+    border-radius: 999px / 500px;
+    pointer-events: none;
+  }
+
+  .seat {
+    position: absolute; transform: translate(-50%, -50%);
+    text-align: center; width: 78px;
+  }
+  .seat .pos { font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--on-felt-2); }
+  .seat .stack { font-family: var(--mono); font-size: 10px; color: var(--on-felt-3); }
+  .seat .puck {
+    width: 34px; height: 34px; margin: 0 auto 5px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: radial-gradient(circle at 40% 35%, #1e2a20, #0c130d);
+    border: 1px solid #2c3422;
+    font-family: var(--mono); font-size: 9px; color: var(--on-felt-3);
+  }
+  .seat.folded { opacity: 0.45; }
+  .seat.folded .tag { font-family: var(--sans); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--on-felt-3); }
+  .seat.action .puck {
+    background: radial-gradient(circle at 40% 35%, #3a2d12, #1a1407);
+    border-color: var(--on-felt-gold-deep); color: var(--on-felt-gold);
+  }
+  .seat .action-note {
+    font-family: var(--sans); font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--on-felt-gold); text-transform: uppercase; margin-top: 3px;
+  }
+  .dealer-btn {
+    display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold)); color: var(--text-ink);
+    font-size: 8px; font-weight: 800; margin-left: 4px; vertical-align: middle;
+  }
+
+  /* hero seat with cards */
+  .seat.hero { width: 120px; }
+  .seat.hero .hero-ring {
+    padding: 6px; border-radius: 14px;
+    background: radial-gradient(circle at 50% 0%, rgba(201,167,92,0.22), transparent 70%);
+  }
+  .hero-cards { display: flex; gap: 5px; justify-content: center; }
+  .seat.hero .you {
+    margin-top: 6px; font-family: var(--sans); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--on-felt-gold);
+  }
+  .seat.hero .stack { color: var(--on-felt-2); }
+  .seat.hero .pos { color: var(--on-felt-gold) !important; }
+
+  .pot-center {
+    position: absolute; top: 44%; left: 50%; transform: translate(-50%,-50%);
+    text-align: center; z-index: 3;
+  }
+  .pot-center .lbl { font-family: var(--sans); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--on-felt-gold-deep); }
+  .pot-center .amt { font-family: var(--serif); font-size: 26px; color: var(--on-felt-gold); font-variant-numeric: tabular-nums; text-shadow: 0 2px 16px rgba(201,167,92,0.3); }
+
+  /* playing cards */
+  .card-face {
+    width: 46px; height: 64px; border-radius: 5px;
+    background: linear-gradient(160deg, #f4efe2, #e7dfca);
+    box-shadow: 0 4px 12px -3px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.08);
+    display: grid; grid-template-rows: auto 1fr; padding: 4px 5px;
+    position: relative; color: var(--card-ink, #16110a);
+  }
+  .card-face.sm { width: 36px; height: 50px; }
+  .card-face .rank { font-family: var(--serif); font-size: 18px; font-weight: 700; line-height: 1; }
+  .card-face.sm .rank { font-size: 15px; }
+  .card-face .suit { font-size: 15px; line-height: 1; align-self: end; justify-self: end; }
+  .card-face.sm .suit { font-size: 13px; }
+  .card-face.red  { --card-ink: #b93b34; }
+  .card-face.black{ --card-ink: #16110a; }
+  .card-back {
+    width: 30px; height: 42px; border-radius: 4px;
+    background:
+      repeating-linear-gradient(45deg, #23402e 0 4px, #1a3123 4px 8px);
+    border: 1px solid var(--gold-deep);
+    box-shadow: 0 3px 8px -2px rgba(0,0,0,0.6);
+  }
+
+  /* ---- decision bar ---- */
+  .decision-bar {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s3);
+    margin-top: var(--s5);
+  }
+  .act-btn {
+    appearance: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    font-family: var(--serif); font-size: 19px;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    transition: all var(--dur) var(--ease-out);
+  }
+  .act-btn .key {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    color: var(--text-3); border: 1px solid var(--hairline); border-radius: var(--r-sm);
+    padding: 1px 6px;
+  }
+  .act-btn:hover { border-color: var(--gold-deep); background: var(--surface-3); transform: translateY(-1px); }
+  .act-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .act-btn.primary {
+    color: var(--text-ink);
+    background: linear-gradient(180deg, var(--gold-bright), var(--gold) 60%, var(--gold-deep));
+    border-color: var(--gold-deep);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 18px -8px rgba(201,167,92,0.6);
+  }
+  .act-btn.primary .key { color: #5a4410; border-color: rgba(0,0,0,0.25); background: rgba(255,255,255,0.4); }
+
+  /* controls INSIDE the dark stage keep dark-theme surfaces in both themes */
+  .stage .act-btn:not(.primary) {
+    color: var(--on-felt); background: #171f16; border-color: #2c3422;
+  }
+  .stage .act-btn:not(.primary) .key { color: var(--on-felt-3); border-color: #2c3422; }
+  .stage .act-btn:not(.primary):hover { border-color: var(--on-felt-gold-deep); background: #1d271b; }
+  .key-hint { color: var(--on-felt-3); }
+  .key-hint strong { color: var(--on-felt-gold); }
+
+  /* ---- range grid ---- */
+  .range-card { padding: var(--s4) var(--s5) var(--s5); }
+  .range-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s3); }
+  .range-grid {
+    display: grid; grid-template-columns: repeat(13, 1fr); gap: 2px;
+    font-family: var(--mono); font-size: 8.5px;
+  }
+  .rc {
+    aspect-ratio: 1; display: grid; place-items: center;
+    border-radius: 2px; color: var(--rc-ink); font-weight: 600;
+    position: relative;
+  }
+  .rc.raise { background: linear-gradient(180deg, var(--rc-raise-1), var(--rc-raise-2)); }
+  .rc.call  { background: linear-gradient(180deg, var(--rc-call-1), var(--rc-call-2)); }
+  .rc.fold  { background: var(--rc-fold-bg); color: var(--rc-fold-fg); }
+  .rc.hero {
+    outline: 2px solid var(--gold-bright); outline-offset: -1px; z-index: 2;
+    box-shadow: 0 0 10px rgba(201,167,92,0.6);
+  }
+  .range-legend { display: flex; gap: var(--s4); margin-top: var(--s4); font-size: 11px; color: var(--text-2); flex-wrap: wrap; }
+  .range-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .range-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .range-legend .r { background: var(--rc-raise-2); }
+  .range-legend .c { background: var(--rc-call-2); }
+  .range-legend .f { background: var(--rc-fold-bg); border: 1px solid var(--hairline); }
+  .range-legend .h { background: transparent; outline: 2px solid var(--gold-bright); }
+
+  /* ---- feedback ---- */
+  .feedback {
+    margin-top: var(--s6);
+    border: 1px solid var(--gold-deep);
+    border-radius: var(--r-lg);
+    background:
+      linear-gradient(180deg, rgba(201,167,92,0.05), transparent 40%),
+      var(--surface);
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+  }
+  .feedback-inner { padding: var(--s6); max-width: 760px; }
+  .verdict-tag {
+    display: inline-block;
+    font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--loss); border: 1px solid var(--loss-dim); background: rgba(224,104,92,0.08);
+    padding: 5px 12px; border-radius: 99px; margin-bottom: var(--s4);
+  }
+  .verdict { font-family: var(--serif); font-size: 28px; color: var(--text); margin: 0 0 var(--s5); line-height: 1.15; }
+  .verdict em { color: var(--gold-bright); font-style: italic; }
+
+  .ev-ledger {
+    border: 1px solid var(--hairline); border-radius: var(--r-md);
+    background: var(--ink); overflow: hidden;
+    border-left: 3px solid var(--gold);
+  }
+  .ev-row {
+    display: grid; grid-template-columns: 90px 1fr auto; align-items: center; gap: var(--s4);
+    padding: var(--s3) var(--s4);
+    border-top: 1px solid var(--hairline);
+  }
+  .ev-row:first-child { border-top: none; }
+  .ev-row .k { font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); }
+  .ev-row .play { font-family: var(--serif); font-size: 16px; }
+  .ev-row .play.you { color: var(--loss); }
+  .ev-row .play.best { color: var(--gain); }
+  .ev-row .num { font-family: var(--mono); font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .ev-row .num .neg { color: var(--loss); }
+  .ev-row .num .zero { color: var(--gain); }
+  .ev-row.cost { background: rgba(224,104,92,0.05); }
+  .ev-row.cost .k { color: var(--loss); }
+  .ev-row.cost .num { color: var(--loss); font-size: 15px; }
+
+  .rationale {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    font-family: var(--mono); font-size: 12px; color: var(--gold-bright);
+    border: 1px solid var(--gold-deep); border-radius: 99px;
+    padding: 5px 12px; margin: var(--s5) 0 var(--s4);
+    background: rgba(201,167,92,0.06);
+  }
+  .coaching { color: var(--text-2); font-size: 15.5px; line-height: 1.6; max-width: 62ch; }
+  .coaching strong { color: var(--text); font-weight: 600; }
+
+  .concept-card {
+    margin-top: var(--s5);
+    border: 1px solid var(--gold-deep); border-radius: var(--r-md);
+    background: linear-gradient(180deg, var(--gold-glow), var(--surface-2));
+    padding: var(--s5); position: relative;
+  }
+  .concept-card .eyebrow { margin-bottom: var(--s2); display: block; }
+  .concept-card h4 { font-family: var(--serif); font-size: 20px; margin: 0 0 var(--s2); color: var(--text); }
+  .concept-card p { color: var(--text-2); font-size: 14px; margin: 0 0 var(--s3); max-width: 60ch; }
+  .concept-card a { color: var(--gold-bright); font-size: 13px; font-weight: 600; text-decoration: none; letter-spacing: 0.03em; }
+  .concept-card a:hover { text-decoration: underline; }
+
+  .feedback-foot {
+    display: flex; align-items: center; gap: var(--s4);
+    padding: var(--s5) var(--s6);
+    border-top: 1px solid var(--hairline);
+    background: var(--ink);
+  }
+
+  /* ============================================================
+     QUIZZES (texture + equity)
+     ============================================================ */
+  .quiz-wrap { max-width: 880px; margin: 0 auto; }
+  .board-stage {
+    position: relative; padding: var(--s7) var(--s6);
+    border-radius: 16px;
+    background:
+      radial-gradient(80% 90% at 50% 40%, var(--felt-3), var(--felt-2) 55%, var(--felt-1));
+    border: 1px solid var(--hairline);
+    box-shadow: inset 0 0 0 2px rgba(201,167,92,0.12), var(--shadow-2);
+    text-align: center; overflow: hidden;
+  }
+  .board-stage::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(50% 60% at 50% 45%, rgba(255,255,255,0.05), transparent 70%);
+    pointer-events: none;
+  }
+  .board-label { position: relative; color: var(--on-felt-gold-deep); }
+  /* any label sitting on the dark felt board stays light in both themes */
+  .board-stage .label-xs { color: var(--on-felt-3); }
+  .board-cards { display: flex; gap: var(--s3); justify-content: center; margin-top: var(--s4); position: relative; }
+  .board-cards .card-face { width: 62px; height: 86px; }
+  .board-cards .card-face .rank { font-size: 24px; }
+  .board-cards .card-face .suit { font-size: 20px; }
+
+  .quiz-q { font-family: var(--serif); font-size: 26px; color: var(--text); text-align: center; margin: var(--s6) 0 var(--s5); }
+  .answers { display: flex; gap: var(--s4); justify-content: center; flex-wrap: wrap; }
+  .answer-btn {
+    appearance: none; cursor: pointer;
+    font-family: var(--serif); font-size: 20px; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--hairline);
+    padding: var(--s4) var(--s7); border-radius: var(--r-md);
+    min-width: 140px;
+    transition: all var(--dur) var(--ease-out);
+  }
+  .answer-btn:hover { border-color: var(--gold); background: var(--surface-3); transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(0,0,0,0.8); }
+  .answer-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .answer-btn .hint { display: block; font-family: var(--sans); font-size: 11px; color: var(--text-3); letter-spacing: 0.04em; margin-top: 4px; }
+
+  /* equity: villain range as grouped chips + mini bar */
+  .equity-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s6); margin-top: var(--s6); align-items: start; }
+  .hand-block { text-align: center; }
+  .hand-block .lbl { display: block; margin-bottom: var(--s3); }
+  .villain-panel { padding: var(--s5); }
+  .range-group { margin-top: var(--s4); }
+  .range-group .grp-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s2); }
+  .range-group .grp-label .name { font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: var(--text-2); text-transform: uppercase; }
+  .range-group .grp-label .count { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+  .hand-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .h-chip {
+    font-family: var(--mono); font-size: 11px; color: var(--text-2);
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--surface-2); border: 1px solid var(--hairline);
+  }
+  .h-chip.pair { border-color: var(--gold-deep); color: var(--gold-bright); background: rgba(201,167,92,0.06); }
+  .h-chip.suited { border-color: var(--gain-dim); color: var(--gain); background: rgba(124,193,148,0.05); }
+
+  .equity-input { margin-top: var(--s6); text-align: center; }
+  .equity-input .field { display: inline-flex; align-items: stretch; gap: var(--s3); margin-top: var(--s4); }
+  .equity-field {
+    font-family: var(--mono); font-size: 22px; color: var(--text);
+    background: var(--ink); border: 1px solid var(--hairline); border-radius: var(--r-md);
+    padding: var(--s3) var(--s4); width: 150px; text-align: center;
+  }
+  .equity-field:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-color: var(--gold-deep); }
+  .equity-field::placeholder { color: var(--text-3); }
+  .equity-hint { color: var(--text-3); font-size: 13px; margin-top: var(--s4); }
+  .equity-bar {
+    max-width: 480px; margin: var(--s5) auto 0; height: 34px; border-radius: var(--r-md);
+    background: var(--surface-2); border: 1px solid var(--hairline); overflow: hidden;
+    display: flex; position: relative;
+  }
+  .equity-bar .hero-eq { background: linear-gradient(180deg, var(--gold-bright), var(--gold)); display: grid; place-items: center; color: var(--text-ink); font-family: var(--mono); font-size: 12px; font-weight: 700; }
+  .equity-bar .vill-eq { flex: 1; display: grid; place-items: center; color: var(--text-3); font-family: var(--mono); font-size: 12px; }
+
+  /* ============================================================
+     FOOTER banner
+     ============================================================ */
+  .club-footer {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center; gap: var(--s3);
+    padding: 10px;
+    background: linear-gradient(180deg, rgba(7,9,7,0.4), var(--ink) 60%);
+    border-top: 1px solid var(--hairline);
+    backdrop-filter: blur(6px);
+    font-family: var(--sans); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3);
+  }
+  .club-footer .diamond { width: 5px; height: 5px; }
+  .club-footer strong { color: var(--gold); font-weight: 600; }
+
+  /* section spacing */
+  .section + .section { margin-top: var(--s6); }
+  .section-head { margin-bottom: var(--s4); }
+  .section-head .eyebrow { display: block; margin-bottom: 6px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  /* ---------- responsive: hold to 1024 ---------- */
+  @media (max-width: 1120px) {
+    .shell { padding: 0 var(--s5); }
+    .home-grid, .practice-grid, .home-lower, .equity-layout { grid-template-columns: 1fr; }
+    .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    .leaks { grid-column: 1 / -1; }
+    .masthead-top { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+  <div class="shell">
+
+    <!-- ============ MASTHEAD ============ -->
+    <header class="masthead">
+      <div class="masthead-top">
+        <div class="brand">
+          <div class="brand-crest" aria-hidden="true">
+            <svg viewBox="0 0 46 46" fill="none">
+              <rect x="1" y="1" width="44" height="44" rx="4" stroke="#9a7d3c" stroke-width="1"/>
+              <rect x="5" y="5" width="36" height="36" rx="2" stroke="#c9a75c" stroke-width="0.6" opacity="0.6"/>
+              <path d="M23 12 L31 23 L23 34 L15 23 Z" fill="#c9a75c"/>
+              <path d="M23 17 L27.5 23 L23 29 L18.5 23 Z" fill="#0a0e0b"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-name">Poker <span class="amp">·</span> Trainer</div>
+            <div class="brand-sub">The Midnight Club</div>
+          </div>
+        </div>
+
+        <div class="masthead-right">
+          <button class="theme-toggle" id="themeToggle" type="button"
+                  role="switch" aria-checked="false"
+                  aria-label="Switch between Night and Day rooms">
+            <span class="tt-track" aria-hidden="true">
+              <span class="tt-opt tt-night">Night</span>
+              <span class="tt-opt tt-day">Day</span>
+              <span class="tt-knob"></span>
+            </span>
+          </button>
+
+          <div class="ledger" title="Running EV given up today">
+            <span class="new-tag">New</span>
+            <div>
+              <div class="label-xs" style="margin-bottom:4px;">EV Ledger · Today</div>
+              <div style="display:flex; align-items:baseline; gap:8px;">
+                <span class="ledger-figure">−4.7</span>
+                <span class="mono" style="font-size:11px; color:var(--text-3);">bb given up</span>
+              </div>
+            </div>
+            <div class="ledger-meter">
+              <div class="ledger-bar"><span style="width:38%"></span></div>
+              <div class="mono" style="font-size:10px; color:var(--text-3); margin-top:5px; text-align:right;">38% of daily leak budget</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button class="tab" role="tab" aria-selected="true"  data-tab="home">Home</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="practice">Practice</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="texture">Texture Quiz</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="equity">Equity Quiz</button>
+      </nav>
+    </header>
+
+    <main>
+
+      <!-- ================= HOME ================= -->
+      <section class="panel active" id="panel-home" role="tabpanel">
+
+        <!-- stat strip -->
+        <div class="stat-strip">
+          <div class="stat"><span class="stat-figure gold">71<span style="font-size:20px">%</span></span><span class="stat-label label-xs">Accuracy</span></div>
+          <div class="stat"><span class="stat-figure">1</span><span class="stat-label label-xs">Day Streak</span></div>
+          <div class="stat"><span class="stat-figure">122</span><span class="stat-label label-xs">Due</span></div>
+          <div class="stat"><span class="stat-figure">390</span><span class="stat-label label-xs">Hands</span></div>
+          <div class="leaks">
+            <span class="label-xs">Top Leaks</span>
+            <div class="leak-row">
+              <span class="leak-chip"><span class="dot"></span>EQUITY_EST <span class="pct">30%</span></span>
+              <span class="leak-chip"><span class="dot"></span>VS_CHECK_RAISE <span class="pct">60%</span></span>
+              <span class="leak-chip"><span class="dot"></span>VS_3BET_IP <span class="pct">60%</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-grid">
+          <!-- today's plan -->
+          <div class="card card--deco">
+            <div class="card-head">
+              <div>
+                <span class="eyebrow">The Evening's Card</span>
+                <h2 class="card-title" style="margin:6px 0 0;">Today's Plan</h2>
+              </div>
+            </div>
+            <div class="plan-hero">
+              <span class="plan-figure">122</span>
+              <span class="plan-figure-sub">spots due for<br>review tonight</span>
+            </div>
+            <ul class="plan-list">
+              <li class="plan-item"><span class="name"><span class="pip"></span>RFI (BTN)</span><span class="due">due 07-03</span></li>
+              <li class="plan-item"><span class="name"><span class="pip"></span>Facing check-raise (CO)</span><span class="due">due 07-03</span></li>
+              <li class="plan-item"><span class="name"><span class="pip"></span>vs Limpers (BTN)</span><span class="due">due 07-03</span></li>
+              <li class="plan-item"><span class="name"><span class="pip"></span>Facing check-raise (BTN)</span><span class="due">due 07-03</span></li>
+              <li class="plan-item"><span class="name"><span class="pip"></span>Facing c-bet (BB)</span><span class="due">due 07-03</span></li>
+              <li class="plan-item"><span class="name"><span class="pip"></span>Facing check-raise (UTG)</span><span class="due">due 07-03</span></li>
+            </ul>
+            <div class="plan-foot">
+              <button class="btn-gold">Start reviews →</button>
+            </div>
+          </div>
+
+          <!-- learning path -->
+          <div class="card card--deco">
+            <div class="card-head">
+              <div>
+                <span class="eyebrow">The Curriculum</span>
+                <h2 class="card-title" style="margin:6px 0 0;">Learning Path</h2>
+              </div>
+              <span class="label-xs">Solid ≥ 80% · 20+ reps</span>
+            </div>
+            <ul class="path-list">
+              <li class="path-item"><span class="path-num">01</span><span class="path-name">RFI</span><span class="status learning">Learning</span></li>
+              <li class="path-item"><span class="path-num">02</span><span class="path-name">vs RFI</span><span class="status learning">Learning</span></li>
+              <li class="path-item"><span class="path-num">03</span><span class="path-name">Blind defense</span><span class="status solid">Solid</span></li>
+              <li class="path-item"><span class="path-num">04</span><span class="path-name">vs Limpers</span><span class="status learning">Learning</span></li>
+              <li class="path-item"><span class="path-num">05</span><span class="path-name">vs 3-bet</span><span class="status learning">Learning</span></li>
+              <li class="path-item"><span class="path-num">06</span><span class="path-name">C-bet</span><span class="status solid">Solid</span></li>
+              <li class="path-item"><span class="path-num">07</span><span class="path-name">Facing c-bet</span><span class="status learning">Learning</span></li>
+              <li class="path-item"><span class="path-num">08</span><span class="path-name">Facing check-raise</span><span class="status learning">Learning</span></li>
+              <li class="path-item"><span class="path-num">09</span><span class="path-name">Exploits</span><span class="status new">New</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- streak calendar + session recap -->
+        <div class="home-lower">
+          <div class="card card--deco cal-wrap">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <div>
+                <span class="eyebrow">Attendance</span>
+                <h3 class="card-title" style="margin:6px 0 0;">Streak Calendar</h3>
+              </div>
+              <span class="new-tag">New</span>
+            </div>
+            <div class="cal-grid" id="calGrid" aria-hidden="true"></div>
+            <div class="cal-legend">
+              <span>Less</span>
+              <span class="swatch cal-cell"></span>
+              <span class="swatch cal-cell l1"></span>
+              <span class="swatch cal-cell l2"></span>
+              <span class="swatch cal-cell l3"></span>
+              <span class="swatch cal-cell l4"></span>
+              <span>More</span>
+              <span style="margin-left:auto; font-family:var(--mono);">last 8 weeks</span>
+            </div>
+          </div>
+
+          <div class="card card--deco recap">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; position:relative; z-index:2;">
+              <div>
+                <span class="eyebrow">The House Recap</span>
+                <h3 class="card-title" style="margin:6px 0 0;">Last Session</h3>
+              </div>
+              <span class="new-tag">New</span>
+            </div>
+            <div class="recap-stats" style="position:relative; z-index:2;">
+              <div class="recap-stat"><div class="k">28</div><div class="label-xs">Hands played</div></div>
+              <div class="recap-stat"><div class="k">75<span style="font-size:18px">%</span></div><div class="label-xs">Accuracy</div></div>
+              <div class="recap-stat"><div class="k gain">+3.1</div><div class="label-xs">bb saved</div></div>
+            </div>
+            <div class="recap-mistake" style="position:relative; z-index:2;">
+              <span class="badge">Biggest miss</span>
+              <div>
+                <div style="font-family:var(--serif); font-size:16px; color:var(--text);">Called a check-raise on K♥Q♥2♠ with 3rd pair</div>
+                <div class="mono" style="font-size:12px; color:var(--loss); margin-top:4px;">cost ≈ 1.8bb · folding was best</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= PRACTICE ================= -->
+      <section class="panel" id="panel-practice" role="tabpanel">
+
+        <div class="chips-block">
+          <span class="label-xs">Preflop Practice</span>
+          <div class="chips-row" role="group" aria-label="Preflop modes">
+            <button class="chip" aria-pressed="true">Random</button>
+            <button class="chip" aria-pressed="false">Review due</button>
+            <button class="chip" aria-pressed="false">Leak focus</button>
+            <button class="chip" aria-pressed="false">Exploit</button>
+            <button class="chip" aria-pressed="false">Challenge</button>
+          </div>
+        </div>
+        <div class="chips-block">
+          <span class="label-xs">Postflop Spots</span>
+          <div class="chips-row" role="group" aria-label="Postflop spots">
+            <button class="chip" aria-pressed="false">C-bet</button>
+            <button class="chip" aria-pressed="false">Facing c-bet</button>
+            <button class="chip" aria-pressed="false">Facing check-raise</button>
+          </div>
+        </div>
+        <div class="chips-block" style="display:flex; align-items:center; gap:var(--s4);">
+          <div class="toggle" role="group" aria-label="Study or test">
+            <button aria-pressed="true">Study</button>
+            <button aria-pressed="false">Test</button>
+          </div>
+          <span class="mono" style="font-size:12px; color:var(--text-3);">Study: the range chart is visible while you decide.</span>
+        </div>
+
+        <div class="practice-grid">
+          <!-- the stage -->
+          <div>
+            <div class="stage">
+              <div class="table-meta">
+                <span>vs_3bet · 1/2 · 9-max · 100bb deep</span>
+                <span class="badge-live">You are to act</span>
+              </div>
+
+              <div class="felt">
+                <!-- seats around the ellipse -->
+                <div class="seat folded" style="left:30%; top:12%;"><div class="puck">·</div><div class="pos">UTG</div><div class="tag">Fold</div></div>
+                <div class="seat folded" style="left:50%; top:9%;"><div class="puck">·</div><div class="pos">UTG1</div><div class="tag">Fold</div></div>
+                <div class="seat folded" style="left:70%; top:12%;"><div class="puck">·</div><div class="pos">UTG2</div><div class="tag">Fold</div></div>
+                <div class="seat folded" style="left:87%; top:34%;"><div class="puck">·</div><div class="pos">LJ</div><div class="tag">Fold</div></div>
+                <div class="seat folded" style="left:88%; top:64%;"><div class="puck">·</div><div class="pos">HJ</div><div class="tag">Fold</div></div>
+
+                <!-- hero CO -->
+                <div class="seat hero action" style="left:70%; top:88%;">
+                  <div class="hero-ring">
+                    <div class="hero-cards">
+                      <div class="card-face red"><span class="rank">Q</span><span class="suit">♥</span></div>
+                      <div class="card-face red"><span class="rank">8</span><span class="suit">♥</span></div>
+                    </div>
+                  </div>
+                  <div class="pos" style="margin-top:6px; color:var(--gold-bright);">CO</div>
+                  <div class="you">You are to act</div>
+                  <div class="stack">100bb</div>
+                </div>
+
+                <!-- BTN 3-bets -->
+                <div class="seat action" style="left:38%; top:88%;">
+                  <div class="puck">3B</div>
+                  <div class="pos">BTN<span class="dealer-btn">D</span></div>
+                  <div class="action-note">3-bets 7.5</div>
+                  <div class="stack">100bb</div>
+                </div>
+
+                <div class="seat folded" style="left:13%; top:64%;"><div class="puck">·</div><div class="pos">SB</div><div class="tag">Fold</div></div>
+                <div class="seat folded" style="left:12%; top:34%;"><div class="puck">·</div><div class="pos">BB</div><div class="tag">Fold</div></div>
+
+                <div class="pot-center">
+                  <div class="lbl">Pot</div>
+                  <div class="amt">11.5<span style="font-size:15px">bb</span></div>
+                </div>
+              </div>
+
+              <div class="decision-bar">
+                <button class="act-btn">Fold <span class="key">F</span></button>
+                <button class="act-btn">Call 5bb <span class="key">C</span></button>
+                <button class="act-btn primary">Raise 22bb <span class="key">R</span></button>
+              </div>
+              <div class="mono key-hint" style="text-align:center; font-size:11px; margin-top:var(--s3);">
+                Keys · <strong>F</strong> fold · <strong>C</strong> call · <strong>R</strong> raise · <strong>Space</strong> next
+              </div>
+            </div>
+          </div>
+
+          <!-- range grid -->
+          <div class="card card--deco range-card">
+            <div class="range-head">
+              <div>
+                <span class="eyebrow">Solver Line</span>
+                <div class="card-title" style="font-size:18px; margin-top:4px;">vs 3-bet vs BTN</div>
+              </div>
+              <span class="mono" style="font-size:10px; color:var(--text-3);">approx.</span>
+            </div>
+            <div class="range-grid" id="rangeGrid" aria-label="13x13 range chart"></div>
+            <div class="range-legend">
+              <span><i class="r"></i> Raise</span>
+              <span><i class="c"></i> Call</span>
+              <span><i class="f"></i> Fold</span>
+              <span><i class="h"></i> Your hand · Q8s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- feedback (post-decision) -->
+        <div class="feedback">
+          <div class="feedback-inner">
+            <span class="verdict-tag">Mistake</span>
+            <h3 class="verdict">You chose <em>raise</em> — <em>fold</em> earns more here.</h3>
+
+            <div class="ev-ledger">
+              <div class="ev-row">
+                <span class="k">You</span>
+                <span class="play you">Raise 22bb · <span style="color:var(--text-3)">played 0%</span></span>
+                <span class="num">EV ≈ <span class="neg">−0.98bb</span></span>
+              </div>
+              <div class="ev-row">
+                <span class="k">Best</span>
+                <span class="play best">Fold · <span style="color:var(--text-3)">played 100%</span></span>
+                <span class="num">EV ≈ <span class="zero">0bb</span></span>
+              </div>
+              <div class="ev-row cost">
+                <span class="k">Cost</span>
+                <span class="play" style="color:var(--loss); font-size:14px;">bb given up on this decision</span>
+                <span class="num">≈ 0.98bb</span>
+              </div>
+            </div>
+
+            <div class="rationale"><span class="diamond" style="width:5px;height:5px;background:var(--gold-bright);"></span> too aggressive</div>
+
+            <p class="coaching">
+              You opened CO and the BTN 3-bets from position, so you're <strong>out of position for the whole hand</strong> and defend a tighter merged range — 4-bet QQ+/AK plus the A5s wheel-blocker as the lone bluff, and flat only 99–JJ, AQs, AJs, KQs. Q8s has neither the equity to continue nor fold-equity to bluff-raise; against a pool that rarely 3-bet-bluffs, the disciplined line is simply to <strong>fold at 100%</strong>.
+            </p>
+
+            <div class="concept-card">
+              <span class="eyebrow">Concept · Point-of-need</span>
+              <h4>Facing a 3-Bet: Decide Before the Table Does</h4>
+              <p>Your continuing range against a 3-bet should be narrower out of position than in it, and live 3-bets are usually strong — most low-stakes players don't bluff-3-bet enough to justify loose continues.</p>
+              <a href="#">Read the card →</a>
+            </div>
+          </div>
+          <div class="feedback-foot">
+            <button class="btn-gold">Next hand <span class="mono" style="font-size:11px; opacity:0.7;">Space</span></button>
+            <span class="mono" style="font-size:12px; color:var(--text-3);">Logged to your EV ledger · re-surfaces via SRS if weak</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TEXTURE QUIZ ================= -->
+      <section class="panel" id="panel-texture" role="tabpanel">
+        <div class="quiz-wrap">
+          <div class="section-head" style="text-align:center;">
+            <span class="eyebrow">Board Reading</span>
+          </div>
+          <div class="board-stage">
+            <span class="label-xs board-label">The Flop</span>
+            <div class="board-cards">
+              <div class="card-face red"><span class="rank">K</span><span class="suit">♥</span></div>
+              <div class="card-face red"><span class="rank">Q</span><span class="suit">♥</span></div>
+              <div class="card-face black"><span class="rank">2</span><span class="suit">♠</span></div>
+            </div>
+          </div>
+
+          <h2 class="quiz-q">How wet is this flop?</h2>
+          <div class="answers">
+            <button class="answer-btn">Dry<span class="hint">few draws</span></button>
+            <button class="answer-btn">Medium<span class="hint">some connectivity</span></button>
+            <button class="answer-btn">Wet<span class="hint">flush & straight draws</span></button>
+          </div>
+          <p class="equity-hint" style="text-align:center;">Two hearts, connected broadways — lots of turn cards change the nut order.</p>
+        </div>
+      </section>
+
+      <!-- ================= EQUITY QUIZ ================= -->
+      <section class="panel" id="panel-equity" role="tabpanel">
+        <div class="quiz-wrap">
+          <div class="section-head" style="text-align:center;">
+            <span class="eyebrow">Equity Estimation</span>
+          </div>
+
+          <div class="equity-layout">
+            <div class="card card--deco" style="padding:var(--s6);">
+              <div class="hand-block" style="margin-bottom:var(--s6);">
+                <span class="label-xs lbl">Hero Holds</span>
+                <div class="board-cards" style="margin-top:var(--s3);">
+                  <div class="card-face red"><span class="rank">A</span><span class="suit">♦</span></div>
+                  <div class="card-face black"><span class="rank">5</span><span class="suit">♠</span></div>
+                </div>
+              </div>
+              <div class="deco-rule" style="margin:var(--s5) 0;"><span class="diamond"></span></div>
+              <div class="hand-block">
+                <span class="label-xs lbl">The Flop</span>
+                <div class="board-cards" style="margin-top:var(--s3);">
+                  <div class="card-face red"><span class="rank">Q</span><span class="suit">♦</span></div>
+                  <div class="card-face red"><span class="rank">J</span><span class="suit">♥</span></div>
+                  <div class="card-face red"><span class="rank">10</span><span class="suit">♥</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- villain range as grouped chips (was an unreadable comma list) -->
+            <div class="card card--deco villain-panel">
+              <div style="display:flex; align-items:baseline; justify-content:space-between;">
+                <div>
+                  <span class="eyebrow">Villain's Calling Range</span>
+                  <div class="card-title" style="font-size:18px; margin-top:4px;">42 combos · grouped</div>
+                </div>
+              </div>
+
+              <div class="range-group">
+                <div class="grp-label"><span class="name">Pocket pairs</span><span class="count">7</span></div>
+                <div class="hand-chips">
+                  <span class="h-chip pair">22–99</span><span class="h-chip pair">TT</span><span class="h-chip pair">JJ</span>
+                </div>
+              </div>
+              <div class="range-group">
+                <div class="grp-label"><span class="name">Suited</span><span class="count">18</span></div>
+                <div class="hand-chips">
+                  <span class="h-chip suited">A2s</span><span class="h-chip suited">A3s</span><span class="h-chip suited">A4s</span><span class="h-chip suited">A5s</span>
+                  <span class="h-chip suited">A6s</span><span class="h-chip suited">A7s</span><span class="h-chip suited">A8s</span><span class="h-chip suited">A9s</span>
+                  <span class="h-chip suited">ATs</span><span class="h-chip suited">AJs</span><span class="h-chip suited">K9s</span><span class="h-chip suited">KTs</span>
+                  <span class="h-chip suited">KJs</span><span class="h-chip suited">KQs</span><span class="h-chip suited">Q9s</span><span class="h-chip suited">QTs</span>
+                  <span class="h-chip suited">QJs</span><span class="h-chip suited">J9s</span>
+                </div>
+              </div>
+              <div class="range-group">
+                <div class="grp-label"><span class="name">Connectors</span><span class="count">6</span></div>
+                <div class="hand-chips">
+                  <span class="h-chip">JTs</span><span class="h-chip">T9s</span><span class="h-chip">98s</span>
+                  <span class="h-chip">87s</span><span class="h-chip">76s</span><span class="h-chip">65s</span><span class="h-chip">54s</span>
+                </div>
+              </div>
+              <div class="range-group">
+                <div class="grp-label"><span class="name">Offsuit broadways</span><span class="count">11</span></div>
+                <div class="hand-chips">
+                  <span class="h-chip">A9o</span><span class="h-chip">ATo</span><span class="h-chip">AJo</span><span class="h-chip">AQo</span>
+                  <span class="h-chip">KTo</span><span class="h-chip">KJo</span><span class="h-chip">KQo</span><span class="h-chip">QJo</span><span class="h-chip">JTo</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="equity-input">
+            <h2 class="quiz-q" style="margin-bottom:0;">Estimate hero's equity vs this range</h2>
+            <p class="equity-hint">A♦5♠ has a wheel draw and ace-high — how often do you win by the river?</p>
+            <div class="field">
+              <input class="equity-field" type="text" inputmode="numeric" placeholder="equity %" aria-label="Your equity estimate, percent" />
+              <button class="btn-gold" style="font-size:15px; padding:0 var(--s5);">Submit</button>
+            </div>
+            <div class="equity-bar" title="Illustrative split">
+              <div class="hero-eq" style="width:34%">hero ~34%</div>
+              <div class="vill-eq">range ~66%</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- fixed mockup banner -->
+  <footer class="club-footer">
+    <span class="diamond"></span>
+    <span>Mockup <strong>1 / 5</strong> — Midnight Club</span>
+    <span class="diamond"></span>
+  </footer>
+
+<script>
+  /* ---------- theme toggle: Night <-> Day ---------- */
+  (function themeToggle(){
+    const root = document.documentElement;
+    const btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    function apply(theme){
+      root.setAttribute('data-theme', theme);
+      btn.setAttribute('aria-checked', theme === 'day' ? 'true' : 'false');
+    }
+    // allow ?theme=day deep-link (for screenshots / sharing)
+    const q = new URLSearchParams(location.search).get('theme');
+    if (q === 'day' || q === 'night') apply(q);
+    btn.addEventListener('click', () => {
+      apply(root.getAttribute('data-theme') === 'day' ? 'night' : 'day');
+    });
+  })();
+
+  /* ---------- tab switcher ---------- */
+  const tabs = document.querySelectorAll('.tab');
+  const panels = {
+    home: document.getElementById('panel-home'),
+    practice: document.getElementById('panel-practice'),
+    texture: document.getElementById('panel-texture'),
+    equity: document.getElementById('panel-equity'),
+  };
+  function selectTab(name, scroll) {
+    if (!panels[name]) return;
+    tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name ? 'true' : 'false'));
+    Object.entries(panels).forEach(([k, p]) => p.classList.toggle('active', k === name));
+    if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => selectTab(tab.dataset.tab, true));
+  });
+  /* deep-link: ?tab=practice or #practice preselects a panel (no click needed) */
+  (function initTab(){
+    const q = new URLSearchParams(location.search).get('tab');
+    const h = location.hash.replace('#','');
+    const start = (q && panels[q]) ? q : (panels[h] ? h : null);
+    if (start) selectTab(start, false);
+  })();
+
+  /* keyboard arrow nav on tablist */
+  document.querySelector('.tabs').addEventListener('keydown', (e) => {
+    const list = [...tabs];
+    const i = list.findIndex(t => t.getAttribute('aria-selected') === 'true');
+    if (e.key === 'ArrowRight') { list[(i+1)%list.length].focus(); list[(i+1)%list.length].click(); }
+    if (e.key === 'ArrowLeft')  { list[(i-1+list.length)%list.length].focus(); list[(i-1+list.length)%list.length].click(); }
+  });
+
+  /* ---------- chip / toggle group behavior ---------- */
+  document.querySelectorAll('[role="group"]').forEach(group => {
+    const isSingle = group.classList.contains('chips-row') || group.classList.contains('toggle');
+    group.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (group.querySelector('.toggle') || group.classList.contains('toggle')) {
+          group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed','false'));
+          btn.setAttribute('aria-pressed','true');
+        } else {
+          group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed','false'));
+          btn.setAttribute('aria-pressed','true');
+        }
+      });
+    });
+  });
+
+  /* ---------- streak calendar (8 weeks x 8 rows heat) ---------- */
+  (function buildCalendar(){
+    const grid = document.getElementById('calGrid');
+    if (!grid) return;
+    // deterministic-ish intensity pattern (56 cells)
+    const pattern = [0,1,2,0,3,4,1,2, 2,3,4,3,2,1,0,1, 1,0,2,3,4,4,3,2, 0,1,1,2,3,2,1,0, 2,3,4,2,1,0,0,1, 3,4,4,3,2,1,2,3, 1,2,0,1,3,4,2,1];
+    pattern.forEach(v => {
+      const c = document.createElement('div');
+      c.className = 'cal-cell' + (v ? ' l'+v : '');
+      grid.appendChild(c);
+    });
+  })();
+
+  /* ---------- 13x13 range grid ---------- */
+  (function buildRange(){
+    const grid = document.getElementById('rangeGrid');
+    if (!grid) return;
+    const ranks = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+    // raise-heavy top block, some calls, rest fold — approximating a vs-3bet defend chart
+    const raise = new Set(['AA','KK','QQ','JJ','AKs','AQs','AJs','ATs','A5s','A4s','KQs','AKo']);
+    const call  = new Set(['TT','99','88','KJs','KTs','QJs','QTs','JTs','T9s','98s','AQo','KQo','A9s','A8s']);
+
+    for (let r = 0; r < 13; r++) {
+      for (let c = 0; c < 13; c++) {
+        const hi = ranks[Math.min(r,c)], lo = ranks[Math.max(r,c)];
+        let hand, kind;
+        if (r === c) { hand = hi+lo; kind='pair'; }
+        else if (c > r) { hand = hi+lo+'s'; kind='s'; }   // upper triangle = suited
+        else { hand = lo+hi+'o'; kind='o'; }               // lower triangle = offsuit
+
+        const cell = document.createElement('div');
+        let klass = 'fold';
+        if (raise.has(hand)) klass = 'raise';
+        else if (call.has(hand)) klass = 'call';
+        cell.className = 'rc ' + klass;
+        cell.textContent = hand.replace('s','').replace('o','') + (kind==='s'?'s':kind==='o'?'o':'');
+        // shorten label for space
+        cell.textContent = hand;
+        if (hand === 'Q8s') cell.classList.add('hero');
+        grid.appendChild(cell);
+      }
+    }
+  })();
+
+  /* ---------- decision keyboard hints (visual only echo) ---------- */
+  document.addEventListener('keydown', (e) => {
+    const map = { f:0, c:1, r:2 };
+    const practiceOpen = document.getElementById('panel-practice').classList.contains('active');
+    if (!practiceOpen) return;
+    const k = e.key.toLowerCase();
+    if (k in map) {
+      const btns = document.querySelectorAll('.decision-bar .act-btn');
+      btns.forEach(b => b.style.outline = '');
+      const b = btns[map[k]];
+      if (b) { b.focus(); }
+    }
+  });
+</script>
+</body>
+</html>
