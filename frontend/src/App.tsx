@@ -46,6 +46,27 @@ const POSTFLOP_MODES: { id: Mode; label: string }[] = [
   { id: "vs_check_raise", label: "Facing check-raise" },
 ];
 
+// T2: Night|Day room. Default dark ("night"); the chosen theme persists so
+// the room stays the way you left it across reloads.
+const THEME_KEY = "theme";
+type Theme = "dark" | "light";
+
+function readTheme(): Theme {
+  try {
+    return window.localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+function writeTheme(theme: Theme): void {
+  try {
+    window.localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    /* localStorage unavailable — preference just won't persist */
+  }
+}
+
 // CW-6: Study shows the answer grid while deciding (PR #6 behavior); Test
 // hides it until the spot is graded, then reveals it.
 const STUDY_TEST_KEY = "studyTestMode";
@@ -77,6 +98,12 @@ export default function App() {
   // the chosen action (EvaluationResult.chosen_eval carries only freq + EV).
   const [chosen, setChosen] = useState<Decision | null>(null);
   const [studyTestMode, setStudyTestMode] = useState<StudyTestMode>(() => readStudyTestMode());
+  // The inline snippet in index.html sets data-theme before first paint; mirror
+  // it into state so the Night|Day switch renders the correct side.
+  const [theme, setTheme] = useState<Theme>(() => {
+    const attr = document.documentElement.dataset.theme;
+    return attr === "light" ? "light" : attr === "dark" ? "dark" : readTheme();
+  });
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [leaks, setLeaks] = useState<LeakStat[]>([]);
   const [plan, setPlan] = useState<ReviewPlanResponse | null>(null);
@@ -204,8 +231,12 @@ export default function App() {
   }, [view, spot, result, mode, decide, loadNext]);
 
   const toggleTheme = () => {
-    const h = document.documentElement;
-    h.dataset.theme = h.dataset.theme === "dark" ? "light" : "dark";
+    setTheme((prev) => {
+      const next: Theme = prev === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      writeTheme(next);
+      return next;
+    });
   };
 
   const hasGrid = Object.keys(grid).length > 0;
@@ -217,11 +248,34 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <h1>Poker Trainer</h1>
-          <span className="tag">preflop + flop · heuristic</span>
+          <span className="brand-crest" aria-hidden="true">
+            <svg viewBox="0 0 46 46" fill="none">
+              <rect x="1" y="1" width="44" height="44" rx="4" className="crest-frame" strokeWidth="1" />
+              <rect x="5" y="5" width="36" height="36" rx="2" className="crest-inner" strokeWidth="0.6" />
+              <path d="M23 12 L31 23 L23 34 L15 23 Z" className="crest-mark" />
+              <path d="M23 17 L27.5 23 L23 29 L18.5 23 Z" className="crest-eye" />
+            </svg>
+          </span>
+          <div className="brand-lockup">
+            <h1 className="brand-name">
+              Poker <span className="brand-amp">·</span> Trainer
+            </h1>
+            <span className="tag">preflop + flop · heuristic</span>
+          </div>
         </div>
-        <button className="btn" onClick={toggleTheme}>
-          Theme
+        <button
+          type="button"
+          className="theme-toggle"
+          role="switch"
+          aria-checked={theme === "light"}
+          aria-label="Switch between Night and Day rooms"
+          onClick={toggleTheme}
+        >
+          <span className="tt-track" aria-hidden="true">
+            <span className="tt-opt tt-night">Night</span>
+            <span className="tt-opt tt-day">Day</span>
+            <span className="tt-knob" />
+          </span>
         </button>
       </header>
 

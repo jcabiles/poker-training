@@ -7,8 +7,9 @@
   padding: var(--space-6) var(--space-4);
 }
 
-/* T4 shell — masthead: brand mark left, theme control right; the nav rail
-   below carries the single hairline, so the topbar itself stays ruleless. */
+/* T2 masthead — the club crest + wordmark sit left, the gilded Night|Day
+   switch right; the nav rail below carries the single hairline, so the topbar
+   itself stays ruleless. */
 .topbar {
   display: flex;
   align-items: center;
@@ -18,33 +19,133 @@
 }
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-3);
-  flex-wrap: wrap;
 }
-.brand::before {
-  /* brass diamond pip — the room's mark; decorative (empty content, invisible
-     to AT). Sized off the space ramp; no motion. */
-  content: "";
-  align-self: center;
+
+/* Brand crest — inline SVG diamond mark in an art-deco double frame. Gold on
+   the current surface; decorative (aria-hidden). Colors pull from tokens via
+   the child rules below (fill/stroke can't be tokenized on <svg> shorthand). */
+.brand-crest {
   flex: none;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--primary);
-  transform: rotate(45deg);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
 }
-.brand h1 {
+.brand-crest svg {
+  width: 100%;
+  height: 100%;
+}
+.crest-frame {
+  fill: none;
+  stroke: var(--primary);
+}
+.crest-inner {
+  fill: none;
+  stroke: var(--gold-bright);
+  opacity: 0.55;
+}
+.crest-mark {
+  fill: var(--primary);
+}
+.crest-eye {
+  /* engraved centre — the page ground shows through the diamond's heart */
+  fill: var(--bg);
+}
+
+.brand-lockup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.brand-name {
   font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: 600;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.4px;
+  line-height: 1.05;
   margin: 0;
+}
+.brand-amp {
+  color: var(--primary);
 }
 .tag {
   font-family: var(--font-body); /* serif floor: never inherit Fraunces below 15px */
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--muted);
-  font-weight: 400;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* T2 — gilded Night|Day switch (role="switch"). Both labels always visible;
+   the gold knob slides under the active one. Native <button> gives Enter/Space
+   + the app's global :focus-visible ring. aria-checked=true ⇒ Day (light). */
+.theme-toggle {
+  appearance: none;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--radius-pill);
+}
+.tt-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 132px;
+  height: 40px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-pill);
+  background:
+    radial-gradient(120% 140% at 50% 0%, var(--gold-glow), transparent 70%),
+    var(--surface-2);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.tt-opt {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.tt-knob {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--gold-bright), var(--primary) 70%);
+  box-shadow: var(--shadow-card);
+}
+/* Night (default, dark): knob left; "Night" reads as engraved ink on gold,
+   "Day" recedes to muted. */
+.tt-night {
+  color: var(--primary-text);
+}
+.tt-day {
+  color: var(--muted);
+}
+/* Day (light): knob slides right; labels swap emphasis. */
+[data-theme="light"] .tt-knob {
+  transform: translateX(100%);
+}
+[data-theme="light"] .tt-night {
+  color: var(--muted);
+}
+[data-theme="light"] .tt-day {
+  color: var(--primary-text);
+}
+.theme-toggle:hover .tt-track {
+  border-color: var(--gold-bright);
 }
 
 /* T4 — primary view rail. Plain <button>s (keeps the drill keydown guard's
@@ -64,16 +165,18 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px; /* underline sits on the rail hairline */
   padding: var(--space-2) var(--space-1) var(--space-3);
-  font-family: var(--font-body);
-  font-size: var(--text-base);
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  font-family: var(--font-display); /* T2: serif tabs — the club register */
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: 0.3px;
   color: var(--muted);
   cursor: pointer;
 }
 .nav-tab:hover {
   color: var(--text);
 }
+/* Active tab = gold underline + text-color step: shape cue + color cue, never
+   color-only. The gold rule reads as brass foil on the hairline rail. */
 .nav-tab.active {
   color: var(--text);
   border-bottom-color: var(--primary);
@@ -1457,6 +1560,17 @@ kbd {
     transition:
       color var(--dur-1) var(--ease-1),
       border-bottom-color var(--dur-1) var(--ease-1);
+  }
+  /* T2 — the Night|Day knob glides between labels; track + labels crossfade.
+     Reduce users get the instant swap (no transition outside this block). */
+  .tt-knob {
+    transition: transform var(--dur-2) var(--ease-1);
+  }
+  .tt-track {
+    transition: border-color var(--dur-1) var(--ease-1);
+  }
+  .tt-opt {
+    transition: color var(--dur-2) var(--ease-1);
   }
   .tier-deepdive summary,
   .concept-card summary {

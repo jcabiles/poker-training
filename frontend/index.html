@@ -13,6 +13,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- T2: restore the saved Night|Day room before first paint (default: dark)
+         so the theme never flashes. Mirrors App.tsx's THEME_KEY / readTheme. -->
+    <script>
+      try {
+        if (localStorage.getItem("theme") === "light") {
+          document.documentElement.dataset.theme = "light";
+        }
+      } catch (e) {
+        /* localStorage unavailable — keep the default dark theme */
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
