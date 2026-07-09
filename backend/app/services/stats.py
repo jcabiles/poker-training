@@ -103,12 +103,90 @@ def summary(session: Session, today: date | None = None) -> dict:
     )
     trend = round(_accuracy(ordered[-20:]) - _accuracy(ordered[-40:-20]), 3)
 
+    ev_given_up_today = sum(r.ev_loss_bb for r in rows if _local_date(r.created_at) == today)
+
     return {
         "total_attempts": len(rows),
         "accuracy": round(_accuracy(rows), 3),
         "due_count": due,
         "streak_days": streak,
         "trend": trend,
+        "ev_given_up_today_bb": round(ev_given_up_today, 2),
+    }
+
+
+def _spot_label(row: DrillAttempt) -> str:
+    """Human-usable label for a DrillAttempt, derived from stored fields only."""
+    cat_name = _name(row.leak_category) if row.leak_category is not None else None
+    if cat_name and row.hand_class:
+        return f"{cat_name} ({row.hand_class})"
+    if cat_name:
+        return cat_name
+    if row.hand_class:
+        return row.hand_class
+    return row.spot_signature
+
+
+def calendar(session: Session, weeks: int = 8, today: date | None = None) -> list[dict]:
+    """Per-day attempt counts + accuracy for the last `weeks` weeks up to today.
+
+    Returns a full grid (including zero-attempt days), aligned so the range
+    starts on the Monday of the week containing today-minus-(weeks-1)-weeks,
+    through today.
+    """
+    today = today or date.today()
+    start = today - timedelta(weeks=weeks - 1)
+    start -= timedelta(days=start.weekday())  # back up to that week's Monday
+
+    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
+    by_day: dict[date, list[DrillAttempt]] = defaultdict(list)
+    for r in rows:
+        by_day[_local_date(r.created_at)].append(r)
+
+    out = []
+    d = start
+    while d <= today:
+        items = by_day.get(d, [])
+        out.append(
+            {
+                "date": d.isoformat(),
+                "attempts": len(items),
+                "accuracy": round(_accuracy(items), 3) if items else 0.0,
+            }
+        )
+        d += timedelta(days=1)
+    return out
+
+
+def recap(session: Session) -> dict:
+    """Most recent calendar day (local) that has any attempts."""
+    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
+    if not rows:
+        return {
+            "day": None,
+            "hands": 0,
+            "accuracy": 0.0,
+            "bb_given_up": 0.0,
+            "biggest_miss": None,
+        }
+
+    by_day: dict[date, list[DrillAttempt]] = defaultdict(list)
+    for r in rows:
+        by_day[_local_date(r.created_at)].append(r)
+
+    last_day = max(by_day)
+    items = by_day[last_day]
+    worst = max(items, key=lambda i: i.ev_loss_bb)
+
+    return {
+        "day": last_day.isoformat(),
+        "hands": len(items),
+        "accuracy": round(_accuracy(items), 3),
+        "bb_given_up": round(sum(i.ev_loss_bb for i in items), 2),
+        "biggest_miss": {
+            "label": _spot_label(worst),
+            "ev_loss_bb": round(worst.ev_loss_bb, 2),
+        },
     }
 
 
