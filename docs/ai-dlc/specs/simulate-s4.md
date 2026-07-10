@@ -63,6 +63,11 @@ def sample_postflop_decision(
     opponents: int,              # live (IN or ALLIN) opponents remaining
     rng: random.Random,          # the HAND's injected rng — never a fresh Random
     noise: float = 1.0,          # per-session multiplier (S9 supplies; 1.0 = none)
+    current_bet_to: float = 0.0, # the street's current bet-TO amount (HandState.
+                                 # current_bet_bb) — combined-refuter amendment: the
+                                 # to_call approximation deviates from the pinned raise
+                                 # formula by the seat's street investment in multi-raise
+                                 # sequences; callers pass the true value (0.0 = unopened)
 ) -> Decision
 # Returns an engine-ready Decision: action ∈ legal shapes; BET/RAISE always carry
 # absolute size_bb (raise-TO) sampled from pack.postflop.sizing then CLAMPED into the

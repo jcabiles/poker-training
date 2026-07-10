@@ -12,7 +12,7 @@
 
 ## S4 — persona postflop engine
 
-- [ ] **T1 — Strength ladder + lever engine (heavy-worker).**
+- [x] **T1 — Strength ladder + lever engine (heavy-worker).**
   `domain/personas_postflop.py` (new): StrengthBucket (7 disjoint rungs per the spec's
   disjointness rule), DrawCategory, public `strength_bucket()` (analytic only, river ⇒
   DrawCategory.NONE), `sample_postflop_decision()` (frozen signature; merit mapping w/
@@ -25,7 +25,7 @@
   **No-gos:** no engine/grader/provider/srs changes · no MC equity in the hot loop ·
   no persona-aware grading · preflop sampling path byte-identical.
 
-- [ ] **T2 — Packs + closed-loop suite (implementer).**
+- [x] **T2 — Packs + closed-loop suite (implementer).**
   Author `postflop` blocks in all 6 `content/personas/*.json` (doc-grounded per spec
   Content section). `backend/tests/test_personas_postflop.py` (new): unit tests (rung
   fixtures incl. disjointness edges, monotonicity, sizing-spread proof, clamp/jam,
@@ -40,7 +40,7 @@
 
 ## S7 — river graders
 
-- [ ] **T3 — River grading core (heavy-worker).**
+- [x] **T3 — River grading core (heavy-worker).**
   NodeContext += `RIVER_BARREL("river_barrel")`/`VS_RIVER_BET("vs_river_bet")`;
   `texture.py::river_card_class` (board[4] vs board[:4], same 5 classes/precedence);
   `range_advantage` river branch (flop/turn paths byte-identical); `grade_river_barrel`/
@@ -55,7 +55,7 @@
   **No-gos:** no `_hand_category` body changes · no srs/drill/scenarios/review/db edits
   (T4's) · no leaks/grading/feedback edits (T5's) · flop+turn grader outputs byte-identical.
 
-- [ ] **T4 — SRS river dim + rebuild + migration (heavy-worker).**
+- [x] **T4 — SRS river dim + rebuild + migration (heavy-worker).**
   `srs.py`: SECOND conditional append (river-only, after turn_class — refuter-verified
   design; flop AND turn hashes byte-unchanged, pins stay literal) + docstring update.
   `db/models.py`: nullable `river_class` + fix the stale turn_class comment; additive
@@ -74,7 +74,7 @@
   **No-gos:** NEVER update a pinned hash literal · additive migration only · no
   postflop/spot/texture edits (T3's — author to frozen names).
 
-- [ ] **T5 — Leaks + feedback + river tests (implementer).**
+- [x] **T5 — Leaks + feedback + river tests (implementer).**
   `leaks.py`: RIVER_BARREL=205, VS_RIVER_BET=206, TAXONOMY_VERSION→5; `grading.py`
   river branches (second mapping site); `feedback.py`: `_NODE` river entries,
   `_RIVER_CLASS` dict, **widen the turn_class gate's node tuple to include river nodes
@@ -91,7 +91,7 @@
 
 ## Close-out
 
-- [ ] **T6 — Lead fan-in.** Full `pytest -q` + ruff + `./scripts/verify.sh`; pins literal +
+- [x] **T6 — Lead fan-in.** Full `pytest -q` + ruff + `./scripts/verify.sh`; pins literal +
   unchanged; migration 0008 applies; S3 preflop band test + S6 turn tests byte-identical;
   closed-loop runtime ≤ budget (report); refuter on the combined diff; PR
   `feat/simulate-wave3`; mark S4 + S7 `[x]` in roadmap + add the 3-bet-target roadmap note.

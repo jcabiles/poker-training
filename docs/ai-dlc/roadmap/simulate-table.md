@@ -126,7 +126,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       actions; `verify.sh` OK. **Appetite:** ~1 epic. **No-gos:** postflop behavior (S4);
       no depth-aware charts (100BB authoring); no persona-aware *grading* anywhere.
 
-- [ ] **S4 — Persona postflop engine + live-texture calibration.** ICE 9·6·3. *(Track B, W3 — strictly after S2+S3: its tests need the finished hand engine)*
+- [x] **S4 — Persona postflop engine + live-texture calibration.** *(done 2026-07-10, wave 3: `personas_postflop.py` — 7-rung analytic ladder + lever-block engine (levers in packs, mechanics in code); closed-loop full-hand suite N≈600/persona at 11.6s; honest PRD±3σ bands — AF + fold-to-cbet all pass after a refuter-driven merit rebalance + exact current_bet_to raise formula. **Two documented deviations:** table-texture players-to-flop floor 3.0→2.4 (VPIP-sum bound — a maniac-bearing lineup structurally kills passive limped multiway pots) and WTSD for 5/6 personas uses ENGINE-ANCHORED regression bands + cross-persona ordering invariants, not PRD tracker anchors (per-seat levers provably can't steer this population statistic — lever sweeps moved it <0.05 while breaking AF; PRD-fidelity revisit = Later item alongside engine perf: apply() is 91% pydantic deep-copy, ~430 hands/s ceiling))* ICE 9·6·3. *(Track B, W3)*
       **Problem:** bots must act on flop/turn/river or no hand reaches showdown.
       **Outcome-link:** realistic multi-street trees (the raise/3-bet/barrel situations asked for).
       **Solution:** strength-bucket (7-rung ladder + draw category, Loki-style EHS) →
@@ -181,7 +181,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       **Appetite:** ~1 large epic. **No-gos:** multiway (S8); river (S7); no Practice drill
       mode here (Next); EVs labeled approximate.
 
-- [ ] **S7 — River graders: value/bluff + facing river bets.** ICE 8·6·4. *(Track C, W3 — after S6)*
+- [x] **S7 — River graders: value/bluff + facing river bets.** *(done 2026-07-10, wave 3: RIVER_BARREL/VS_RIVER_BET graders + RiverHeuristicProvider (4th `_by_street` slot); busted-draw demotion (draw→air on river — refuter-confirmed `_hand_category` overvalued busted draws at the 1.2 tier); river_card_class + second conditional SRS append + `river_class` column (migration 0008) + separate `_RIVER_CTX` rebuild branch matching all 5 archetype fields; feedback names BOTH turn and river cards (6-wide tags); leaks 205/206, TAXONOMY_VERSION 5; pins unchanged + new turn-hash pin independently re-derived; 4-flush/4-straight 5-card regression fixtures. **Per-street grading now covers all 4 streets.**)* ICE 8·6·4. *(Track C, W3 — after S6)*
       **Problem:** no river grading (old 2h/2i). (Note: the made-hand-vs-draw conflation the
       contract map flagged was already fixed in `53c865c` — made straights/flushes now
       categorize before draw flags; do NOT re-diagnose it.)
