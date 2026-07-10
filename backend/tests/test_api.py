@@ -258,6 +258,70 @@ def test_postflop_grade_persists_and_grades(client, temp_engine):
         assert len(list(s.exec(select(DrillAttempt)))) == 1
 
 
+# --- S6: coverage gate + turn SRS rebuild ---
+
+
+def test_not_found_grade_persists_nothing(client, temp_engine):
+    """Tripwire: a NOT_FOUND grade returns 200 but writes NOTHING — no
+    DrillAttempt row, no SRSItemRow (pre-S6 both were written unconditionally,
+    seeding junk rows into the due queue)."""
+    from factories import make_cbet_spot
+
+    from app.domain.spot import Street
+
+    # A river spot: no provider covers the river (S7), so this grades NOT_FOUND.
+    spot = make_cbet_spot().model_copy(
+        update={"street": Street.RIVER, "board": ["Ac", "Kd", "Qh", "7s", "2h"]}
+    )
+    resp = client.post(
+        "/api/v1/drill/grade",
+        json={"spot": spot.model_dump(mode="json"), "action": {"action": "check"}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["coverage"] == "not_found"
+    with Session(temp_engine) as s:
+        assert list(s.exec(select(DrillAttempt))) == []
+        assert list(s.exec(select(SRSItemRow))) == []
+
+
+def test_turn_due_row_rebuilds_matching_archetype(client, temp_engine):
+    """A due TURN row rebuilds a spot whose node_context, street, flop texture
+    AND turn-card class all match the row — non-tautological: we assert the
+    rebuilt spot's own properties, not just the srs_signature override."""
+    import random
+    from datetime import date, timedelta
+
+    from app.api.v1 import drill
+    from app.domain.scenarios import build_turn_barrel_spot
+    from app.domain.spot import Position
+    from app.domain.texture import classify, turn_card_class
+    from app.services.review import record_attempt
+
+    spot = build_turn_barrel_spot(
+        random.Random(7), pairing=(Position.BTN, Position.BB), eff_bb=100.0
+    )
+    with Session(temp_engine) as s:
+        row = record_attempt(s, spot, "optimal", 203)
+        sig, tex, tclass = row.signature, row.texture_class, row.turn_class
+        assert row.street == "turn"
+        assert tclass is not None  # S6 dimension persisted, not write-only
+        row.due_date = date.today() - timedelta(days=1)  # backdate so it's due
+        s.add(row)
+        s.commit()
+
+    # Seed the router's RNG so rejection sampling is deterministic (this seed
+    # yields a tier-a exact archetype match among the 150 candidates).
+    drill._RNG.seed(20260710)
+    body = client.get("/api/v1/drill/next?mode=review").json()["spot"]
+    rebuilt = Spot.model_validate(body)
+    assert rebuilt.street.value == "turn"
+    assert len(rebuilt.board) == 4
+    assert "turn_barrel" in body["node_context"]
+    assert body["srs_signature"] == sig
+    assert classify(rebuilt.board[:3]).texture_class == tex  # flop texture matches
+    assert turn_card_class(rebuilt.board) == tclass  # turn-card class matches
+
+
 def test_texture_quiz_round_trips(client, temp_engine):
     item = client.get("/api/v1/drill/quiz/next?kind=texture").json()
     assert item["kind"] == "texture"

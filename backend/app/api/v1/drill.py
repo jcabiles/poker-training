@@ -22,7 +22,7 @@ from app.domain.challenge import sample_challenge_spot
 from app.domain.content.notation import hole_cards_to_class
 from app.domain.content.registry import build_index, load_preflop_packs, lookup
 from app.domain.equity import combos_for_range, equity_vs_range
-from app.domain.evaluation import EvaluationResult
+from app.domain.evaluation import Coverage, EvaluationResult
 from app.domain.grading import archetype_leak, leak_category_for, range_grid
 from app.domain.leaks import LeakCategory
 from app.domain.providers import get_provider
@@ -31,7 +31,9 @@ from app.domain.scenarios import (
     build_cbet_spot,
     build_check_raise_spot,
     build_spot,
+    build_turn_barrel_spot,
     build_vs_cbet_spot,
+    build_vs_turn_bet_spot,
     sample_cbet_spot,
     sample_check_raise_spot,
     sample_exploit_spot,
@@ -40,7 +42,7 @@ from app.domain.scenarios import (
 )
 from app.domain.spot import NodeContext, Position, Spot, Street
 from app.domain.srs import faced_bet_bucket, spot_signature, spr_bucket
-from app.domain.texture import classify
+from app.domain.texture import classify, turn_card_class
 from app.schemas.drill import (
     GradeRequest,
     NextDrillResponse,
@@ -86,7 +88,14 @@ def _next_vs_check_raise() -> Spot:
     return sample_check_raise_spot(_RNG)
 
 
-_POSTFLOP_CTX = (NodeContext.CBET, NodeContext.VS_CBET, NodeContext.VS_CHECK_RAISE)
+_POSTFLOP_CTX = (
+    NodeContext.CBET,
+    NodeContext.VS_CBET,
+    NodeContext.VS_CHECK_RAISE,
+    NodeContext.TURN_BARREL,
+    NodeContext.VS_TURN_BET,
+)
+_TURN_CTX = (NodeContext.TURN_BARREL.value, NodeContext.VS_TURN_BET.value)
 
 
 def _rebuild_postflop(row) -> Spot | None:
@@ -127,14 +136,46 @@ def _rebuild_postflop(row) -> Spot | None:
             return build_check_raise_spot(
                 _RNG, pairing=(pos, Position.BB), eff_bb=_RNG.choice(_DEPTHS), raise_mult=None
             )
+    elif row.node_context == NodeContext.TURN_BARREL.value:
+        # Hero is the opener/aggressor (like CBET) who c-bet flop and now
+        # decides on the 2nd barrel.
+        def build() -> Spot:
+            return build_turn_barrel_spot(
+                _RNG, pairing=(pos, Position.BB), eff_bb=_RNG.choice(_DEPTHS)
+            )
+    elif row.node_context == NodeContext.VS_TURN_BET.value and row.facing:
+        # Hero is the BB flop-caller (like VS_CBET) facing the opener's turn
+        # bet; bet_frac maps 1:1 to the faced-bet bucket (turn pot fraction).
+        try:
+            opener = Position(row.facing)
+        except ValueError:
+            return None
+        frac = 0.33 if row.faced_bet_bucket == "small" else 0.75
+
+        def build() -> Spot:
+            return build_vs_turn_bet_spot(
+                _RNG, pairing=(opener, Position.BB), eff_bb=_RNG.choice(_DEPTHS), bet_frac=frac
+            )
     else:
         return None
 
     candidates = [build() for _ in range(150)]
-    target = (row.texture_class, row.spr_bucket, row.faced_bet_bucket)
+    if row.node_context in _TURN_CTX:
+        # Turn rows carry a 4th archetype dimension: the turn-card class (S6).
+        target = (row.texture_class, row.spr_bucket, row.faced_bet_bucket, row.turn_class)
 
-    def _key(s: Spot):
-        return (classify(s.board[:3]).texture_class, spr_bucket(s.spr), faced_bet_bucket(s))
+        def _key(s: Spot):
+            return (
+                classify(s.board[:3]).texture_class,  # flop texture — rows store flop-3
+                spr_bucket(s.spr),
+                faced_bet_bucket(s),
+                turn_card_class(s.board),
+            )
+    else:
+        target = (row.texture_class, row.spr_bucket, row.faced_bet_bucket)
+
+        def _key(s: Spot):
+            return (classify(s.board[:3]).texture_class, spr_bucket(s.spr), faced_bet_bucket(s))
 
     chosen = (
         next((s for s in candidates if _key(s) == target), None)  # tier a: exact
@@ -237,23 +278,27 @@ async def grade_drill(
 ) -> EvaluationResult:
     result = await _provider.evaluate(req.spot, req.action)
     correctness = result.correctness.value if result.correctness else None
-    # Honor the SRS-key override (review spots) so the attempt + SRS update key the
-    # same archetype row. record_attempt reads req.spot.srs_signature internally.
-    sig = req.spot.srs_signature or spot_signature(req.spot)
-    hand_class = hole_cards_to_class(*req.spot.hero.hole_cards)
-    session.add(
-        DrillAttempt(
-            spot_signature=sig,
-            leak_category=result.leak_category,
-            chosen_action=req.action.action.value,
-            correctness=correctness,
-            ev_loss_bb=result.ev_loss_bb,
-            provider=result.provider.value,
-            hand_class=hand_class,
+    # Coverage gate (S6): a NOT_FOUND grade carries no verdict, so persisting it
+    # would pollute analytics AND seed junk SRS rows (flop-truncated archetypes
+    # of ungradeable spots that then enter the due queue). Skip BOTH writes.
+    if result.coverage != Coverage.NOT_FOUND:
+        # Honor the SRS-key override (review spots) so the attempt + SRS update key
+        # the same archetype row. record_attempt reads req.spot.srs_signature internally.
+        sig = req.spot.srs_signature or spot_signature(req.spot)
+        hand_class = hole_cards_to_class(*req.spot.hero.hole_cards)
+        session.add(
+            DrillAttempt(
+                spot_signature=sig,
+                leak_category=result.leak_category,
+                chosen_action=req.action.action.value,
+                correctness=correctness,
+                ev_loss_bb=result.ev_loss_bb,
+                provider=result.provider.value,
+                hand_class=hand_class,
+            )
         )
-    )
-    session.commit()
-    record_attempt(session, req.spot, correctness, result.leak_category)
+        session.commit()
+        record_attempt(session, req.spot, correctness, result.leak_category)
     return result
 
 

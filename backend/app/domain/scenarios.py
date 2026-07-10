@@ -581,3 +581,153 @@ def build_check_raise_spot(
 def sample_check_raise_spot(rng: random.Random | None = None) -> Spot:
     rng = rng or random.Random()
     return build_check_raise_spot(rng, eff_bb=rng.choice(_DEPTHS))
+
+
+# --- Turn: 2nd barrel + facing a turn bet (S6) ---
+# Same HU SRP pairings as the flop builders, one street later. Both builders
+# extend the c-bet line: hero (or villain) c-bet the flop, the defender called,
+# and play reaches the turn. The 4th board card is drawn uniformly, so
+# rejection-sampling callers (SRS rebuild) see every turn_card_class.
+
+
+def build_turn_barrel_spot(
+    rng: random.Random,
+    *,
+    pairing: tuple[Position, Position] | None = None,
+    eff_bb: float = 100.0,
+) -> Spot:
+    """Hero = IP opener who c-bet the flop and got called; BB checks the turn
+    and hero decides whether to fire the 2nd barrel (check / bet small / big)."""
+    from app.domain.equity import combos_for_range
+
+    opener, caller = pairing or rng.choice(_CBET_PAIRINGS)
+    rfi = _find_entry(NodeContext.RFI, opener, None)
+    bd = _find_entry(NodeContext.BLIND_DEFENSE, caller, opener)
+    hero_range = _combos_for(rfi, ActionType.RAISE) or "22+, A2s+, KTs+, QJs, AJo+"
+    villain_range = _combos_for(bd, ActionType.CALL) or "22-99, ATs+, KJs+, QJs, AJo+, KQo"
+
+    h1, h2 = rng.choice(combos_for_range(hero_range))
+    dead = {h1, h2}
+    board = rng.sample([c for c in _DECK if c not in dead], 4)  # flop + turn card
+
+    osize = _OPEN_SIZE.get(opener, 2.5)
+    flop_pot = round(2 * osize + 0.5, 2)  # opener + BB call + SB dead 0.5
+    cbet = round(rng.choice([0.33, 0.75]) * flop_pot, 1)  # flop c-bet, called
+    pot = round(flop_pot + 2 * cbet, 2)  # turn pot: flop pot + c-bet + call
+    remaining = round(eff_bb - osize - cbet, 2)  # both invested osize + cbet
+    spr = round(remaining / pot, 1)
+    small = round(0.33 * pot, 1)
+    big = round(0.75 * pot, 1)
+
+    players, history = _hu_srp_seats(
+        hero=opener,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=remaining,
+        caller_stack=remaining,
+        eff_bb=eff_bb,
+    )
+    history += [
+        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
+        HistoryAction(street=Street.FLOP, position=caller, action=ActionType.CALL, amount_bb=cbet),
+        HistoryAction(street=Street.TURN, position=caller, action=ActionType.CHECK, amount_bb=0.0),
+    ]
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
+        street=Street.TURN,
+        board=board,
+        pot_bb=pot,
+        hero=Hero(position=opener, hole_cards=(h1, h2), stack_bb=remaining),
+        players=players,
+        effective_stack_bb=remaining,
+        spr=spr,
+        action_history=history,
+        to_act=opener,
+        legal_actions=[
+            LegalAction(action=ActionType.CHECK),
+            LegalAction(action=ActionType.BET, min_bb=small, max_bb=remaining),
+            LegalAction(action=ActionType.BET, min_bb=big, max_bb=remaining),
+        ],
+        node_context=[NodeContext.TURN_BARREL],
+        facing=caller,
+        hero_range=hero_range,
+        villain_range=villain_range,
+    )
+
+
+def build_vs_turn_bet_spot(
+    rng: random.Random,
+    *,
+    pairing: tuple[Position, Position] | None = None,
+    eff_bb: float = 100.0,
+    bet_frac: float | None = None,
+) -> Spot:
+    """Hero = BB defender who called the flop c-bet and now faces the opener's
+    turn bet (fold / call / raise). `bet_frac` sizes the TURN bet as a fraction
+    of the pre-bet turn pot (0.33 -> 'small' faced-bet bucket, 0.75 -> 'big').
+    CALL.min_bb is incremental — hero has nothing invested on the turn yet, so
+    it equals the turn bet."""
+    from app.domain.equity import combos_for_range
+
+    opener, caller = pairing or rng.choice(_CBET_PAIRINGS)
+    rfi = _find_entry(NodeContext.RFI, opener, None)
+    bd = _find_entry(NodeContext.BLIND_DEFENSE, caller, opener)
+    villain_range = _combos_for(rfi, ActionType.RAISE) or "22+, A2s+, KTs+, QJs, AJo+"
+    hero_range = _combos_for(bd, ActionType.CALL) or "22-99, ATs+, KJs+, QJs, AJo+, KQo"
+
+    h1, h2 = rng.choice(combos_for_range(hero_range))
+    dead = {h1, h2}
+    board = rng.sample([c for c in _DECK if c not in dead], 4)  # flop + turn card
+
+    osize = _OPEN_SIZE.get(opener, 2.5)
+    flop_pot = round(2 * osize + 0.5, 2)  # opener + BB call + SB dead 0.5
+    cbet = round(rng.choice([0.33, 0.75]) * flop_pot, 1)  # flop c-bet, hero called
+    turn_pot = round(flop_pot + 2 * cbet, 2)  # pre-bet turn pot
+    frac = bet_frac if bet_frac is not None else rng.choice([0.33, 0.75])
+    tbet = round(frac * turn_pot, 1)
+    pot = round(turn_pot + tbet, 2)  # pot hero faces INCLUDES the turn bet
+    hero_remaining = round(eff_bb - osize - cbet, 2)
+    villain_remaining = round(eff_bb - osize - cbet - tbet, 2)
+    effective = min(hero_remaining, villain_remaining)
+    spr = round(effective / pot, 1)
+    raise_size = round(3 * tbet, 1)
+
+    players, history = _hu_srp_seats(
+        hero=caller,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=villain_remaining,
+        caller_stack=hero_remaining,
+        eff_bb=eff_bb,
+    )
+    history += [
+        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
+        HistoryAction(street=Street.FLOP, position=caller, action=ActionType.CALL, amount_bb=cbet),
+        HistoryAction(street=Street.TURN, position=caller, action=ActionType.CHECK, amount_bb=0.0),
+        HistoryAction(street=Street.TURN, position=opener, action=ActionType.BET, amount_bb=tbet),
+    ]
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
+        street=Street.TURN,
+        board=board,
+        pot_bb=pot,
+        hero=Hero(position=caller, hole_cards=(h1, h2), stack_bb=hero_remaining),
+        players=players,
+        effective_stack_bb=effective,
+        spr=spr,
+        action_history=history,
+        to_act=caller,
+        legal_actions=[
+            LegalAction(action=ActionType.FOLD),
+            LegalAction(action=ActionType.CALL, min_bb=tbet),
+            LegalAction(action=ActionType.RAISE, min_bb=raise_size, max_bb=hero_remaining),
+        ],
+        node_context=[NodeContext.VS_TURN_BET],
+        facing=opener,
+        hero_range=hero_range,
+        villain_range=villain_range,
+    )

@@ -110,11 +110,15 @@ def _postflop_signature(spot: Spot) -> str:
     to one SRS item (but small vs big faced bets stay separate).
 
     APPEND RULE (persisted-data contract): the order of `parts` is hashed into
-    every stored SRS item id — reordering, renaming, or inserting fields
-    orphans all existing SM-2 history. New dimensions must be APPENDED after
-    `faced_bet_bucket` (the current last field) and must evaluate to a constant
-    for existing flop spots so their hashes are preserved. The pinned-hash test
-    in tests/test_signature.py is the tripwire for accidental changes."""
+    every stored SRS item id ("|".join(parts) -> sha256) — reordering, renaming,
+    or inserting fields orphans all existing SM-2 history. Appending an element
+    ALSO changes the hash, even a constant placeholder ("-"), because the join
+    adds a separator. So new dimensions must be CONDITIONALLY appended: OMITTED
+    entirely for the spots that already exist (flop stays byte-identical at its
+    original element count) and appended only for the streets the dimension
+    actually describes. No aliasing risk: street sits at tuple index 2, so a
+    turn/river parts list can never collide with a flop one. The pinned-hash
+    tests in tests/test_signature.py are the tripwire for accidental changes."""
     from app.domain.texture import classify
 
     ctx = ",".join(sorted(c.value for c in spot.node_context))
@@ -131,6 +135,12 @@ def _postflop_signature(spot: Spot) -> str:
         spr_bucket(spot.spr),
         faced_bet_bucket(spot),
     ]
+    if spot.street in (Street.TURN, Street.RIVER) and len(spot.board) >= 4:
+        # S6 turn dimension — CONDITIONAL append (see APPEND RULE above): flop
+        # spots never reach here, so their parts list stays byte-identical.
+        from app.domain.texture import turn_card_class
+
+        parts.append(turn_card_class(spot.board))
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
