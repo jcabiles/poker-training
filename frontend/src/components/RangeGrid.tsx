@@ -68,15 +68,22 @@ export default function RangeGrid({
         aria-controls="range-grid-body"
         onClick={toggleCollapsed}
       >
-        <span>Range</span>
-        <span className="gridchevron" aria-hidden="true">
-          {collapsed ? "▸" : "▾"}
+        <span className="gridhead">
+          <span className="gridhead-eyebrow">Solver Line</span>
+          <span className="gridhead-label" id={TITLE_ID}>
+            {node}
+          </span>
+        </span>
+        <span className="gridtoggle-aside">
+          <span className="gridhead-approx" aria-hidden="true">
+            approx.
+          </span>
+          <span className="gridchevron" aria-hidden="true">
+            {collapsed ? "▸" : "▾"}
+          </span>
         </span>
       </button>
       <div id="range-grid-body" hidden={collapsed}>
-        <div className="gridtitle" id={TITLE_ID}>
-          {node} range
-        </div>
         {/* APG "table" semantics (CW-7), not "grid" — these cells are static,
             read-only lookups (no click/selection), so the interactive
             grid pattern (roving tabindex, arrow-key cell navigation) does
@@ -126,14 +133,12 @@ export default function RangeGrid({
         <div className="gridlegend">
           {LEGEND.map(([c, label]) => (
             <span key={c} className="lgi">
-              <span className={`cell sample ${c}`} /> {label}
+              <span className={`cell sample ${c}`} aria-hidden="true" /> {label}
             </span>
           ))}
-        </div>
-        <div className="gridlegend">
-          <span className="cell sample sample-hero" aria-hidden="true" />
-          <span>
-            your hand: <span className="num">{hero}</span>
+          <span className="lgi lgi-hero">
+            <span className="cell sample sample-hero" aria-hidden="true" /> your hand{" "}
+            <span className="num">{hero}</span>
           </span>
         </div>
       </div>
