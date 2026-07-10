@@ -18,15 +18,24 @@ function textureHint(option: string): string | undefined {
   return TEXTURE_HINTS[option.trim().toLowerCase()];
 }
 
+function quizTone(res: QuizResult): "good" | "warn" | "bad" {
+  if (res.correct) return "good";
+  return res.correctness.toLowerCase() === "acceptable" ? "warn" : "bad";
+}
+
 export default function QuizPanel({ kind }: { kind: QuizKind }) {
   const [item, setItem] = useState<QuizItem | null>(null);
   const [res, setRes] = useState<QuizResult | null>(null);
   const [estimate, setEstimate] = useState("");
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setRes(null);
     setEstimate("");
+    setChosen(null);
+    setInputError(null);
     setError(null);
     try {
       setItem(await quizNext(kind));
@@ -41,6 +50,7 @@ export default function QuizPanel({ kind }: { kind: QuizKind }) {
 
   const answerTexture = async (choice: string) => {
     if (!item || res) return;
+    setChosen(choice);
     try {
       setRes(await quizGrade({ kind: "texture", board: item.board, choice }));
     } catch (e) {
@@ -51,7 +61,12 @@ export default function QuizPanel({ kind }: { kind: QuizKind }) {
   const answerEquity = async () => {
     if (!item || res) return;
     const pct = parseFloat(estimate);
-    if (Number.isNaN(pct)) return;
+    // type=number min/max only constrain the spinner — typed values arrive
+    // unclamped, so validate here instead of grading a 4500% "equity".
+    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+      setInputError("Enter an equity between 0 and 100.");
+      return;
+    }
     try {
       setRes(
         await quizGrade({
@@ -129,10 +144,20 @@ export default function QuizPanel({ kind }: { kind: QuizKind }) {
         <div className="decisionbar quiz-answers">
           {item.options.map((o) => {
             const hint = textureHint(o);
+            // After grading, mark the correct answer and (if different) the
+            // user's wrong pick directly on the buttons — the verdict text
+            // alone shouldn't be needed to reconstruct what happened.
+            const graded = res
+              ? o === res.expected
+                ? " answer-correct"
+                : o === chosen
+                  ? " answer-wrong"
+                  : ""
+              : "";
             return (
               <button
                 key={o}
-                className="btn answer-btn"
+                className={"btn answer-btn" + graded}
                 disabled={!!res}
                 onClick={() => answerTexture(o)}
               >
@@ -152,22 +177,31 @@ export default function QuizPanel({ kind }: { kind: QuizKind }) {
             value={estimate}
             placeholder="equity %"
             aria-label="Your equity estimate, percent"
+            aria-invalid={inputError != null}
             disabled={!!res}
-            onChange={(e) => setEstimate(e.target.value)}
+            onChange={(e) => {
+              setEstimate(e.target.value);
+              setInputError(null);
+            }}
             onKeyDown={(e) => e.key === "Enter" && answerEquity()}
           />
           <button className="btn btn-primary" disabled={!!res} onClick={answerEquity}>
             Submit estimate
           </button>
+          {inputError && (
+            <span className="input-error" role="alert">
+              {inputError}
+            </span>
+          )}
         </div>
       )}
 
       {res && (
-        <div className={`panel quiz-result ${res.correct ? "good-bg" : "bad-bg"}`}>
+        // Partial credit ("acceptable") reads as a caution, not an error —
+        // warn tone; only a plain miss gets the bad tone.
+        <div className={`panel quiz-result ${quizTone(res)}-bg`}>
           <div className="verdict-row">
-            <span className={`stamp ${res.correct ? "good" : "bad"}`}>
-              {res.correctness.toUpperCase()}
-            </span>
+            <span className={`stamp ${quizTone(res)}`}>{res.correctness.toUpperCase()}</span>
             <span>
               expected{" "}
               <strong className={res.kind === "equity" ? "num" : undefined}>{res.expected}</strong>,

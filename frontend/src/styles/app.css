@@ -1756,6 +1756,26 @@ kbd {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--surface), var(--primary) 6%);
 }
+/* Graded texture answers: the correct option and (when different) the user's
+   wrong pick are marked on the buttons themselves — the verdict text alone
+   shouldn't be needed to reconstruct the choice. Beats the :disabled fade
+   (same T8-states cascade position rationale as .btn:disabled). */
+.quiz-answers .answer-btn.answer-correct:disabled {
+  border-color: var(--good);
+  background: var(--good-bg);
+  opacity: 1;
+}
+.quiz-answers .answer-btn.answer-correct:disabled .answer-label {
+  color: var(--good);
+}
+.quiz-answers .answer-btn.answer-wrong:disabled {
+  border-color: var(--bad);
+  background: var(--bad-bg);
+  opacity: 1;
+}
+.quiz-answers .answer-btn.answer-wrong:disabled .answer-label {
+  color: var(--bad);
+}
 .quizpanel .decisionbar .btn-primary:not(:disabled):hover {
   background: color-mix(in srgb, var(--primary) 88%, var(--text));
 }
@@ -1763,6 +1783,16 @@ kbd {
 /* Equity entry — the mono field + gilded Submit centered under the question. */
 .quiz-equity-input {
   justify-content: center;
+  align-items: center;
+}
+.input-error {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--bad);
+}
+.input[aria-invalid="true"] {
+  border-color: var(--bad);
 }
 .input {
   background: var(--surface);
@@ -2490,10 +2520,13 @@ kbd {
 }
 
 /* Short-viewport density (1024×768 gate: felt + decision bar visible without
-   scrolling). The club chrome (T2 masthead, T3 marquee, mode chips) added
-   ~58px of vertical rhythm over the pre-epic layout — reclaim it here by
-   tightening the stack's margins only; component internals are untouched. */
-@media (max-height: 820px) {
+   scrolling — for EVERY drill mode: exploit adds a villain-badge row and
+   postflop a board row over the spot T4 was measured on, and T10 caught the
+   exploit bar clipping even at 1440×900, hence the 920px trigger). Reclaims
+   the club chrome's added rhythm by tightening stack margins, bounding the
+   table ring lower, and tucking the villain badge into the felt's top-right
+   corner; component internals are untouched. */
+@media (max-height: 920px) {
   .app {
     padding-top: var(--space-3);
   }
@@ -2522,5 +2555,20 @@ kbd {
   }
   .decisionbar {
     margin-top: var(--space-3);
+  }
+  /* Table ring: one card-height shorter; the elliptical geometry is inline
+     percentage data, so pods scale with the ring. */
+  .tablering {
+    max-height: calc(var(--card-h) * 3.4);
+    margin-bottom: var(--space-3);
+  }
+  /* Exploit drills: the villain badge stops costing a row — it becomes a
+     corner marker on the felt (felt-staged is the positioning context). */
+  .felt-staged .villain {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-4);
+    margin-bottom: 0;
+    z-index: 2;
   }
 }

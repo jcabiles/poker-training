@@ -16,6 +16,12 @@ function actionLabel(action: string, sizeBb?: number | null): string {
   return sizeBb ? `${action} ${sizeBb}bb` : action;
 }
 
+// EV figures render with a true minus (U+2212), matching the masthead ledger
+// and recap figures — number stringification would emit an ASCII hyphen.
+function fmtEv(n: number): string {
+  return String(n).replace("-", "−");
+}
+
 export default function FeedbackPanel({
   result,
   chosen,
@@ -96,7 +102,7 @@ export default function FeedbackPanel({
               </span>
             </span>
             <span className="ev-nums">
-              EV <span className="num">≈{result.chosen_eval.ev_bb}</span>bb
+              EV <span className="num">≈{fmtEv(result.chosen_eval.ev_bb)}</span>bb
             </span>
             {choseBest && <span className="best">best</span>}
           </div>
@@ -111,14 +117,14 @@ export default function FeedbackPanel({
                   </span>
                 </span>
                 <span className="ev-nums">
-                  EV <span className="num">≈{best.ev_bb}</span>bb
+                  EV <span className="num">≈{fmtEv(best.ev_bb)}</span>bb
                 </span>
               </div>
               <div className="ev-row cost">
                 <span className="ev-who">Cost</span>
                 <span className="ev-act ev-cost-note">bb given up on this decision</span>
                 <span className="ev-nums">
-                  <span className="num">≈−{result.ev_loss_bb}</span>bb
+                  <span className="num">≈{result.ev_loss_bb}</span>bb
                 </span>
               </div>
             </>
@@ -142,7 +148,7 @@ export default function FeedbackPanel({
               </b>
               <span className="num mix-freq">{Math.round(a.frequency * 100)}%</span>
               <span className="mix-ev">
-                EV <span className="num">≈{a.ev_bb}</span>bb
+                EV <span className="num">≈{fmtEv(a.ev_bb)}</span>bb
               </span>
               {a.action === result.best_action.action &&
                 a.size_bb === result.best_action.size_bb && <span className="best">best</span>}

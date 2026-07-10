@@ -128,4 +128,5 @@ No parallel execution on the frontend chain — `app.css` is a single-owner hots
 ## Explicitly out of scope
 Session recap *modal/flow* beyond the Home card · XP/gamification · Blitz/timed modes · focus mode ·
 position×module matrix · SRS forecast chart (candidates for a later epic) · any change to grading,
-`spot_signature()`, SRS, or content packs.
+`spot_signature()`, SRS, or content packs · **mobile reflow** (the app is desktop-first; supported
+breakpoints are 1440 and 1024 — the T10 sweep confirmed 375px is broken and it stays a later epic).
