@@ -1,0 +1,181 @@
+{
+  "id": "persona_maniac",
+  "version": "1.0.0",
+  "domain": "persona",
+  "persona": "maniac",
+  "display_name": "Maniac",
+  "sizing": { "open_bb": 4.5, "threebet_mult": 5.5, "fourbet_mult": 3.0 },
+  "preflop": [
+    {
+      "facing": "unopened",
+      "positions": ["UTG"],
+      "mixes": [
+        { "combos": "55+, A6s+, K9s+, QTs+, J9s+, T9s, A9o+, KJo+", "weights": { "raise": 0.85, "fold": 0.15 } },
+        { "combos": "33, 44, A4s, A5s, K8s, QTo", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "22, A2s, A3s, K2s, K3s, K4s, K5s, K6s, K7s, Q4s, Q5s, Q6s, Q7s, Q8s, Q9s, J4s, J5s, J6s, J7s, J8s, T4s, T5s, T6s, T7s, T8s, 53s, 54s, 63s, 64s, 65s, 74s, 75s, 76s, 85s, 86s, A2o, A3o, A6o, A7o, A8o, A9o, K5o, K6o, K7o, K8o, K9o, Q7o, Q8o, Q9o, QTo, J8o, J9o, T9o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["UTG1"],
+      "mixes": [
+        { "combos": "44+, A4s+, K7s+, Q9s+, J8s+, T8s+, 98s, A8o+, KTo+, QJo", "weights": { "raise": 0.85, "fold": 0.15 } },
+        { "combos": "22, 33, A2s, A3s, K6s, JTo", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "K2s, K3s, K4s, K5s, K8s, Q4s, Q5s, Q6s, Q7s, Q8s, J4s, J5s, J6s, J7s, T4s, T5s, T6s, T7s, 53s, 54s, 63s, 64s, 65s, 74s, 75s, 76s, 85s, 86s, A5o, A6o, A7o, K6o, K7o, Q9o, J9o, T9o, 98o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["UTG2"],
+      "mixes": [
+        { "combos": "33+, A2s+, K5s+, Q8s+, J7s+, T7s+, 97s+, 87s, A6o+, K9o+, QTo+, JTo", "weights": { "raise": 0.8, "fold": 0.2 } },
+        { "combos": "22, K4s, Q7s, J6s, 76s, A5o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "K2s, K3s, Q4s, Q5s, Q6s, J3s, J4s, J5s, T4s, T5s, T6s, 53s, 54s, 63s, 64s, 65s, 74s, 75s, A2o, A3o, A4o, K6o, K7o, K8o, Q8o, J8o, T9o, 98o, 87o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["LJ"],
+      "mixes": [
+        {
+          "combos": "22+, A2s+, K3s+, Q6s+, J6s+, T6s+, 86s+, 75s+, 64s+, A4o+, K7o+, Q9o+, J9o+, T9o",
+          "weights": { "raise": 0.8, "fold": 0.2 }
+        },
+        { "combos": "K2s, Q5s, J5s, 54s, A3o, K6o, Q8o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "Q3s, Q4s, J3s, J4s, T4s, T5s, 42s, 43s, 52s, 53s, 63s, A2o, K4o, K5o, Q6o, Q7o, J8o, T8o, 98o, 87o, 76o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["HJ"],
+      "mixes": [
+        {
+          "combos": "22+, A2s+, K2s+, Q4s+, J5s+, T5s+, 85s+, 74s+, 63s+, 53s+, A2o+, K5o+, Q7o+, J8o+, T8o+",
+          "weights": { "raise": 0.85, "fold": 0.15 }
+        },
+        { "combos": "Q3s, J4s, 43s, K4o, Q6o, J7o, T7o, 98o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "J2s, J3s, T3s, T4s, 32s, 42s, 52s, K3o, Q4o, Q5o, J6o, T6o, 87o, 76o, 65o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["CO"],
+      "mixes": [
+        {
+          "combos": "22+, A2s+, K2s+, Q2s+, J3s+, T4s+, 84s+, 73s+, 63s+, 53s+, 43s, A2o+, K3o+, Q6o+, J8o+, T8o+, 98o",
+          "weights": { "raise": 0.85, "fold": 0.15 }
+        },
+        { "combos": "J2s, T3s, 32s, K2o, Q5o, J7o, T7o, 87o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "T2s, T3s, 32s, 42s, 52s, K2o, Q3o, Q4o, J5o, T5o, 76o, 65o, 54o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["BTN"],
+      "mixes": [
+        {
+          "combos": "22+, A2s+, K2s+, Q2s+, J2s+, T3s+, 83s+, 72s+, 62s+, 52s+, 42s, A2o+, K2o+, Q4o+, J7o+, T7o+, 97o+, 87o",
+          "weights": { "raise": 0.7, "fold": 0.3 }
+        },
+        { "combos": "32s, K2o, Q3o, J6o, T6o, 96o, 86o, 76o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "K3o, Q2o, Q3o, J3o, J4o, T4o, T5o, 54o, 65o, 76o, 87o, 98o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["SB"],
+      "mixes": [
+        {
+          "combos": "22+, A2s+, K2s+, Q4s+, J5s+, T5s+, 85s+, 74s+, 63s+, 53s+, A3o+, K5o+, Q7o+, J9o+, T9o",
+          "weights": { "raise": 0.85, "fold": 0.15 }
+        },
+        { "combos": "Q3s, J4s, 43s, A2o, K4o, Q6o, J8o, T8o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "J2s, T3s, 32s, 42s, 52s, K2o, Q4o, Q5o, J6o, T6o, 87o, 76o, 65o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": ["BB"],
+      "mixes": [
+        { "combos": "33+, A3s+, K6s+, Q9s+, J8s+, T8s+, 98s, A7o+, K9o+, QTo+, JTo", "weights": { "raise": 0.8, "fold": 0.2 } },
+        { "combos": "22, A2s, K5s, Q8s, J7s, 87s, A6o, K8o", "weights": { "raise": 0.85, "fold": 0.15 } },
+        {
+          "combos": "K2s, K3s, K4s, Q3s, Q4s, Q5s, Q6s, Q7s, J4s, J5s, J6s, J7s, T5s, T6s, T7s, 65s, 75s, 76s, 54s, 43s, A3o, A4o, A5o, K6o, K7o, Q9o, J9o, T9o, 98o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "vs_limpers",
+      "positions": null,
+      "mixes": [
+        { "combos": "22+, A2s+, K5s+, Q8s+, J8s+, T8s+, 98s, A6o+, KTo+, QTo+, JTo", "weights": { "raise": 1.0 } },
+        {
+          "combos": "K2s, K3s, K4s, Q6s, Q7s, J6s, J7s, T6s, T7s, 76s, 65s, A2o, A3o, A4o, A5o",
+          "weights": { "raise": 0.5, "fold": 0.5 }
+        },
+        { "combos": "43s, 32s, 98o, 87o", "weights": { "limp": 0.5, "fold": 0.5 } }
+      ]
+    },
+    {
+      "facing": "vs_rfi",
+      "positions": null,
+      "mixes": [
+        { "combos": "TT+, AJs+, AQo+", "weights": { "3bet": 1.0 } },
+        {
+          "combos": "22+, A2s+, K7s+, Q9s+, J9s+, T9s, 98s, 87s, A8o+, KJo+, QJo, JTo",
+          "weights": { "3bet": 0.45, "fold": 0.55 }
+        },
+        { "combos": "*", "weights": { "call": 0.55, "fold": 0.45 } }
+      ]
+    },
+    {
+      "facing": "vs_3bet",
+      "positions": null,
+      "mixes": [
+        { "combos": "TT+, AJs+, AQo+", "weights": { "4bet": 1.0 } },
+        {
+          "combos": "A2s, A3s, A4s, A5s, K9s, KTs, Q9s, JTs, A8o, A9o, KQo",
+          "weights": { "4bet": 0.5, "fold": 0.5 }
+        },
+        {
+          "combos": "22-99, A6s+, K5s+, Q7s+, J8s+, T8s+, 98s, A6o+, KTo+, QTo+, JTo",
+          "weights": { "call": 0.5, "fold": 0.5 }
+        }
+      ]
+    },
+    {
+      "facing": "vs_4bet",
+      "positions": null,
+      "mixes": [
+        { "combos": "QQ+, AKs, AKo", "weights": { "5bet_shove": 1.0 } },
+        { "combos": "A5s, A4s, KQs", "weights": { "5bet_shove": 0.5, "fold": 0.5 } },
+        { "combos": "TT, JJ, AQs", "weights": { "call": 0.5, "fold": 0.5 } }
+      ]
+    }
+  ]
+}
