@@ -27,7 +27,7 @@ from app.domain.evaluation import (
 )
 from app.domain.leaks import LeakCategory
 from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Spot, Street
-from app.domain.texture import Texture, classify
+from app.domain.texture import Texture, classify, turn_card_class
 
 # --- N3: authored postflop rationale (content path) ---
 # backend/app/domain/postflop.py -> parents[3] == repo root
@@ -100,15 +100,46 @@ def _in_position(hero: Position, villain: Position) -> bool:
     return _POSTFLOP_ORDER.get(hero, 0) > _POSTFLOP_ORDER.get(villain, 0)
 
 
+_TURN_CTX = (NodeContext.TURN_BARREL, NodeContext.VS_TURN_BET)
+
+
 def range_advantage(
     node_context: NodeContext, hero_pos: Position, villain_pos: Position, texture: Texture
 ) -> str:
     """Who holds the range advantage: 'hero' | 'villain' | 'neutral'.
 
-    Positional + texture rule: the preflop aggressor (hero) starts with an edge,
-    keeps/extends it on high & dry boards, loses it on low/connected/wet boards,
-    and pays an out-of-position penalty.
+    Dispatches on `node_context` (S6): flop contexts keep the original
+    positional + texture rule bit-for-bit; turn contexts use a turn-aware
+    variant — the flop bet got CALLED, so the aggressor's baseline edge has
+    decayed and low/wet boards tilt further toward the caller (research §5.1:
+    "the board texture has become too good for their range" is a give-up
+    trigger). Same (positions, texture) can therefore label differently on the
+    turn than on the flop. `texture` is the FLOP texture in both branches.
     """
+    if node_context in _TURN_CTX:
+        score = 0.5  # aggressor's preflop edge decays once the flop bet is called
+        if texture.high_board:
+            score += 0.5 if texture.high_card == "A" else 1.0
+        else:
+            # a called low flop favors the caller even more by the turn — the
+            # calling range connected while the aggressor's broadways bricked
+            score -= 1.5
+        if texture.wetness == "dry":
+            score += 1.0
+        elif texture.wetness == "wet":
+            score -= 1.5
+        if texture.connectedness == "connected":
+            score -= 1.0
+        if not _in_position(hero_pos, villain_pos):
+            score -= 1.0
+        if score >= 2.0:
+            return "hero"
+        if score <= -1.0:
+            return "villain"
+        return "neutral"
+
+    # Flop contexts (CBET / VS_CHECK_RAISE / …): the original preflop-aggressor
+    # rule, unchanged — flop grader outputs must stay byte-identical.
     score = 1.0  # preflop-aggressor baseline edge
     if texture.high_board:
         # doc 06 §2 (citing this project's own doc 02): ace-high is a documented
@@ -799,6 +830,314 @@ def grade_vs_check_raise(
         ev_loss_bb=ev_loss,
         correctness=correctness,
         rationale_tags=["vs_check_raise", adv, cat, tex.wetness],
+        explanation=why,
+    )
+    if rationale:
+        result.authored_rationale = rationale
+    return result
+
+
+# --- S6: turn graders (2nd barrel + facing a turn bet), HU SRP ---
+#
+# Research grounding (docs/research/02-postflop-strategy.md §5.1-5.2): fire the
+# turn on scare cards that weaken the caller's flop-continue range (overcards,
+# board-pairing cards that strengthen the aggressor's story); check back bricks
+# with air/medium showdown value; flush/straight-completing turns favor the
+# CALLER's range (hero's blockers are unmodeled here), so barreling them without
+# a hand is discouraged. Facing a turn barrel, discipline is pot-odds-first: a
+# second barrel is stronger news than a lone c-bet but weaker than a check-raise.
+
+# Per-turn-class barrel merit shift (§5.2 fire-frequency table).
+_TURN_BARREL_SCARE = {
+    "over": 0.6,  # overcard weakens the caller's pair-heavy continue range
+    "pairing": 0.4,  # pairing card strengthens the barreler's story
+    "straight": -0.2,  # context-dependent; slight give-up lean without blockers
+    "flush": -0.4,  # caller's range improved; hero is unprotected sans blockers
+    "blank": -0.5,  # bricks are give-up cards for the bluffing part of the range
+}
+_TURN_FOLD_BASE = 0.8  # vs a 2nd barrel: above _merits_vs_cbet's 0.6, below vs_check_raise's 1.6
+_TURN_SCARE_FOLD_BONUS = 0.3  # scare turns make the barrel story credible -> fold a bit more
+_TURN_SCARE_CLASSES = ("over", "flush", "straight")
+
+
+def _merits_turn_barrel(
+    adv: str, texture: Texture, cat: str, turn_class: str, in_position: bool
+) -> tuple[float, float, float]:
+    """Return (check, bet_small, bet_big) merit scores (proxy EV, ~bb) for hero —
+    the flop c-bettor deciding whether to fire the turn.
+
+    `texture` is the FLOP texture (classify(board[:3])); `turn_class` is the
+    turn card's class vs the flop (turn_card_class). §5.1: barrel scare cards
+    and strong hands/draws; give up bricks with air, pot-control medium
+    showdown value, and give up more OOP.
+    """
+    value = _CAT_VALUE[cat]
+    adv_bonus = {"hero": 1.0, "neutral": 0.0, "villain": -1.0}[adv]
+    scare = _TURN_BARREL_SCARE[turn_class]
+
+    check = 1.0
+    if cat == "air":
+        check += 1.2  # give up more air on the turn than the flop (§5.1)
+    elif cat == "weak_made":
+        check += 0.6  # medium showdown value realizes best by pot-controlling
+    if adv != "hero":
+        check += 0.6
+    if turn_class in ("flush", "straight"):
+        check += 0.4  # the board improved the caller's range
+    if turn_class == "blank" and cat in ("air", "weak_made"):
+        check += 0.4  # bricks are give-ups without a real hand or scare card
+    if not in_position:
+        check += 0.3  # OOP barrels need more; checking ranges are wider OOP
+
+    bet = value + adv_bonus + scare
+    small = bet
+    big = bet
+    if texture.wetness == "dry":
+        small += 0.3  # static boards keep the small-sizing lean from the flop
+    if turn_class in ("over", "pairing"):
+        big += 0.3  # scare cards support the bigger, polarizing 2nd barrel
+    if cat in ("strong", "draw"):
+        big += 0.3  # value + semibluff combo draws size up (§5.1 best barrels)
+    else:
+        big -= 0.8  # never pile big money in with air/marginal on the turn
+    return check, small, big
+
+
+def _merits_vs_turn_bet(
+    value: float, price: float, cat: str, turn_class: str
+) -> tuple[float, float, float]:
+    """Return (fold, call, raise) merit scores (proxy EV, ~bb) for hero — the
+    flop caller now facing a turn barrel.
+
+    Pot-odds-first (§5.4 equity realization + pot-odds discipline): `price` =
+    faced bet / pot (incl. the bet). A 2nd barrel is a stronger strength signal
+    than a lone c-bet (fold baseline 0.8 > vs_cbet's 0.6) but far weaker than a
+    check-raise; scare turns (§5.2) make the barreler's story credible, so
+    folding gains merit on them.
+    """
+    fold = _TURN_FOLD_BASE
+    if cat == "air":
+        fold += 1.2
+    elif cat == "weak_made":
+        fold += 0.4
+    fold += price * 1.5  # worse price (bigger barrel) -> folding better
+    if turn_class in _TURN_SCARE_CLASSES:
+        fold += _TURN_SCARE_FOLD_BONUS
+    fold -= value * 0.6  # strong made hands / draws rarely fold
+
+    call = value
+    call += (0.5 - price) * 2.0  # pot-odds discipline: cheap -> call, dear -> fold
+    if cat == "air":
+        call -= 1.2  # bluff-catching pure air vs two barrels is bad
+    elif cat == "weak_made" and turn_class == "blank":
+        call += 0.4  # a brick changes nothing — keep bluff-catching marginal pairs
+
+    if cat == "strong":
+        raise_ = value + 0.4  # value raise; worse hands continue vs the barrel
+    elif cat == "draw":
+        raise_ = value - 0.6  # one card to come: semibluff raise is thin, call is fine
+    elif cat == "weak_made":
+        raise_ = -1.0  # never raise-bluff-catch a marginal made hand
+    else:  # air
+        raise_ = -1.4
+    return fold, call, raise_
+
+
+def grade_turn_barrel(
+    spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
+) -> EvaluationResult:
+    if spot.street != Street.TURN:
+        raise ValueError("grade_turn_barrel is turn-only")
+    board = spot.board
+    tex = classify(board[:3])  # flop texture — deliberate flop slice
+    tclass = turn_card_class(board)
+    ctx = spot.node_context[0] if spot.node_context else NodeContext.TURN_BARREL
+    villain = _villain_pos(spot)
+    adv = range_advantage(ctx, spot.hero.position, villain, tex)
+    cat = _hand_category(spot.hero.hole_cards, board)
+    small, big = _bet_sizes(spot)
+    rationale = _postflop_rationale(NodeContext.TURN_BARREL, spot.hero.position, villain)
+
+    m_check, m_small, m_big = _merits_turn_barrel(
+        adv, tex, cat, tclass, _in_position(spot.hero.position, villain)
+    )
+    merits = [m_check, m_small, m_big]
+    freqs = _frequencies(merits)
+
+    specs = [
+        (ActionType.CHECK, None, m_check, freqs[0]),
+        (ActionType.BET, small, m_small, freqs[1]),
+        (ActionType.BET, big, m_big, freqs[2]),
+    ]
+    evals = [
+        ActionEval(action=a, size_bb=size, frequency=round(f, 3), ev_bb=round(m, 2))
+        for a, size, m, f in specs
+    ]
+    best = max(evals, key=lambda e: e.ev_bb)
+    is_mixed = sum(1 for f in freqs if f > POST_MIX) >= 2
+    leak = int(LeakCategory.TURN_BARREL)
+
+    base_kwargs = {
+        "per_action": evals,
+        "best_action": best,
+        "provider": ProviderKind.HEURISTIC,
+        "coverage": Coverage.FULL,
+        "leak_category": leak,
+        "is_mixed": is_mixed,
+    }
+    tags = ["turn_barrel", adv, cat, tex.wetness, tclass]
+
+    def _size_label(size: float | None) -> str:
+        if size is None:
+            return "check"
+        if big and small and big != small:
+            return "big bet" if size >= big else "small bet"
+        return "bet"
+
+    if decision is None:
+        result = EvaluationResult(
+            **base_kwargs,
+            rationale_tags=tags,
+            explanation=(
+                f"{tclass} turn on a {tex.wetness} flop ({adv} range advantage); "
+                f"hero has {cat}: {_size_label(best.size_bb)} is the play."
+            ),
+        )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
+
+    chosen = _match(evals, decision, small, big)
+    ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    if chosen.action == best.action and chosen.size_bb == best.size_bb:
+        correctness = Correctness.OPTIMAL
+    elif chosen.frequency > POST_MIX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_ACCEPTABLE_MAX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_MISTAKE_MAX:
+        correctness = Correctness.MISTAKE
+    else:
+        correctness = Correctness.BLUNDER
+
+    if correctness == Correctness.OPTIMAL:
+        why = (
+            f"{cat} on a {tclass} turn ({adv} range advantage): "
+            f"{_size_label(best.size_bb)} is the play."
+        )
+    else:
+        why = (
+            f"{cat} on a {tclass} turn ({adv} range advantage): best is "
+            f"{_size_label(best.size_bb)}; you chose {_size_label(chosen.size_bb)} "
+            f"(-{ev_loss}bb)."
+        )
+
+    result = EvaluationResult(
+        **base_kwargs,
+        chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
+        ev_loss_bb=ev_loss,
+        correctness=correctness,
+        rationale_tags=tags,
+        explanation=why,
+    )
+    if rationale:
+        result.authored_rationale = rationale
+    return result
+
+
+def grade_vs_turn_bet(
+    spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
+) -> EvaluationResult:
+    if spot.street != Street.TURN:
+        raise ValueError("grade_vs_turn_bet is turn-only")
+    board = spot.board
+    tex = classify(board[:3])  # flop texture — deliberate flop slice
+    tclass = turn_card_class(board)
+    aggressor = spot.facing or _villain_pos(spot)
+    # Defender-frame advantage label for the tags/prose (same frame as
+    # grade_vs_cbet — hero is the caller here); merits stay pot-odds-first.
+    adv = range_advantage_defender(aggressor, spot.hero.position, tex)
+    cat = _hand_category(spot.hero.hole_cards, board)
+    value = _HAND_VALUE[cat]
+    faced, pot = _faced_call_and_pot(spot)
+    price = faced / pot if pot > 0 else 0.5
+    rationale = _postflop_rationale(NodeContext.VS_TURN_BET, spot.hero.position, aggressor)
+
+    raise_size = next(
+        (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
+        None,
+    )
+    m_fold, m_call, m_raise = _merits_vs_turn_bet(value, price, cat, tclass)
+    specs = [
+        (ActionType.FOLD, None, m_fold),
+        (ActionType.CALL, faced or None, m_call),
+        (ActionType.RAISE, raise_size, m_raise),
+    ]
+    freqs = _frequencies([m for _, _, m in specs])
+    evals = [
+        ActionEval(action=a, size_bb=size, frequency=round(f, 3), ev_bb=round(m, 2))
+        for (a, size, m), f in zip(specs, freqs, strict=True)
+    ]
+    best = max(evals, key=lambda e: e.ev_bb)
+    is_mixed = sum(1 for f in freqs if f > POST_MIX) >= 2
+    leak = int(LeakCategory.VS_TURN_BET)
+
+    base_kwargs = {
+        "per_action": evals,
+        "best_action": best,
+        "provider": ProviderKind.HEURISTIC,
+        "coverage": Coverage.FULL,
+        "leak_category": leak,
+        "is_mixed": is_mixed,
+    }
+    tags = ["vs_turn_bet", adv, cat, tex.wetness, tclass]
+
+    if decision is None:
+        result = EvaluationResult(
+            **base_kwargs,
+            rationale_tags=tags,
+            explanation=(
+                f"{cat} facing a turn barrel on a {tclass} turn "
+                f"({adv} range advantage): {best.action.value} is the play."
+            ),
+        )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
+
+    chosen = next((e for e in evals if e.action == decision.action), None)
+    if chosen is None:
+        chosen = ActionEval(
+            action=decision.action, frequency=0.0, ev_bb=min(e.ev_bb for e in evals) - 1.0
+        )
+    ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    if chosen.action == best.action:
+        correctness = Correctness.OPTIMAL
+    elif chosen.frequency > POST_MIX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_ACCEPTABLE_MAX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_MISTAKE_MAX:
+        correctness = Correctness.MISTAKE
+    else:
+        correctness = Correctness.BLUNDER
+
+    if correctness == Correctness.OPTIMAL:
+        why = f"{cat} on a {tclass} turn ({adv} edge): {best.action.value} is the play."
+    else:
+        why = (
+            f"{cat} on a {tclass} turn ({adv} edge): best is {best.action.value}; "
+            f"you chose {decision.action.value} (-{ev_loss}bb)."
+        )
+
+    result = EvaluationResult(
+        **base_kwargs,
+        chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
+        ev_loss_bb=ev_loss,
+        correctness=correctness,
+        rationale_tags=tags,
         explanation=why,
     )
     if rationale:

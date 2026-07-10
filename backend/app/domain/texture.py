@@ -87,3 +87,50 @@ def classify(board: list[str]) -> Texture:
         high_card=high_card,
         texture_class=texture_class,
     )
+
+
+def turn_card_class(board: list[str]) -> str:
+    """Classify the turn card (board[3]) against the flop (board[:3]) into exactly
+    one of "pairing" | "flush" | "straight" | "over" | "blank" (S6).
+
+    Precedence in that order: a board-pairing card beats a flush-completing card
+    beats a straight-completing card beats an overcard to the flop beats a blank.
+    Raises if fewer than 4 board cards. `classify()` above stays flop-only.
+    """
+    if len(board) < 4:
+        raise ValueError(f"texture.turn_card_class needs >=4 board cards, got {len(board)}")
+    flop, turn = board[:3], board[3]
+    turn_rank, turn_suit = _RIDX[turn[0]], turn[1]
+    flop_ranks = [_RIDX[c[0]] for c in flop]
+
+    # 1. pairing — the turn matches a flop rank (trips/boats now possible)
+    if turn_rank in flop_ranks:
+        return "pairing"
+
+    # 2. flush-completing — the turn makes 3+ of one suit on the board
+    if sum(1 for c in flop if c[1] == turn_suit) >= 2:
+        return "flush"
+
+    # 3. straight-completing — the turn plus two flop cards fit a 5-rank window,
+    # so a two-card holding can now complete a straight through the turn card.
+    # Aces count both high and low (wheel).
+    def _straighty(ranks: list[int], t: int) -> bool:
+        for i, a in enumerate(ranks):
+            for b in ranks[i + 1 :]:
+                if a != b and max(a, b, t) - min(a, b, t) <= 4:
+                    return True
+        return False
+
+    def _low(r: int) -> int:  # ace-low remap for wheel straights
+        return -1 if r == _RIDX["A"] else r
+
+    if _straighty(flop_ranks, turn_rank) or _straighty(
+        [_low(r) for r in flop_ranks], _low(turn_rank)
+    ):
+        return "straight"
+
+    # 4. overcard to the flop
+    if turn_rank > max(flop_ranks):
+        return "over"
+
+    return "blank"

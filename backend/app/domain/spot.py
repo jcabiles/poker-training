@@ -77,6 +77,8 @@ class NodeContext(StrEnum):
     CBET = "cbet"  # flop c-bet decision (Phase 2a)
     VS_CBET = "vs_cbet"  # facing a flop c-bet — defense (Phase 2b)
     VS_CHECK_RAISE = "vs_check_raise"  # facing a flop check-raise, as the c-bettor (2e-1)
+    TURN_BARREL = "turn_barrel"  # flop aggressor deciding whether to bet the turn (S6)
+    VS_TURN_BET = "vs_turn_bet"  # facing a turn bet after calling flop (S6)
 
 
 class Stakes(BaseModel):

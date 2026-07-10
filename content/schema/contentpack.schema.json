@@ -130,7 +130,9 @@
         "vs_limpers",
         "cbet",
         "vs_cbet",
-        "vs_check_raise"
+        "vs_check_raise",
+        "turn_barrel",
+        "vs_turn_bet"
       ],
       "title": "NodeContext",
       "type": "string"

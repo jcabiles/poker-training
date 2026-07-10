@@ -12,6 +12,7 @@ from app.domain.providers.composite import CompositeProvider
 from app.domain.providers.heuristic import HeuristicProvider
 from app.domain.providers.postflop import PostflopHeuristicProvider
 from app.domain.providers.tiered import TieredFeedbackProvider
+from app.domain.providers.turn import TurnHeuristicProvider
 
 _INDEX: dict | None = None
 
@@ -24,7 +25,8 @@ def _preflop_index() -> dict:
 
 
 def get_provider(name: str = "composite"):
-    # The default routed provider: preflop -> heuristic, flop -> postflop.
+    # The default routed provider: preflop -> heuristic, flop -> postflop,
+    # turn -> turn heuristic (S6).
     # "heuristic" kept as an alias so existing callers keep working unchanged.
     # Every provider returned here is wrapped in TieredFeedbackProvider — the
     # shared teaching seam a future solver/hybrid provider inherits for free.
@@ -33,6 +35,7 @@ def get_provider(name: str = "composite"):
             CompositeProvider(
                 HeuristicProvider(_preflop_index()),
                 PostflopHeuristicProvider(),
+                TurnHeuristicProvider(),
             )
         )
     if name == "preflop":

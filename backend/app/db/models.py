@@ -57,6 +57,9 @@ class SRSItemRow(SQLModel, table=True):
     texture_class: str | None = Field(default=None)
     spr_bucket: str | None = Field(default=None)
     faced_bet_bucket: str | None = Field(default=None)
+    # Turn-card class (S6) — "pairing|flush|straight|over|blank"; NULL for
+    # preflop/flop rows (the dimension only exists on turn/river archetypes).
+    turn_class: str | None = Field(default=None)
     ease_factor: float = 2.5
     interval_days: int = 0
     repetitions: int = 0

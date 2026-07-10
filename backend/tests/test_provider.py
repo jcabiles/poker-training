@@ -151,8 +151,10 @@ def test_composite_unknown_flop_node_is_not_found():
 
 
 def test_postflop_provider_rejects_turn_street():
-    # Phase 2e-0 T3: PostflopHeuristicProvider only supports FLOP, not TURN.
-    # A turn spot with CBET context must still return NOT_FOUND.
+    # Phase 2e-0 T3 / S6: routed through get_provider() -> composite -> the
+    # TURN provider now handles this street, but its supports() gate rejects
+    # flop-node contexts (CBET) by design, so a turn spot carrying a flop
+    # context must still return NOT_FOUND end-to-end.
     from factories import make_cbet_spot
 
     from app.domain.spot import Street
@@ -193,3 +195,79 @@ def test_postflop_provider_still_grades_flop():
     res = _run(p.optimal(spot))
     assert res.coverage == Coverage.FULL
     assert res.provider == ProviderKind.HEURISTIC
+
+
+# --- S6: TurnHeuristicProvider gating (authored ahead of T3's providers/turn.py;
+# skips until app.domain.providers.turn + NodeContext.TURN_BARREL exist) ---
+
+try:
+    from app.domain.providers.turn import TurnHeuristicProvider
+
+    _HAS_TURN_PROVIDER = True
+except ImportError:
+    _HAS_TURN_PROVIDER = False
+
+from app.domain.spot import NodeContext, Street  # noqa: E402
+
+_HAS_TURN_CTX = hasattr(NodeContext, "TURN_BARREL")
+
+
+def test_turn_provider_supports_turn_barrel_spot():
+    if not (_HAS_TURN_PROVIDER and _HAS_TURN_CTX):
+        import pytest
+
+        pytest.skip("awaiting T3: providers/turn.py / NodeContext.TURN_BARREL")
+    from factories import make_cbet_spot
+
+    p = TurnHeuristicProvider()
+    flop = make_cbet_spot()
+    turn_spot = flop.model_copy(
+        update={
+            "street": Street.TURN,
+            "board": [*flop.board, "2s"],
+            "node_context": [NodeContext.TURN_BARREL],
+        }
+    )
+    assert _run(p.supports(turn_spot)) is True
+
+
+def test_turn_provider_rejects_flop_street():
+    if not _HAS_TURN_PROVIDER:
+        import pytest
+
+        pytest.skip("awaiting T3: providers/turn.py")
+    from factories import make_cbet_spot
+
+    p = TurnHeuristicProvider()
+    assert _run(p.supports(make_cbet_spot())) is False  # street=FLOP
+
+
+def test_turn_provider_rejects_flop_contexts_on_turn_board():
+    if not (_HAS_TURN_PROVIDER and _HAS_TURN_CTX):
+        import pytest
+
+        pytest.skip("awaiting T3: providers/turn.py / NodeContext.TURN_BARREL")
+    from factories import make_cbet_spot
+
+    p = TurnHeuristicProvider()
+    flop = make_cbet_spot()
+    turn_spot = flop.model_copy(
+        update={"street": Street.TURN, "board": [*flop.board, "2s"]}  # node_context stays [CBET]
+    )
+    assert _run(p.supports(turn_spot)) is False
+
+
+def test_turn_provider_rejects_board_len_three():
+    if not (_HAS_TURN_PROVIDER and _HAS_TURN_CTX):
+        import pytest
+
+        pytest.skip("awaiting T3: providers/turn.py / NodeContext.TURN_BARREL")
+    from factories import make_cbet_spot
+
+    p = TurnHeuristicProvider()
+    flop = make_cbet_spot()
+    short_turn = flop.model_copy(
+        update={"street": Street.TURN, "node_context": [NodeContext.TURN_BARREL]}
+        # board deliberately left at length 3
+    )
+    assert _run(p.supports(short_turn)) is False

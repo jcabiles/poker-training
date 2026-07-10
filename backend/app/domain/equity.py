@@ -79,6 +79,9 @@ def _best7(cards: list[str]) -> tuple:
     return best
 
 
+best7 = _best7  # public alias; 7-card list[str] -> comparable strength tuple
+
+
 def class_to_combos(cls: str) -> list[tuple[str, str]]:
     """'AA' -> 6 combos, 'AKs' -> 4, 'AKo' -> 12."""
     if len(cls) == 2:  # pair
@@ -95,7 +98,10 @@ def combos_for_range(spec: str, dead: frozenset[str] = frozenset()) -> list[tupl
     from app.domain.content.notation import parse_range
 
     out: list[tuple[str, str]] = []
-    for cls in parse_range(spec):
+    # parse_range returns a SET; sort so combo order (and thus anything drawn
+    # from it with a seeded rng) is deterministic across processes instead of
+    # varying with PYTHONHASHSEED.
+    for cls in sorted(parse_range(spec)):
         for combo in class_to_combos(cls):
             if not (set(combo) & dead):
                 out.append(combo)

@@ -1,0 +1,50 @@
+{
+  "id": "postflop-turn",
+  "version": 1,
+  "domain": "postflop",
+  "description": "Authored rationale for the HU single-raised-pot turn nodes (S6): the 2nd-barrel decision (hero = flop c-bettor) and facing a turn barrel (hero = flop caller). Keyed by hero/counterpart pairing; scoring itself lives in backend/app/domain/postflop.py (grade_turn_barrel / grade_vs_turn_bet). Source: docs/research/02-postflop-strategy.md §5.1-5.2, 5.4.",
+  "entries": [
+    {
+      "node_context": "turn_barrel",
+      "position": "BTN",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "After BB calls the flop c-bet, BTN's second barrel should be driven by what the turn card does to BB's continue range: overcards and board-pairing cards weaken the pairs and pair-plus hands BB called with and let BTN keep firing, while flush- or straight-completing turns improve the caller's range and are checked back more without a hand or key blockers. Bricks are give-up cards for pure air — BB has already shown a hand willing to continue, so a bluff needs a scare card or picked-up equity to keep the story credible."
+    },
+    {
+      "node_context": "turn_barrel",
+      "position": "CO",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "CO's second barrel follows the same scare-card logic as BTN's, but with a slightly tighter flop c-betting range the barrel is more value-weighted: fire turns that pair the board or bring an overcard (they hit CO's broadway-heavy range harder than BB's calls), keep barreling strong hands and combo draws for value and protection, and check back medium showdown value on bricks — a marginal pair realizes its equity best by getting to showdown cheaply, not by betting into the part of BB's range that continues."
+    },
+    {
+      "node_context": "turn_barrel",
+      "position": "UTG",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "UTG's narrow, broadway-and-pairs range means its barrels are the most credible of the three pairings on high turn cards — an overcard or a board-pairing turn almost always favors UTG's story. The trade-off is that BB's flop call is aimed squarely at that known-strong range: on flush- or straight-completing turns and low bricks, BB's wider calling range catches up fast, so UTG should give up its weakest bluffs sooner rather than fire a second barrel into an improved range."
+    },
+    {
+      "node_context": "vs_turn_bet",
+      "position": "BB",
+      "facing": "BTN",
+      "actions": [],
+      "rationale": "A second barrel from BTN is meaningfully stronger news than the flop c-bet — BTN c-bets very wide but keeps firing turns with a range weighted toward value and real draws. Start from pot odds: the price you're offered decides how strong a hand you need, and a marginal pair that beat the flop bet often can't profitably continue against a big turn bet. On brick turns nothing has changed and disciplined bluff-catching keeps its value; on scare turns that complete draws or bring overcards, BTN's story is credible and folding marginal hands at a bad price is the discipline, not a leak."
+    },
+    {
+      "node_context": "vs_turn_bet",
+      "position": "BB",
+      "facing": "CO",
+      "actions": [],
+      "rationale": "Facing a CO double barrel, the pot odds come first: work out the price before thinking about the hand. CO's turn-betting range is tighter and more value-heavy than BTN's, so marginal made hands should continue less often against it, especially on turns that favor CO's broadway-heavy range. Strong hands and good draws continue — draws want the right price on one card to come — while pure air has no business bluff-catching a second barrel out of position."
+    },
+    {
+      "node_context": "vs_turn_bet",
+      "position": "BB",
+      "facing": "UTG",
+      "actions": [],
+      "rationale": "UTG's double barrel is the most value-weighted line in the game tree you'll face from the blinds: the flop c-bet from a narrow range already signalled strength, and a turn bet on top of it is rarely a bluff at live low stakes. Fold marginal pairs at anything but a great price, continue with strong hands and draws that are priced in, and remember that a scare turn which helps UTG's high-card range — an ace, a king, a broadway that completes straights — makes the fold even clearer."
+    }
+  ]
+}

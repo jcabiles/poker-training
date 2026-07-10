@@ -233,3 +233,34 @@ def test_river_signature_differs_from_flop_and_turn():
     )
     assert spot_signature(river) != spot_signature(flop)
     assert spot_signature(river) != spot_signature(turn)
+
+
+# --- S6: turn-card class dimension (CONDITIONALLY appended for turn/river) ---
+
+
+def _turn_spot(turn_card):
+    from app.domain.spot import Street
+
+    flop = _flop_spot(["As", "Kd", "2c"])
+    return flop.model_copy(
+        update={"street": Street.TURN, "board": ["As", "Kd", "2c", turn_card]}
+    )
+
+
+def test_turn_card_class_changes_turn_signature():
+    # Same flop, same everything — only the turn card's CLASS differs:
+    # Ad pairs the board ("pairing"); 7h is a "blank" on As Kd 2c.
+    pairing = spot_signature(_turn_spot("Ad"))
+    blank = spot_signature(_turn_spot("7h"))
+    assert pairing != blank
+
+
+def test_same_turn_card_class_same_signature():
+    # Two different blanks collapse to one SRS item.
+    assert spot_signature(_turn_spot("7h")) == spot_signature(_turn_spot("6d"))
+
+
+def test_flop_signature_unchanged_by_turn_dimension():
+    # Companion to the pinned-hash test: the S6 turn dimension is OMITTED (not
+    # constant-valued) for flop spots, so the flop hash stays byte-identical.
+    assert spot_signature(_flop_spot(["As", "Kd", "2c"])) == "6832a54693ba5f6c"

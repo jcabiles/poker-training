@@ -22,13 +22,20 @@ from app.domain.srs import (
 from app.domain.texture import classify
 
 
-def _postflop_archetype(spot: Spot) -> tuple[str, str | None, str | None, str | None]:
-    """(street, texture_class, spr_bucket, faced_bet_bucket); buckets None for preflop."""
+def _postflop_archetype(spot: Spot) -> tuple[str, str | None, str | None, str | None, str | None]:
+    """(street, texture_class, spr_bucket, faced_bet_bucket, turn_class); buckets None
+    for preflop. texture_class stays the flop-3-card classification on every street;
+    turn_class (S6) is set only for turn/river spots — None for flop."""
     street = spot.street.value
     if spot.street == Street.PREFLOP:
-        return street, None, None, None
+        return street, None, None, None, None
     tex = classify(spot.board[:3]).texture_class if len(spot.board) >= 3 else None  # guard <3 cards
-    return street, tex, spr_bucket(spot.spr), faced_bet_bucket(spot)
+    turn = None
+    if spot.street in (Street.TURN, Street.RIVER) and len(spot.board) >= 4:
+        from app.domain.texture import turn_card_class
+
+        turn = turn_card_class(spot.board)
+    return street, tex, spr_bucket(spot.spr), faced_bet_bucket(spot), turn
 
 
 def record_attempt(
@@ -41,7 +48,7 @@ def record_attempt(
     # it was rebuilt from, regardless of the reconstructed board's own signature).
     sig = spot.srs_signature or spot_signature(spot)
     quality = quality_from_correctness(correctness)
-    street, tex, sprb, facedb = _postflop_archetype(spot)
+    street, tex, sprb, facedb, turnc = _postflop_archetype(spot)
     row = session.get(SRSItemRow, ("", sig))  # composite PK (owner_id, signature)
     if row is None:
         row = SRSItemRow(
@@ -57,13 +64,15 @@ def record_attempt(
             texture_class=tex,
             spr_bucket=sprb,
             faced_bet_bucket=facedb,
+            turn_class=turnc,
         )
     elif row.street is None:  # backfill legacy / pre-2c rows on their next attempt
-        row.street, row.texture_class, row.spr_bucket, row.faced_bet_bucket = (
+        row.street, row.texture_class, row.spr_bucket, row.faced_bet_bucket, row.turn_class = (
             street,
             tex,
             sprb,
             facedb,
+            turnc,
         )
     ease, interval, reps = sm2(row.ease_factor, row.interval_days, row.repetitions, quality)
     row.ease_factor, row.interval_days, row.repetitions = ease, interval, reps
