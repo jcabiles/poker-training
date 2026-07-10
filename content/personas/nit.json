@@ -5,6 +5,14 @@
   "persona": "nit",
   "display_name": "Nit",
   "sizing": { "open_bb": 3.0, "threebet_mult": 3.5, "fourbet_mult": 2.3 },
+  "postflop": {
+    "aggression": 1.0,
+    "stickiness": 0.6,
+    "bluff_freq": 0.04,
+    "sizing": { "0.5": 0.4, "0.75": 0.45, "1.0": 0.15 },
+    "spr_commit": 1.5,
+    "multiway_bluff_damp": 0.3
+  },
   "preflop": [
     {
       "facing": "unopened",

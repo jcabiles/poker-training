@@ -5,6 +5,14 @@
   "persona": "lag",
   "display_name": "LAG",
   "sizing": { "open_bb": 3.0, "threebet_mult": 3.5, "fourbet_mult": 2.4 },
+  "postflop": {
+    "aggression": 1.4,
+    "stickiness": 0.85,
+    "bluff_freq": 0.35,
+    "sizing": { "0.33": 0.15, "0.5": 0.3, "0.75": 0.35, "1.0": 0.2 },
+    "spr_commit": 3.0,
+    "multiway_bluff_damp": 0.65
+  },
   "preflop": [
     {
       "facing": "unopened",
