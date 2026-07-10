@@ -101,7 +101,7 @@ actually on `main` before planning around it.
 ---
 
 ## SOTA UX specifics — FOLDED IN (Thread-B research, complete)
-Three example-rich docs now in `best-practices-drafts/` (learning-pedagogy · poker-trainer & data-viz · IA/visual).
+Three example-rich docs now in `best-practices-drafts/` (learning-pedagogy · poker-coach & data-viz · IA/visual).
 **Biggest cross-cutting insight: the highest-leverage fixes are cheap** — much of the "teaching" upgrade is *surfacing
 data the code already has* (`Entry.rationale`, `EvaluationResult.rationale_tags`, the SM-2 due-queue in `srs.py`), and
 the top IA win is a front-end-only reshuffle. This is not a rebuild.

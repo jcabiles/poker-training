@@ -10,7 +10,7 @@ Everything downstream consumes a small set of schemas and one grading interface.
 
 ## Repo structure
 ```
-poker-trainer/
+poker-coach/
   backend/
     app/
       main.py                # FastAPI app, mounts /api/v1

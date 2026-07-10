@@ -1,4 +1,4 @@
-# AI-DLC profile — poker-trainer
+# AI-DLC profile — poker-coach
 
 stack:        mixed — Python/FastAPI backend + React/Vite/strict-TS frontend
 artifact_dir: docs/ai-dlc
@@ -7,7 +7,7 @@ verify:
   test:  ./scripts/verify.sh          # backend pytest + boot probe → "BACKEND VERIFY OK"
   lint:  cd backend && ruff check .
   build: cd frontend && npm run typecheck && npm run build
-  boot:  ./scripts/serve.sh start     # backend :8008 (health GET /api/v1/health) + vite :5173, background (or: poker-trainer)
+  boot:  ./scripts/serve.sh start     # backend :8008 (health GET /api/v1/health) + vite :5173, background (or: poker-coach)
 
 hotspots:
   - frontend/src/styles/tokens.css    # design tokens — single owner per pass
