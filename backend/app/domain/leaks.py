@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 
-TAXONOMY_VERSION = 3
+TAXONOMY_VERSION = 4
 
 
 class LeakCategory(IntEnum):
@@ -37,6 +37,8 @@ class LeakCategory(IntEnum):
     FLOP_CBET = 200  # flop c-bet decision (HU SRP)
     VS_CBET = 201  # facing a flop c-bet — defense (HU SRP)
     VS_CHECK_RAISE = 202  # facing a flop check-raise as the original bettor (Phase 2e-1)
+    TURN_BARREL = 203  # flop aggressor deciding whether to bet the turn (S6)
+    VS_TURN_BET = 204  # facing a turn bet after calling flop (S6)
     BOARD_TEXTURE = 210  # board-texture classification drill
     EQUITY_EST = 211  # equity-estimation drill
 

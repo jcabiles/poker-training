@@ -47,10 +47,15 @@ _PRE_SHAPE = {
 }
 
 # --- Postflop 4-wide tags [node, adv, cat, wetness] (postflop.py) -> clauses ---
+# Turn nodes emit a 5-wide tag [node, adv, cat, wetness, turn_class] — the 5th
+# tag is backward-compatible with the len(tags) >= 4 dispatch below (flop nodes
+# never populate a 5th tag; turn nodes always do, consumed separately below).
 _NODE = {
     "cbet": "You're the preflop aggressor deciding whether to c-bet",
     "vs_cbet": "You're defending against a c-bet",
     "vs_check_raise": "Your c-bet just got check-raised — fresh strength information",
+    "turn_barrel": "You're the flop aggressor deciding whether to barrel the turn",
+    "vs_turn_bet": "You called the flop and are now facing a turn bet",
 }
 _ADV = {
     "hero": "the range advantage is yours, so betting pressure is credible",
@@ -71,6 +76,14 @@ _WET = {
     "dry": "Dry boards change little on later streets, favoring small, frequent bets",
     "medium": "This medium texture leaves both ranges live, so balance matters",
     "wet": "Wet boards shift fast — sizing polarizes and raises demand respect",
+}
+# tags[4] on turn nodes: the turn card's class vs the flop (texture.turn_card_class).
+_TURN_CLASS = {
+    "pairing": "The turn paired the board, adding trips/full-house possibilities",
+    "flush": "The turn completed a flush draw, a genuine scare card",
+    "straight": "The turn completed a straight draw, a genuine scare card",
+    "over": "The turn brought an overcard to the flop, shifting range equities",
+    "blank": "The turn is a blank that changes little about either range",
 }
 
 
@@ -133,6 +146,11 @@ def _reasoning(spot: Spot, result: EvaluationResult) -> str:
             f"{_WET.get(wet, '')}".rstrip()
             + "."
         )
+        # 5th tag (turn_class) — turn nodes only; names the scare card so the
+        # reasoning is non-tautological about what changed on the turn.
+        if node in ("turn_barrel", "vs_turn_bet") and len(tags) >= 5:
+            turn_class = tags[4]
+            parts.append(_TURN_CLASS.get(turn_class, "The turn card shifts the board texture."))
     else:
         shape = next((t for t in tags if t in _PRE_SHAPE), None)
         if shape is not None:

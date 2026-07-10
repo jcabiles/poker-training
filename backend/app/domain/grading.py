@@ -90,6 +90,10 @@ def leak_category_for(
         return int(LeakCategory.VS_CBET)
     if ctx == NodeContext.VS_CHECK_RAISE:
         return int(LeakCategory.VS_CHECK_RAISE)
+    if ctx == NodeContext.TURN_BARREL:
+        return int(LeakCategory.TURN_BARREL)
+    if ctx == NodeContext.VS_TURN_BET:
+        return int(LeakCategory.VS_TURN_BET)
     return int(LeakCategory.VS_RFI)
 
 
