@@ -100,7 +100,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       in-memory session + logged seed; no hand-rolled shuffle; heavy RNG statistical suite is
       S2's, not here (keep the skeleton thin).
 
-- [ ] **S2 — Hand engine: betting, side pots, showdown, chip conservation.** ICE 9·7·4. *(Track A, W2)*
+- [x] **S2 — Hand engine: betting, side pots, showdown, chip conservation.** *(done 2026-07-10, wave 2: `domain/table/engine.py` — 4 legal-action shapes incl. BB-option + no-reopen, incomplete-raise increment rule, side pots w/ dead money, best7 showdown, deltas sum exactly 0.0 by construction; 407-line scripted+property battery; RNG suite 200k shuffles χ² GOF < 1057 @ 2.1s unmarked; refuter-probed live for BB option/reopen/layering)* ICE 9·7·4. *(Track A, W2)*
       **Problem:** no betting state machine; full hands can't play out.
       **Outcome-link:** correct game = precondition for every graded decision.
       **Solution:** 9-max state machine in `domain/table/` — blinds, limps, raise/3-bet/4-bet,
@@ -162,7 +162,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       **No-gos:** no new grading logic here; no `spot_signature()` preflop changes;
       `range_advantage`/`_rebuild_postflop` rework belongs to S6, not here.
 
-- [ ] **S6 — Turn graders: barrel + facing turn bets.** ICE 8·6·4. *(Track C, W2 — after S5)*
+- [x] **S6 — Turn graders: barrel + facing turn bets.** *(done 2026-07-10, wave 2: TURN_BARREL/VS_TURN_BET graders + TurnHeuristicProvider in `_by_street[TURN]`; `range_advantage` consumes node_context (flop path verbatim, byte-identical); NOT_FOUND coverage gate closes the live persist gap; SRS turn_class CONDITIONALLY appended (refuter caught constant-append breaking the pin — element omitted for flop) + nullable column + migration 0007; rebuild matches 4-tuple incl. turn_class; leaks 203/204, TAXONOMY_VERSION 4; pins 6832…/0cdf… unchanged as literals; combined refuter caught + fixed a PYTHONHASHSEED flake via sorted combo iteration)* ICE 8·6·4. *(Track C, W2 — after S5)*
       **Problem:** no turn grading (old 2f/2g). **Outcome-link:** per-street tracking, street 3.
       **Solution:** heads-up turn aggressor (2nd-barrel: scare-card / picked-up-equity /
       capped-range per research §5.1–5.2) + facing-turn-bet graders behind `StrategyProvider`;

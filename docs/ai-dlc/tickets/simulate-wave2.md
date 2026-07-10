@@ -11,7 +11,7 @@
 
 ## S2 — hand engine
 
-- [ ] **T1 — Engine implementation (heavy-worker).**
+- [x] **T1 — Engine implementation (heavy-worker).**
   `domain/table/engine.py` per the frozen interface: SeatState/Pot/HandState/Settlement,
   `start_hand` (POST blinds, initial betting state 1.0/1.0/2.0), `legal_actions` (4 shapes:
   unopened / facing / matched-with-option / no-reopen [FOLD,CALL]), `apply` (raise-TO
@@ -26,7 +26,7 @@
   **No-gos:** no deck.py changes (pinned-seed test) · no wire/FE/DB · no persona logic ·
   no rng params on the engine (deterministic given inputs).
 
-- [ ] **T2 — Engine test battery + RNG suite (implementer).**
+- [x] **T2 — Engine test battery + RNG suite (implementer).**
   Author to the FROZEN spec interface (parallel with T1): `tests/test_engine.py` — scripted
   side-pot scenarios (3-way double all-in, split main + sole side winner, incomplete-raise
   case asserting legal-action SHAPES, fold-out, BB walk, **limped-pot BB option: [CHECK,
@@ -43,7 +43,7 @@
 
 ## S6 — turn graders
 
-- [ ] **T3 — Turn grading core (heavy-worker).**
+- [x] **T3 — Turn grading core (heavy-worker).**
   NodeContext += `TURN_BARREL("turn_barrel")`/`VS_TURN_BET("vs_turn_bet")`;
   `texture.py::turn_card_class` (pairing|flush|straight|over|blank, precedence order);
   `range_advantage` rewrite — flop path VERBATIM (outputs byte-identical), turn path
@@ -62,7 +62,7 @@
   **No-gos:** no srs.py/drill.py/scenarios.py edits (T4's) · no leaks.py/grading.py/
   feedback.py edits (T5's) · no river · no multiway · no test_domain_purity.py change.
 
-- [ ] **T4 — SRS turn dim + persistence + coverage gate + rebuild (heavy-worker).**
+- [x] **T4 — SRS turn dim + persistence + coverage gate + rebuild (heavy-worker).**
   `srs.py`: CONDITIONAL append of turn_class (element OMITTED for flop — refuter-proven;
   constant-append breaks the pin) + rewrite the false append-rule docstring. DB: nullable
   `turn_class` column on SRSItemRow + additive Alembic migration; `review.py::
@@ -81,7 +81,7 @@
   import the new enum members; they exist once T3 commits, author to frozen names) · no
   drop/alter columns, additive migration only.
 
-- [ ] **T5 — Leaks + feedback wiring + grader tests (implementer).**
+- [x] **T5 — Leaks + feedback wiring + grader tests (implementer).**
   `leaks.py`: TURN_BARREL=203, VS_TURN_BET=204, TAXONOMY_VERSION→4; `grading.py::
   leak_category_for` turn branches (BOTH mapping sites — miss one and leak_focus breaks);
   `feedback.py`: `_NODE` entries for turn_barrel/vs_turn_bet with turn phrasing consuming
@@ -97,7 +97,7 @@
 
 ## Close-out
 
-- [ ] **T6 — Lead fan-in.** Full `pytest -q` + ruff + `./scripts/verify.sh`; verify pinned
+- [x] **T6 — Lead fan-in.** Full `pytest -q` + ruff + `./scripts/verify.sh`; verify pinned
   hashes are literals and unchanged; migration applies on an existing dev DB; refuter on
   the combined diff; PR `feat/simulate-wave2`; mark S2 + S6 `[x]` in the roadmap only
   after checks pass.
