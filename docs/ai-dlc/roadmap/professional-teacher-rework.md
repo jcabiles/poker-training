@@ -1,4 +1,8 @@
-# Professional Teacher Rework — Roadmap (updated 2026-07-02)
+# Professional Teacher Rework — Roadmap (updated 2026-07-10)
+
+> **2026-07-10:** the Simulate initiative (`roadmap/simulate-table.md`) **supersedes the
+> turn/river deferral**: turn/river graders (2f–2i) + multiway (2j) are pulled into its Now
+> column as slices S5–S8. The Later bet below stays for full-hand (2k) only.
 
 > Living, pass/fail, resumable. A fresh context should read this and know exactly what's left.
 > **Supersedes the sequencing** in `roadmap-review-and-proposal.md`: the Learning-Experience pillar becomes the **Now**
