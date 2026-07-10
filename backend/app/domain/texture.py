@@ -134,3 +134,50 @@ def turn_card_class(board: list[str]) -> str:
         return "over"
 
     return "blank"
+
+
+def river_card_class(board: list[str]) -> str:
+    """Classify the river card (board[4]) against the first four cards (board[:4])
+    into exactly one of "pairing" | "flush" | "straight" | "over" | "blank" (S7).
+
+    Same precedence as `turn_card_class`: pairing beats flush-completing beats
+    straight-completing beats overcard beats blank. Raises if fewer than 5 board
+    cards. `classify()` stays flop-only and `turn_card_class()` is untouched.
+    """
+    if len(board) < 5:
+        raise ValueError(f"texture.river_card_class needs >=5 board cards, got {len(board)}")
+    prior, river = board[:4], board[4]
+    river_rank, river_suit = _RIDX[river[0]], river[1]
+    prior_ranks = [_RIDX[c[0]] for c in prior]
+
+    # 1. pairing — the river matches a rank already on board
+    if river_rank in prior_ranks:
+        return "pairing"
+
+    # 2. flush-completing — the river makes 3+ of one suit on the board
+    if sum(1 for c in prior if c[1] == river_suit) >= 2:
+        return "flush"
+
+    # 3. straight-completing — the river plus two prior board cards fit a 5-rank
+    # window, so a two-card holding can now complete a straight through it.
+    # Aces count both high and low (wheel).
+    def _straighty(ranks: list[int], t: int) -> bool:
+        for i, a in enumerate(ranks):
+            for b in ranks[i + 1 :]:
+                if a != b and max(a, b, t) - min(a, b, t) <= 4:
+                    return True
+        return False
+
+    def _low(r: int) -> int:  # ace-low remap for wheel straights
+        return -1 if r == _RIDX["A"] else r
+
+    if _straighty(prior_ranks, river_rank) or _straighty(
+        [_low(r) for r in prior_ranks], _low(river_rank)
+    ):
+        return "straight"
+
+    # 4. overcard to the board so far
+    if river_rank > max(prior_ranks):
+        return "over"
+
+    return "blank"

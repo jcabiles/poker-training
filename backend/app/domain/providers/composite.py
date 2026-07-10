@@ -35,18 +35,19 @@ def _not_found(spot: Spot, decision: Decision | None = None) -> EvaluationResult
 class CompositeProvider:
     name = "composite"
 
-    def __init__(self, preflop, postflop, turn):
+    def __init__(self, preflop, postflop, turn, river):
         self._preflop = preflop
         self._postflop = postflop
         self._turn = turn
+        self._river = river
         # Street-keyed dispatch seam. TURN routes to the turn provider (S6);
-        # RIVER still resolves to the flop provider (whose supports() gate
-        # rejects it -> NOT_FOUND). S7 swaps the RIVER entry — _route stays put.
+        # RIVER routes to the river provider (S7), whose supports() gate
+        # rejects flop/turn node contexts -> NOT_FOUND. _route stays put.
         self._by_street = {
             Street.PREFLOP: preflop,
             Street.FLOP: postflop,
             Street.TURN: turn,
-            Street.RIVER: postflop,
+            Street.RIVER: river,
         }
 
     def _route(self, spot: Spot):

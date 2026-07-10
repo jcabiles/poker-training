@@ -50,12 +50,16 @@ _PRE_SHAPE = {
 # Turn nodes emit a 5-wide tag [node, adv, cat, wetness, turn_class] — the 5th
 # tag is backward-compatible with the len(tags) >= 4 dispatch below (flop nodes
 # never populate a 5th tag; turn nodes always do, consumed separately below).
+# River nodes emit a 6-wide tag [node, adv, cat_effective, wetness, turn_class,
+# river_class] — both the turn-card AND river-card sentences surface (S7).
 _NODE = {
     "cbet": "You're the preflop aggressor deciding whether to c-bet",
     "vs_cbet": "You're defending against a c-bet",
     "vs_check_raise": "Your c-bet just got check-raised — fresh strength information",
     "turn_barrel": "You're the flop aggressor deciding whether to barrel the turn",
     "vs_turn_bet": "You called the flop and are now facing a turn bet",
+    "river_barrel": "You're the flop+turn aggressor deciding whether to barrel the river",
+    "vs_river_bet": "You called the flop and turn and are now facing a river bet",
 }
 _ADV = {
     "hero": "the range advantage is yours, so betting pressure is credible",
@@ -77,13 +81,25 @@ _WET = {
     "medium": "This medium texture leaves both ranges live, so balance matters",
     "wet": "Wet boards shift fast — sizing polarizes and raises demand respect",
 }
-# tags[4] on turn nodes: the turn card's class vs the flop (texture.turn_card_class).
+# tags[4] on turn AND river nodes: the turn card's class vs the flop
+# (texture.turn_card_class). River nodes keep this sentence too — a river
+# barrel through a scare turn keeps that context alongside the river-card
+# sentence below.
 _TURN_CLASS = {
     "pairing": "The turn paired the board, adding trips/full-house possibilities",
     "flush": "The turn completed a flush draw, a genuine scare card",
     "straight": "The turn completed a straight draw, a genuine scare card",
     "over": "The turn brought an overcard to the flop, shifting range equities",
     "blank": "The turn is a blank that changes little about either range",
+}
+# tags[5] on river nodes only: the river card's class vs the first four cards
+# (texture.river_card_class).
+_RIVER_CLASS = {
+    "pairing": "The river paired the board, adding trips/full-house possibilities",
+    "flush": "The river completed a flush, a genuine scare card",
+    "straight": "The river completed a straight, a genuine scare card",
+    "over": "The river brought an overcard to the earlier streets, shifting range equities",
+    "blank": "The river is a blank that changes little about either range",
 }
 
 
@@ -146,11 +162,19 @@ def _reasoning(spot: Spot, result: EvaluationResult) -> str:
             f"{_WET.get(wet, '')}".rstrip()
             + "."
         )
-        # 5th tag (turn_class) — turn nodes only; names the scare card so the
-        # reasoning is non-tautological about what changed on the turn.
-        if node in ("turn_barrel", "vs_turn_bet") and len(tags) >= 5:
+        # 5th tag (turn_class) — turn AND river nodes; names the scare card so
+        # the reasoning is non-tautological about what changed on the turn.
+        if (
+            node in ("turn_barrel", "vs_turn_bet", "river_barrel", "vs_river_bet")
+            and len(tags) >= 5
+        ):
             turn_class = tags[4]
             parts.append(_TURN_CLASS.get(turn_class, "The turn card shifts the board texture."))
+        # 6th tag (river_class) — river nodes only; names the river card so
+        # both the turn-card and river-card sentences surface together (S7).
+        if node in ("river_barrel", "vs_river_bet") and len(tags) >= 6:
+            river_class = tags[5]
+            parts.append(_RIVER_CLASS.get(river_class, "The river card shifts the board texture."))
     else:
         shape = next((t for t in tags if t in _PRE_SHAPE), None)
         if shape is not None:

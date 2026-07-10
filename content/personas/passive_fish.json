@@ -5,6 +5,14 @@
   "persona": "passive_fish",
   "display_name": "Passive Fish",
   "sizing": { "open_bb": 4.0, "threebet_mult": 3.0, "fourbet_mult": 2.2 },
+  "postflop": {
+    "aggression": 0.6,
+    "stickiness": 1.4,
+    "bluff_freq": 0.12,
+    "sizing": { "0.33": 0.6, "0.5": 0.3, "0.75": 0.1 },
+    "spr_commit": 2.0,
+    "multiway_bluff_damp": 0.4
+  },
   "preflop": [
     {
       "facing": "unopened",

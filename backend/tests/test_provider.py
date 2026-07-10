@@ -271,3 +271,90 @@ def test_turn_provider_rejects_board_len_three():
         # board deliberately left at length 3
     )
     assert _run(p.supports(short_turn)) is False
+
+
+# --- S7: RiverHeuristicProvider gating (authored ahead of T3's providers/river.py;
+# skips until app.domain.providers.river + NodeContext.RIVER_BARREL exist) ---
+
+try:
+    from app.domain.providers.river import RiverHeuristicProvider
+
+    _HAS_RIVER_PROVIDER = True
+except ImportError:
+    _HAS_RIVER_PROVIDER = False
+
+_HAS_RIVER_CTX = hasattr(NodeContext, "RIVER_BARREL")
+
+
+def test_river_provider_supports_river_barrel_spot():
+    if not (_HAS_RIVER_PROVIDER and _HAS_RIVER_CTX):
+        import pytest
+
+        pytest.skip("awaiting T3: providers/river.py / NodeContext.RIVER_BARREL")
+    from factories import make_cbet_spot
+
+    p = RiverHeuristicProvider()
+    flop = make_cbet_spot()
+    river_spot = flop.model_copy(
+        update={
+            "street": Street.RIVER,
+            "board": [*flop.board, "2s", "3d"],
+            "node_context": [NodeContext.RIVER_BARREL],
+        }
+    )
+    assert _run(p.supports(river_spot)) is True
+
+
+def test_river_provider_rejects_flop_street():
+    if not _HAS_RIVER_PROVIDER:
+        import pytest
+
+        pytest.skip("awaiting T3: providers/river.py")
+    from factories import make_cbet_spot
+
+    p = RiverHeuristicProvider()
+    assert _run(p.supports(make_cbet_spot())) is False  # street=FLOP
+
+
+def test_river_provider_rejects_flop_and_turn_contexts_on_river_board():
+    if not (_HAS_RIVER_PROVIDER and _HAS_RIVER_CTX):
+        import pytest
+
+        pytest.skip("awaiting T3: providers/river.py / NodeContext.RIVER_BARREL")
+    from factories import make_cbet_spot
+
+    p = RiverHeuristicProvider()
+    flop = make_cbet_spot()
+    river_flop_ctx = flop.model_copy(
+        update={"street": Street.RIVER, "board": [*flop.board, "2s", "3d"]}
+        # node_context stays [CBET]
+    )
+    assert _run(p.supports(river_flop_ctx)) is False
+    river_turn_ctx = flop.model_copy(
+        update={
+            "street": Street.RIVER,
+            "board": [*flop.board, "2s", "3d"],
+            "node_context": [NodeContext.TURN_BARREL],
+        }
+    )
+    assert _run(p.supports(river_turn_ctx)) is False
+
+
+def test_river_provider_rejects_board_len_four():
+    if not (_HAS_RIVER_PROVIDER and _HAS_RIVER_CTX):
+        import pytest
+
+        pytest.skip("awaiting T3: providers/river.py / NodeContext.RIVER_BARREL")
+    from factories import make_cbet_spot
+
+    p = RiverHeuristicProvider()
+    flop = make_cbet_spot()
+    short_river = flop.model_copy(
+        update={
+            "street": Street.RIVER,
+            "board": [*flop.board, "2s"],
+            "node_context": [NodeContext.RIVER_BARREL],
+        }
+        # board deliberately left at length 4
+    )
+    assert _run(p.supports(short_river)) is False

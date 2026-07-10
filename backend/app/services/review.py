@@ -22,20 +22,28 @@ from app.domain.srs import (
 from app.domain.texture import classify
 
 
-def _postflop_archetype(spot: Spot) -> tuple[str, str | None, str | None, str | None, str | None]:
-    """(street, texture_class, spr_bucket, faced_bet_bucket, turn_class); buckets None
-    for preflop. texture_class stays the flop-3-card classification on every street;
-    turn_class (S6) is set only for turn/river spots — None for flop."""
+def _postflop_archetype(
+    spot: Spot,
+) -> tuple[str, str | None, str | None, str | None, str | None, str | None]:
+    """(street, texture_class, spr_bucket, faced_bet_bucket, turn_class, river_class);
+    buckets None for preflop. texture_class stays the flop-3-card classification on
+    every street; turn_class (S6) is set only for turn/river spots — None for flop;
+    river_class (S7) is set only for river spots — None everywhere else."""
     street = spot.street.value
     if spot.street == Street.PREFLOP:
-        return street, None, None, None, None
+        return street, None, None, None, None, None
     tex = classify(spot.board[:3]).texture_class if len(spot.board) >= 3 else None  # guard <3 cards
     turn = None
     if spot.street in (Street.TURN, Street.RIVER) and len(spot.board) >= 4:
         from app.domain.texture import turn_card_class
 
         turn = turn_card_class(spot.board)
-    return street, tex, spr_bucket(spot.spr), faced_bet_bucket(spot), turn
+    river = None
+    if spot.street == Street.RIVER and len(spot.board) >= 5:
+        from app.domain.texture import river_card_class
+
+        river = river_card_class(spot.board)
+    return street, tex, spr_bucket(spot.spr), faced_bet_bucket(spot), turn, river
 
 
 def record_attempt(
@@ -48,7 +56,7 @@ def record_attempt(
     # it was rebuilt from, regardless of the reconstructed board's own signature).
     sig = spot.srs_signature or spot_signature(spot)
     quality = quality_from_correctness(correctness)
-    street, tex, sprb, facedb, turnc = _postflop_archetype(spot)
+    street, tex, sprb, facedb, turnc, riverc = _postflop_archetype(spot)
     row = session.get(SRSItemRow, ("", sig))  # composite PK (owner_id, signature)
     if row is None:
         row = SRSItemRow(
@@ -65,15 +73,17 @@ def record_attempt(
             spr_bucket=sprb,
             faced_bet_bucket=facedb,
             turn_class=turnc,
+            river_class=riverc,
         )
     elif row.street is None:  # backfill legacy / pre-2c rows on their next attempt
-        row.street, row.texture_class, row.spr_bucket, row.faced_bet_bucket, row.turn_class = (
-            street,
-            tex,
-            sprb,
-            facedb,
-            turnc,
-        )
+        (
+            row.street,
+            row.texture_class,
+            row.spr_bucket,
+            row.faced_bet_bucket,
+            row.turn_class,
+            row.river_class,
+        ) = (street, tex, sprb, facedb, turnc, riverc)
     ease, interval, reps = sm2(row.ease_factor, row.interval_days, row.repetitions, quality)
     row.ease_factor, row.interval_days, row.repetitions = ease, interval, reps
     row.due_date = date.today() + timedelta(days=interval)

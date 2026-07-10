@@ -731,3 +731,179 @@ def build_vs_turn_bet_spot(
         hero_range=hero_range,
         villain_range=villain_range,
     )
+
+
+# --- River: 3rd barrel + facing a river bet (S7) ---
+# Same HU SRP pairings, one street later again. Both builders assume ONE prior
+# line: preflop raise + call, flop c-bet + call, turn barrel + call. The 4th and
+# 5th board cards are drawn uniformly, so rejection-sampling callers (SRS
+# rebuild) see every turn_card_class x river_card_class combination.
+
+
+def build_river_barrel_spot(
+    rng: random.Random,
+    *,
+    pairing: tuple[Position, Position] | None = None,
+    eff_bb: float = 100.0,
+) -> Spot:
+    """Hero = IP opener who c-bet the flop AND barreled the turn, called both
+    times; BB checks the river and hero decides whether to fire the 3rd barrel
+    (check / bet small / big)."""
+    from app.domain.equity import combos_for_range
+
+    opener, caller = pairing or rng.choice(_CBET_PAIRINGS)
+    rfi = _find_entry(NodeContext.RFI, opener, None)
+    bd = _find_entry(NodeContext.BLIND_DEFENSE, caller, opener)
+    hero_range = _combos_for(rfi, ActionType.RAISE) or "22+, A2s+, KTs+, QJs, AJo+"
+    villain_range = _combos_for(bd, ActionType.CALL) or "22-99, ATs+, KJs+, QJs, AJo+, KQo"
+
+    h1, h2 = rng.choice(combos_for_range(hero_range))
+    dead = {h1, h2}
+    board = rng.sample([c for c in _DECK if c not in dead], 5)  # flop + turn + river
+
+    osize = _OPEN_SIZE.get(opener, 2.5)
+    # Pot grows through three streets of bets:
+    #   flop pot  = opener + BB call + SB dead 0.5      = 2*osize + 0.5
+    #   turn pot  = flop pot + c-bet + call             = flop_pot + 2*cbet
+    #   river pot = turn pot + turn barrel + call       = turn_pot + 2*tbet
+    flop_pot = round(2 * osize + 0.5, 2)
+    cbet = round(rng.choice([0.33, 0.75]) * flop_pot, 1)  # flop c-bet, called
+    turn_pot = round(flop_pot + 2 * cbet, 2)
+    tbet = round(rng.choice([0.33, 0.75]) * turn_pot, 1)  # turn barrel, called
+    pot = round(turn_pot + 2 * tbet, 2)
+    remaining = round(eff_bb - osize - cbet - tbet, 2)  # both invested osize+cbet+tbet
+    spr = round(remaining / pot, 1)
+    small = round(0.33 * pot, 1)
+    big = round(0.75 * pot, 1)
+
+    players, history = _hu_srp_seats(
+        hero=opener,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=remaining,
+        caller_stack=remaining,
+        eff_bb=eff_bb,
+    )
+    history += [
+        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
+        HistoryAction(street=Street.FLOP, position=caller, action=ActionType.CALL, amount_bb=cbet),
+        HistoryAction(street=Street.TURN, position=caller, action=ActionType.CHECK, amount_bb=0.0),
+        HistoryAction(street=Street.TURN, position=opener, action=ActionType.BET, amount_bb=tbet),
+        HistoryAction(street=Street.TURN, position=caller, action=ActionType.CALL, amount_bb=tbet),
+        HistoryAction(
+            street=Street.RIVER, position=caller, action=ActionType.CHECK, amount_bb=0.0
+        ),
+    ]
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
+        street=Street.RIVER,
+        board=board,
+        pot_bb=pot,
+        hero=Hero(position=opener, hole_cards=(h1, h2), stack_bb=remaining),
+        players=players,
+        effective_stack_bb=remaining,
+        spr=spr,
+        action_history=history,
+        to_act=opener,
+        legal_actions=[
+            LegalAction(action=ActionType.CHECK),
+            LegalAction(action=ActionType.BET, min_bb=small, max_bb=remaining),
+            LegalAction(action=ActionType.BET, min_bb=big, max_bb=remaining),
+        ],
+        node_context=[NodeContext.RIVER_BARREL],
+        facing=caller,
+        hero_range=hero_range,
+        villain_range=villain_range,
+    )
+
+
+def build_vs_river_bet_spot(
+    rng: random.Random,
+    *,
+    pairing: tuple[Position, Position] | None = None,
+    eff_bb: float = 100.0,
+    bet_frac: float | None = None,
+) -> Spot:
+    """Hero = BB defender who called the flop c-bet AND the turn barrel, and now
+    faces the opener's river bet (fold / call / raise). `bet_frac` sizes the
+    RIVER bet as a fraction of the pre-bet river pot (0.33 -> 'small' faced-bet
+    bucket, 0.75 -> 'big'). CALL.min_bb is incremental — hero has nothing
+    invested on the river yet, so it equals the river bet. The river actions are
+    street=RIVER HistoryAction entries so faced_bet_bucket's street filter sees
+    only the current street."""
+    from app.domain.equity import combos_for_range
+
+    opener, caller = pairing or rng.choice(_CBET_PAIRINGS)
+    rfi = _find_entry(NodeContext.RFI, opener, None)
+    bd = _find_entry(NodeContext.BLIND_DEFENSE, caller, opener)
+    villain_range = _combos_for(rfi, ActionType.RAISE) or "22+, A2s+, KTs+, QJs, AJo+"
+    hero_range = _combos_for(bd, ActionType.CALL) or "22-99, ATs+, KJs+, QJs, AJo+, KQo"
+
+    h1, h2 = rng.choice(combos_for_range(hero_range))
+    dead = {h1, h2}
+    board = rng.sample([c for c in _DECK if c not in dead], 5)  # flop + turn + river
+
+    osize = _OPEN_SIZE.get(opener, 2.5)
+    # Pot grows through three streets of bets (hero called each one):
+    #   flop pot        = opener + BB call + SB dead 0.5 = 2*osize + 0.5
+    #   turn pot        = flop pot + c-bet + call        = flop_pot + 2*cbet
+    #   pre-bet river   = turn pot + barrel + call       = turn_pot + 2*tbet
+    #   pot hero faces  = pre-bet river + river bet      = river_pot + rbet
+    flop_pot = round(2 * osize + 0.5, 2)
+    cbet = round(rng.choice([0.33, 0.75]) * flop_pot, 1)  # flop c-bet, hero called
+    turn_pot = round(flop_pot + 2 * cbet, 2)
+    tbet = round(rng.choice([0.33, 0.75]) * turn_pot, 1)  # turn barrel, hero called
+    river_pot = round(turn_pot + 2 * tbet, 2)  # pre-bet river pot
+    frac = bet_frac if bet_frac is not None else rng.choice([0.33, 0.75])
+    rbet = round(frac * river_pot, 1)
+    pot = round(river_pot + rbet, 2)  # pot hero faces INCLUDES the river bet
+    hero_remaining = round(eff_bb - osize - cbet - tbet, 2)
+    villain_remaining = round(eff_bb - osize - cbet - tbet - rbet, 2)
+    effective = min(hero_remaining, villain_remaining)
+    spr = round(effective / pot, 1)
+    raise_size = round(3 * rbet, 1)
+
+    players, history = _hu_srp_seats(
+        hero=caller,
+        opener=opener,
+        caller=caller,
+        osize=osize,
+        opener_stack=villain_remaining,
+        caller_stack=hero_remaining,
+        eff_bb=eff_bb,
+    )
+    history += [
+        HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
+        HistoryAction(street=Street.FLOP, position=caller, action=ActionType.CALL, amount_bb=cbet),
+        HistoryAction(street=Street.TURN, position=caller, action=ActionType.CHECK, amount_bb=0.0),
+        HistoryAction(street=Street.TURN, position=opener, action=ActionType.BET, amount_bb=tbet),
+        HistoryAction(street=Street.TURN, position=caller, action=ActionType.CALL, amount_bb=tbet),
+        HistoryAction(
+            street=Street.RIVER, position=caller, action=ActionType.CHECK, amount_bb=0.0
+        ),
+        HistoryAction(street=Street.RIVER, position=opener, action=ActionType.BET, amount_bb=rbet),
+    ]
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
+        street=Street.RIVER,
+        board=board,
+        pot_bb=pot,
+        hero=Hero(position=caller, hole_cards=(h1, h2), stack_bb=hero_remaining),
+        players=players,
+        effective_stack_bb=effective,
+        spr=spr,
+        action_history=history,
+        to_act=caller,
+        legal_actions=[
+            LegalAction(action=ActionType.FOLD),
+            LegalAction(action=ActionType.CALL, min_bb=rbet),
+            LegalAction(action=ActionType.RAISE, min_bb=raise_size, max_bb=hero_remaining),
+        ],
+        node_context=[NodeContext.VS_RIVER_BET],
+        facing=opener,
+        hero_range=hero_range,
+        villain_range=villain_range,
+    )

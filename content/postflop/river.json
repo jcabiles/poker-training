@@ -1,0 +1,50 @@
+{
+  "id": "postflop-river",
+  "version": 1,
+  "domain": "postflop",
+  "description": "Authored rationale for the HU single-raised-pot river nodes (S7): the third-barrel/value-bet decision (hero = flop+turn aggressor) and facing a river bet (hero = flop+turn caller). Keyed by hero/counterpart pairing; scoring itself lives in backend/app/domain/postflop.py (grade_river_barrel / grade_vs_river_bet). Source: docs/research/02-postflop-strategy.md §5.",
+  "entries": [
+    {
+      "node_context": "river_barrel",
+      "position": "BTN",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "The river is where value-bet discipline gets paid: BB has now called two bets, so BTN's third barrel needs a clear answer to 'what worse hand calls?' Strong hands bet and size up — river bets are polar, and a caller who came this far will pay off a big bet with their bluff-catchers. Marginal made hands should check back and take the free showdown: after two calls they mostly get called by better and fold out worse. Busted draws are the natural bluffs, but only on rivers that keep the story credible — a scare card that beats BB's calling range — never as an automatic third bullet on a brick."
+    },
+    {
+      "node_context": "river_barrel",
+      "position": "CO",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "CO's river decision after barreling twice is mostly a value question: with a tighter starting range the hands that reach the river betting are value-weighted, so the discipline is thin-value judgment — bet big and polar with hands that beat BB's bluff-catchers, and check back the marginal pairs whose showdown value evaporates the moment a third bet goes in. When the river completes the flush or straight BB called two streets to draw at, the give-up is clear without key blockers; when it pairs the board or brings an overcard, the story CO has told since the flop stays credible and the barrel keeps its fold equity."
+    },
+    {
+      "node_context": "river_barrel",
+      "position": "UTG",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "A third barrel from UTG is the most value-heavy line in the tree, and it should look that way: bet the river for value with strong hands and choose the size worse hands can still call, but resist the thin value bet — BB's range after calling twice is condensed around exactly the pairs and better that beat a marginal UTG holding. Bluffing the river from UTG needs both a busted-draw candidate and a scare river that hits UTG's narrow broadway range harder than BB's; on bricks and draw-completing rivers, checking and conceding the pot with the misses is the profitable discipline, not a weakness."
+    },
+    {
+      "node_context": "vs_river_bet",
+      "position": "BB",
+      "facing": "BTN",
+      "actions": [],
+      "rationale": "Facing BTN's third barrel, start from the pot odds: the bet size tells you exactly how often the call must win, and that number — not the feeling of being bluffed — is the decision. Weigh it against bluff-frequency discipline: BTN's wide range produces the most missed draws of any seat, so on brick rivers where the draws all bust, disciplined bluff-catching with marginal pairs keeps its value. On scare rivers that complete the draws or pair the board, the barrel's story is credible and folding a bluff-catcher at a bad price is correct. A busted draw of your own has zero showdown value — it is never a call, only a fold (or a rare raise-bluff you should not make by default)."
+    },
+    {
+      "node_context": "vs_river_bet",
+      "position": "BB",
+      "facing": "CO",
+      "actions": [],
+      "rationale": "A CO river bet after two barrels is value-tilted: the pot odds still set the bar, but CO simply arrives at the river with fewer busted draws than BTN, so the same bluff-catcher that calls a BTN barrel can be a fold here. Work out the price first — a small bet needs your hand to win rarely, a pot-sized bet needs it to win a third of the time — then ask whether CO's line has enough natural bluffs to clear that bar. Strong hands call or raise for value; marginal pairs call selectively on bricks and fold on the scare rivers that complete CO's range; hands with no showdown value fold and save the bet."
+    },
+    {
+      "node_context": "vs_river_bet",
+      "position": "BB",
+      "facing": "UTG",
+      "actions": [],
+      "rationale": "Three bets from UTG at live low stakes is almost always a value hand — bluff-frequency discipline says the population under-bluffs this line badly, so your pot odds need to be exceptional before a pure bluff-catcher continues. Do the arithmetic anyway: price times pot decides the bar, and if UTG's line realistically contains almost no busted draws, a marginal pair does not clear it at any normal size. Reserve calls for strong hands and the top of your bluff-catching range on blank rivers; fold the rest without regret — losing the minimum against an under-bluffed range is where the caller's edge lives."
+    }
+  ]
+}

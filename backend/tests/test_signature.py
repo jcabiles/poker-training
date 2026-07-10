@@ -264,3 +264,43 @@ def test_flop_signature_unchanged_by_turn_dimension():
     # Companion to the pinned-hash test: the S6 turn dimension is OMITTED (not
     # constant-valued) for flop spots, so the flop hash stays byte-identical.
     assert spot_signature(_flop_spot(["As", "Kd", "2c"])) == "6832a54693ba5f6c"
+
+
+# --- S7: river-card class dimension (CONDITIONALLY appended for river only) ---
+
+
+def _river_spot(river_card):
+    from app.domain.spot import Street
+
+    flop = _flop_spot(["As", "Kd", "2c"])
+    return flop.model_copy(
+        update={"street": Street.RIVER, "board": ["As", "Kd", "2c", "7h", river_card]}
+    )
+
+
+def test_river_card_class_changes_river_signature():
+    # Same flop, same (blank) turn, same everything — only the river card's
+    # CLASS differs: Ad pairs the board ("pairing"); 9s is a "blank" on
+    # As Kd 2c 7h (no pair, no flush, no straight, not an overcard).
+    pairing = spot_signature(_river_spot("Ad"))
+    blank = spot_signature(_river_spot("9s"))
+    assert pairing != blank
+
+
+def test_same_river_card_class_same_signature():
+    # Two different blanks collapse to one SRS item.
+    assert spot_signature(_river_spot("9s")) == spot_signature(_river_spot("8d"))
+
+
+def test_turn_signature_unchanged_by_river_dimension():
+    # The S7 river dimension is OMITTED (not constant-valued) for turn spots,
+    # so the turn hash stays byte-identical. This literal was computed from the
+    # pre-S7 code (turn parts list: 10 elements ending in turn_card_class) —
+    # do NOT update it without an explicit migration decision.
+    assert spot_signature(_turn_spot("7h")) == "9c1aae003ae79de0"
+
+
+def test_flop_signature_unchanged_by_river_dimension():
+    # Companion to the pinned-hash test: flop spots reach NEITHER conditional
+    # append, so the flop hash stays byte-identical through S7 too.
+    assert spot_signature(_flop_spot(["As", "Kd", "2c"])) == "6832a54693ba5f6c"

@@ -94,6 +94,10 @@ def leak_category_for(
         return int(LeakCategory.TURN_BARREL)
     if ctx == NodeContext.VS_TURN_BET:
         return int(LeakCategory.VS_TURN_BET)
+    if ctx == NodeContext.RIVER_BARREL:
+        return int(LeakCategory.RIVER_BARREL)
+    if ctx == NodeContext.VS_RIVER_BET:
+        return int(LeakCategory.VS_RIVER_BET)
     return int(LeakCategory.VS_RFI)
 
 

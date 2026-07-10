@@ -118,6 +118,38 @@ class PersonaSizing(BaseModel):
     fourbet_mult: float
 
 
+class PersonaPostflop(BaseModel):
+    """Postflop lever block (S4) — every persona-differentiating number lives
+    here; the shared mechanics live in app/domain/personas_postflop.py."""
+
+    aggression: float = Field(gt=0.0)  # scales bet/raise merit (1.0 = neutral)
+    stickiness: float = Field(gt=0.0)  # scales call merit / resistance to folding
+    bluff_freq: float = Field(ge=0.0, le=1.0)  # baseline bet/raise rate with air
+    sizing: dict[str, float]  # pot-fraction str -> weight; weights sum to ~1
+    spr_commit: float = Field(gt=0.0)  # SPR at/below which strong+ hands commit
+    multiway_bluff_damp: float = Field(ge=0.0, le=1.0)  # per extra opponent
+
+    @field_validator("sizing")
+    @classmethod
+    def _sizing_valid(cls, v: dict[str, float]) -> dict[str, float]:
+        if not v:
+            raise ValueError("sizing must be non-empty")
+        total = 0.0
+        for key, weight in v.items():
+            try:
+                frac = float(key)
+            except ValueError:
+                raise ValueError(f"sizing key {key!r} is not a float pot fraction") from None
+            if frac <= 0.0:
+                raise ValueError(f"sizing fraction {key!r} must be > 0")
+            if weight <= 0.0:
+                raise ValueError(f"sizing weight for {key!r} must be > 0")
+            total += weight
+        if abs(total - 1.0) > 1e-3:
+            raise ValueError(f"sizing weights sum to {total}, expected ~1.0")
+        return v
+
+
 class PersonaPack(BaseModel):
     id: str  # "persona_passive_fish" etc.
     version: str
@@ -126,6 +158,7 @@ class PersonaPack(BaseModel):
     display_name: str
     sizing: PersonaSizing
     preflop: list[PersonaNode]
+    postflop: PersonaPostflop | None = None  # required in all 6 shipped packs
 
     @model_validator(mode="after")
     def _node_ordering(self) -> PersonaPack:

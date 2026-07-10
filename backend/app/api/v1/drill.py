@@ -30,9 +30,11 @@ from app.domain.scenarios import (
     _DEPTHS,
     build_cbet_spot,
     build_check_raise_spot,
+    build_river_barrel_spot,
     build_spot,
     build_turn_barrel_spot,
     build_vs_cbet_spot,
+    build_vs_river_bet_spot,
     build_vs_turn_bet_spot,
     sample_cbet_spot,
     sample_check_raise_spot,
@@ -42,7 +44,7 @@ from app.domain.scenarios import (
 )
 from app.domain.spot import NodeContext, Position, Spot, Street
 from app.domain.srs import faced_bet_bucket, spot_signature, spr_bucket
-from app.domain.texture import classify, turn_card_class
+from app.domain.texture import classify, river_card_class, turn_card_class
 from app.schemas.drill import (
     GradeRequest,
     NextDrillResponse,
@@ -94,8 +96,11 @@ _POSTFLOP_CTX = (
     NodeContext.VS_CHECK_RAISE,
     NodeContext.TURN_BARREL,
     NodeContext.VS_TURN_BET,
+    NodeContext.RIVER_BARREL,
+    NodeContext.VS_RIVER_BET,
 )
 _TURN_CTX = (NodeContext.TURN_BARREL.value, NodeContext.VS_TURN_BET.value)
+_RIVER_CTX = (NodeContext.RIVER_BARREL.value, NodeContext.VS_RIVER_BET.value)
 
 
 def _rebuild_postflop(row) -> Spot | None:
@@ -156,6 +161,26 @@ def _rebuild_postflop(row) -> Spot | None:
             return build_vs_turn_bet_spot(
                 _RNG, pairing=(opener, Position.BB), eff_bb=_RNG.choice(_DEPTHS), bet_frac=frac
             )
+    elif row.node_context == NodeContext.RIVER_BARREL.value:
+        # Hero is the opener/aggressor (like TURN_BARREL) who bet flop + turn
+        # and now decides on the 3rd barrel.
+        def build() -> Spot:
+            return build_river_barrel_spot(
+                _RNG, pairing=(pos, Position.BB), eff_bb=_RNG.choice(_DEPTHS)
+            )
+    elif row.node_context == NodeContext.VS_RIVER_BET.value and row.facing:
+        # Hero is the BB flop+turn caller (like VS_TURN_BET) facing the opener's
+        # river bet; bet_frac maps 1:1 to the faced-bet bucket (river pot fraction).
+        try:
+            opener = Position(row.facing)
+        except ValueError:
+            return None
+        frac = 0.33 if row.faced_bet_bucket == "small" else 0.75
+
+        def build() -> Spot:
+            return build_vs_river_bet_spot(
+                _RNG, pairing=(opener, Position.BB), eff_bb=_RNG.choice(_DEPTHS), bet_frac=frac
+            )
     else:
         return None
 
@@ -170,6 +195,28 @@ def _rebuild_postflop(row) -> Spot | None:
                 spr_bucket(s.spr),
                 faced_bet_bucket(s),
                 turn_card_class(s.board),
+            )
+    elif row.node_context in _RIVER_CTX:
+        # River rows carry a 4th AND 5th archetype dimension: turn- and
+        # river-card class (S7). Kept as a SEPARATE branch from _TURN_CTX on
+        # purpose: turn rows have river_class=None, so a shared 5-wide target
+        # could never match a candidate's key and would silently degrade turn
+        # rebuilds to the fallback tiers.
+        target = (
+            row.texture_class,
+            row.spr_bucket,
+            row.faced_bet_bucket,
+            row.turn_class,
+            row.river_class,
+        )
+
+        def _key(s: Spot):
+            return (
+                classify(s.board[:3]).texture_class,  # flop texture — rows store flop-3
+                spr_bucket(s.spr),
+                faced_bet_bucket(s),
+                turn_card_class(s.board),
+                river_card_class(s.board),
             )
     else:
         target = (row.texture_class, row.spr_bucket, row.faced_bet_bucket)

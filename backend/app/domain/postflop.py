@@ -27,7 +27,7 @@ from app.domain.evaluation import (
 )
 from app.domain.leaks import LeakCategory
 from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Spot, Street
-from app.domain.texture import Texture, classify, turn_card_class
+from app.domain.texture import Texture, classify, river_card_class, turn_card_class
 
 # --- N3: authored postflop rationale (content path) ---
 # backend/app/domain/postflop.py -> parents[3] == repo root
@@ -101,21 +101,54 @@ def _in_position(hero: Position, villain: Position) -> bool:
 
 
 _TURN_CTX = (NodeContext.TURN_BARREL, NodeContext.VS_TURN_BET)
+_RIVER_CTX = (NodeContext.RIVER_BARREL, NodeContext.VS_RIVER_BET)
 
 
 def range_advantage(
-    node_context: NodeContext, hero_pos: Position, villain_pos: Position, texture: Texture
+    node_context: NodeContext,
+    hero_pos: Position,
+    villain_pos: Position,
+    texture: Texture,
+    river_class: str | None = None,
 ) -> str:
     """Who holds the range advantage: 'hero' | 'villain' | 'neutral'.
 
-    Dispatches on `node_context` (S6): flop contexts keep the original
+    Dispatches on `node_context` (S6/S7): flop contexts keep the original
     positional + texture rule bit-for-bit; turn contexts use a turn-aware
     variant — the flop bet got CALLED, so the aggressor's baseline edge has
     decayed and low/wet boards tilt further toward the caller (research §5.1:
     "the board texture has become too good for their range" is a give-up
-    trigger). Same (positions, texture) can therefore label differently on the
-    turn than on the flop. `texture` is the FLOP texture in both branches.
+    trigger). River contexts (S7) decay the aggressor's baseline further —
+    TWO bets got called — and the river-card class (`river_class`, passed only
+    by the river graders) shifts the read: scare rivers re-credit the
+    barreler's story, draw-completing rivers favor the two-time caller. Same
+    (positions, texture) can therefore label differently street to street.
+    `texture` is the FLOP texture in all branches.
     """
+    if node_context in _RIVER_CTX:
+        score = 0.0  # two called bets: the aggressor's edge has decayed past the turn's 0.5
+        if texture.high_board:
+            score += 0.5 if texture.high_card == "A" else 1.0
+        else:
+            score -= 1.5
+        if texture.wetness == "dry":
+            score += 1.0
+        elif texture.wetness == "wet":
+            score -= 1.5
+        if texture.connectedness == "connected":
+            score -= 1.0
+        if river_class in ("over", "pairing"):
+            score += 0.5  # scare rivers weaken the caller's pair-heavy range
+        elif river_class in ("flush", "straight"):
+            score -= 1.0  # draw-completing rivers land in the caller's range
+        if not _in_position(hero_pos, villain_pos):
+            score -= 1.0
+        if score >= 2.0:
+            return "hero"
+        if score <= -1.0:
+            return "villain"
+        return "neutral"
+
     if node_context in _TURN_CTX:
         score = 0.5  # aggressor's preflop edge decays once the flop bet is called
         if texture.high_board:
@@ -1129,6 +1162,326 @@ def grade_vs_turn_bet(
     else:
         why = (
             f"{cat} on a {tclass} turn ({adv} edge): best is {best.action.value}; "
+            f"you chose {decision.action.value} (-{ev_loss}bb)."
+        )
+
+    result = EvaluationResult(
+        **base_kwargs,
+        chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
+        ev_loss_bb=ev_loss,
+        correctness=correctness,
+        rationale_tags=tags,
+        explanation=why,
+    )
+    if rationale:
+        result.authored_rationale = rationale
+    return result
+
+
+# --- S7: river graders (value-bet/bluff + facing a river bet), HU SRP ---
+#
+# Clone of the S6 turn anatomy: same band constants, merit -> freq(3dp) ->
+# EV(2dp) -> correctness ladder. Merits stay flat constants + pot odds
+# (_faced_call_and_pot); NO equity_vs_range (Gate-1). The one river-specific
+# rule is BUSTED-DRAW DEMOTION: with no cards to come, `_hand_category`'s
+# "draw" tier (flush_draw/oesd flags still fire on 5-card boards) has ZERO
+# outs — both graders demote it to "air" (bluff-candidate) for merits AND
+# tags. `_hand_category` itself is untouched (flop/turn callers unaffected).
+
+# Per-river-class barrel merit shift: scare rivers keep the three-street story
+# credible; draw-completing rivers land in the two-time caller's range.
+_RIVER_BARREL_SCARE = {
+    "over": 0.4,  # overcard still weakens the caller's pair range, less so than the turn
+    "pairing": 0.4,  # pairing card keeps favoring the barreler's story
+    "straight": -0.4,  # the caller's flop+turn calls hold the straights
+    "flush": -0.6,  # completed flush: the caller's suited calls got there
+    "blank": -0.3,  # bricks: value still bets, bluffs have run out of story
+}
+_RIVER_FOLD_BASE = 1.0  # a THIRD barrel: above the turn's 0.8, below vs_check_raise's 1.6
+_RIVER_SCARE_FOLD_BONUS = 0.4
+_RIVER_SCARE_CLASSES = ("over", "flush", "straight")
+
+
+def _river_cat_effective(cat: str) -> str:
+    """Busted-draw demotion (S7): on the river a 'draw' has zero outs — it is a
+    bluff-candidate, never the 1.2 value tier. Used for BOTH merits and tags."""
+    return "air" if cat == "draw" else cat
+
+
+def _merits_river_barrel(
+    adv: str, texture: Texture, cat: str, river_class: str, in_position: bool
+) -> tuple[float, float, float]:
+    """Return (check, bet_small, bet_big) merit scores (proxy EV, ~bb) for hero —
+    the flop+turn aggressor deciding whether to fire the river.
+
+    Value-bet discipline: the river is the last bet — strong hands size up and
+    polarize; marginal made hands realize their showdown value for free by
+    checking (a third bet folds out worse, gets called by better); busted draws
+    arrive here already demoted to "air" and only barrel where a scare river
+    keeps the story credible. `cat` is the DEMOTED category.
+    """
+    value = _CAT_VALUE[cat]
+    adv_bonus = {"hero": 1.0, "neutral": 0.0, "villain": -1.0}[adv]
+    scare = _RIVER_BARREL_SCARE[river_class]
+
+    check = 1.2  # checking the river is final — showdown value realizes for free
+    if cat == "air":
+        check += 1.2  # most bluffs have given up by the river
+    elif cat == "weak_made":
+        check += 1.0  # thin value after two calls mostly gets called by better
+    if adv != "hero":
+        check += 0.6
+    if river_class in ("flush", "straight"):
+        check += 0.5  # the board completed the caller's draws
+    if not in_position:
+        check += 0.3
+
+    bet = value + adv_bonus + scare
+    small = bet
+    big = bet
+    if texture.wetness == "dry":
+        small += 0.3  # static boards keep the small-sizing lean
+    if cat == "strong":
+        big += 0.5  # river bets are polar: strong value sizes up
+    else:
+        big -= 1.0  # never pile the big river bet in thin or with air
+    return check, small, big
+
+
+def _merits_vs_river_bet(
+    value: float, price: float, cat: str, river_class: str
+) -> tuple[float, float, float]:
+    """Return (fold, call, raise) merit scores (proxy EV, ~bb) for hero — the
+    flop+turn caller now facing a river bet.
+
+    Pot-odds + bluff-frequency discipline: the price sets the bluff-catch bar,
+    a third barrel is the strongest bet-signal short of a check-raise (fold
+    baseline 1.0 > turn's 0.8), and scare rivers make the story credible so
+    folding gains merit on them. `cat` is the DEMOTED category (busted draws
+    are "air" — with zero outs they are the clearest folds of all).
+    """
+    fold = _RIVER_FOLD_BASE
+    if cat == "air":
+        fold += 1.2
+    elif cat == "weak_made":
+        fold += 0.4
+    fold += price * 1.5  # worse price (bigger river bet) -> folding better
+    if river_class in _RIVER_SCARE_CLASSES:
+        fold += _RIVER_SCARE_FOLD_BONUS
+    fold -= value * 0.6  # strong made hands rarely fold
+
+    call = value
+    call += (0.5 - price) * 2.0  # pot-odds discipline: cheap -> call, dear -> fold
+    if cat == "air":
+        call -= 1.4  # no equity, no future streets: bluff-catching air is the worst call
+    elif cat == "weak_made" and river_class == "blank":
+        call += 0.4  # a brick river changes nothing — keep the disciplined bluff-catches
+
+    if cat == "strong":
+        raise_ = value + 0.4  # value raise; worse hands bet-called the river
+    elif cat == "weak_made":
+        raise_ = -1.0  # never raise a marginal bluff-catcher
+    else:  # air (incl. demoted busted draws)
+        raise_ = -1.4
+    return fold, call, raise_
+
+
+def grade_river_barrel(
+    spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
+) -> EvaluationResult:
+    if spot.street != Street.RIVER:
+        raise ValueError("grade_river_barrel is river-only")
+    board = spot.board
+    tex = classify(board[:3])  # flop texture — deliberate flop slice
+    tclass = turn_card_class(board)
+    rclass = river_card_class(board)
+    ctx = spot.node_context[0] if spot.node_context else NodeContext.RIVER_BARREL
+    # Villain-position convention (the S6 check-raiser lesson): pass
+    # `spot.facing or _villain_pos(spot)` — the flop-caller-turned-defender's
+    # seat, NEVER hero's own, or the in-position read corrupts.
+    villain = spot.facing or _villain_pos(spot)
+    adv = range_advantage(ctx, spot.hero.position, villain, tex, river_class=rclass)
+    cat = _hand_category(spot.hero.hole_cards, board)
+    cat_effective = _river_cat_effective(cat)  # busted draws demote to air
+    small, big = _bet_sizes(spot)
+    rationale = _postflop_rationale(NodeContext.RIVER_BARREL, spot.hero.position, villain)
+
+    m_check, m_small, m_big = _merits_river_barrel(
+        adv, tex, cat_effective, rclass, _in_position(spot.hero.position, villain)
+    )
+    merits = [m_check, m_small, m_big]
+    freqs = _frequencies(merits)
+
+    specs = [
+        (ActionType.CHECK, None, m_check, freqs[0]),
+        (ActionType.BET, small, m_small, freqs[1]),
+        (ActionType.BET, big, m_big, freqs[2]),
+    ]
+    evals = [
+        ActionEval(action=a, size_bb=size, frequency=round(f, 3), ev_bb=round(m, 2))
+        for a, size, m, f in specs
+    ]
+    best = max(evals, key=lambda e: e.ev_bb)
+    is_mixed = sum(1 for f in freqs if f > POST_MIX) >= 2
+    leak = int(LeakCategory.RIVER_BARREL)
+
+    base_kwargs = {
+        "per_action": evals,
+        "best_action": best,
+        "provider": ProviderKind.HEURISTIC,
+        "coverage": Coverage.FULL,
+        "leak_category": leak,
+        "is_mixed": is_mixed,
+    }
+    tags = ["river_barrel", adv, cat_effective, tex.wetness, tclass, rclass]
+
+    def _size_label(size: float | None) -> str:
+        if size is None:
+            return "check"
+        if big and small and big != small:
+            return "big bet" if size >= big else "small bet"
+        return "bet"
+
+    if decision is None:
+        result = EvaluationResult(
+            **base_kwargs,
+            rationale_tags=tags,
+            explanation=(
+                f"{rclass} river on a {tex.wetness} flop ({adv} range advantage); "
+                f"hero has {cat_effective}: {_size_label(best.size_bb)} is the play."
+            ),
+        )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
+
+    chosen = _match(evals, decision, small, big)
+    ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    if chosen.action == best.action and chosen.size_bb == best.size_bb:
+        correctness = Correctness.OPTIMAL
+    elif chosen.frequency > POST_MIX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_ACCEPTABLE_MAX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_MISTAKE_MAX:
+        correctness = Correctness.MISTAKE
+    else:
+        correctness = Correctness.BLUNDER
+
+    if correctness == Correctness.OPTIMAL:
+        why = (
+            f"{cat_effective} on a {rclass} river ({adv} range advantage): "
+            f"{_size_label(best.size_bb)} is the play."
+        )
+    else:
+        why = (
+            f"{cat_effective} on a {rclass} river ({adv} range advantage): best is "
+            f"{_size_label(best.size_bb)}; you chose {_size_label(chosen.size_bb)} "
+            f"(-{ev_loss}bb)."
+        )
+
+    result = EvaluationResult(
+        **base_kwargs,
+        chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
+        ev_loss_bb=ev_loss,
+        correctness=correctness,
+        rationale_tags=tags,
+        explanation=why,
+    )
+    if rationale:
+        result.authored_rationale = rationale
+    return result
+
+
+def grade_vs_river_bet(
+    spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
+) -> EvaluationResult:
+    if spot.street != Street.RIVER:
+        raise ValueError("grade_vs_river_bet is river-only")
+    board = spot.board
+    tex = classify(board[:3])  # flop texture — deliberate flop slice
+    tclass = turn_card_class(board)
+    rclass = river_card_class(board)
+    # Villain-position convention (the S6 check-raiser lesson): pass
+    # `spot.facing or _villain_pos(spot)` — the river BETTOR's seat, NEVER
+    # hero's own, or the defender's positional read corrupts.
+    aggressor = spot.facing or _villain_pos(spot)
+    # Defender-frame advantage label (grade_vs_turn_bet precedent — hero is the
+    # caller); range_advantage_defender is street-agnostic, reused VERBATIM.
+    adv = range_advantage_defender(aggressor, spot.hero.position, tex)
+    cat = _hand_category(spot.hero.hole_cards, board)
+    cat_effective = _river_cat_effective(cat)  # busted draws demote to air
+    value = _HAND_VALUE[cat_effective]
+    faced, pot = _faced_call_and_pot(spot)
+    price = faced / pot if pot > 0 else 0.5
+    rationale = _postflop_rationale(NodeContext.VS_RIVER_BET, spot.hero.position, aggressor)
+
+    raise_size = next(
+        (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
+        None,
+    )
+    m_fold, m_call, m_raise = _merits_vs_river_bet(value, price, cat_effective, rclass)
+    specs = [
+        (ActionType.FOLD, None, m_fold),
+        (ActionType.CALL, faced or None, m_call),
+        (ActionType.RAISE, raise_size, m_raise),
+    ]
+    freqs = _frequencies([m for _, _, m in specs])
+    evals = [
+        ActionEval(action=a, size_bb=size, frequency=round(f, 3), ev_bb=round(m, 2))
+        for (a, size, m), f in zip(specs, freqs, strict=True)
+    ]
+    best = max(evals, key=lambda e: e.ev_bb)
+    is_mixed = sum(1 for f in freqs if f > POST_MIX) >= 2
+    leak = int(LeakCategory.VS_RIVER_BET)
+
+    base_kwargs = {
+        "per_action": evals,
+        "best_action": best,
+        "provider": ProviderKind.HEURISTIC,
+        "coverage": Coverage.FULL,
+        "leak_category": leak,
+        "is_mixed": is_mixed,
+    }
+    tags = ["vs_river_bet", adv, cat_effective, tex.wetness, tclass, rclass]
+
+    if decision is None:
+        result = EvaluationResult(
+            **base_kwargs,
+            rationale_tags=tags,
+            explanation=(
+                f"{cat_effective} facing a river bet on a {rclass} river "
+                f"({adv} range advantage): {best.action.value} is the play."
+            ),
+        )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
+
+    chosen = next((e for e in evals if e.action == decision.action), None)
+    if chosen is None:
+        chosen = ActionEval(
+            action=decision.action, frequency=0.0, ev_bb=min(e.ev_bb for e in evals) - 1.0
+        )
+    ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    if chosen.action == best.action:
+        correctness = Correctness.OPTIMAL
+    elif chosen.frequency > POST_MIX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_ACCEPTABLE_MAX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_MISTAKE_MAX:
+        correctness = Correctness.MISTAKE
+    else:
+        correctness = Correctness.BLUNDER
+
+    if correctness == Correctness.OPTIMAL:
+        why = f"{cat_effective} on a {rclass} river ({adv} edge): {best.action.value} is the play."
+    else:
+        why = (
+            f"{cat_effective} on a {rclass} river ({adv} edge): best is {best.action.value}; "
             f"you chose {decision.action.value} (-{ev_loss}bb)."
         )
 

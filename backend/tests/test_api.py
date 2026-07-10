@@ -269,7 +269,8 @@ def test_not_found_grade_persists_nothing(client, temp_engine):
 
     from app.domain.spot import Street
 
-    # A river spot: no provider covers the river (S7), so this grades NOT_FOUND.
+    # A river spot with a flop (CBET) node context: the S7 river provider only
+    # accepts the river node contexts, so this still grades NOT_FOUND.
     spot = make_cbet_spot().model_copy(
         update={"street": Street.RIVER, "board": ["Ac", "Kd", "Qh", "7s", "2h"]}
     )
@@ -320,6 +321,47 @@ def test_turn_due_row_rebuilds_matching_archetype(client, temp_engine):
     assert body["srs_signature"] == sig
     assert classify(rebuilt.board[:3]).texture_class == tex  # flop texture matches
     assert turn_card_class(rebuilt.board) == tclass  # turn-card class matches
+
+
+def test_river_due_row_rebuilds_matching_archetype(client, temp_engine):
+    """A due RIVER row rebuilds a spot whose node_context, street, flop texture,
+    turn-card class AND river-card class all match the row — non-tautological:
+    we assert the rebuilt spot's own properties, not just the srs_signature
+    override."""
+    import random
+    from datetime import date, timedelta
+
+    from app.api.v1 import drill
+    from app.domain.scenarios import build_river_barrel_spot
+    from app.domain.spot import Position
+    from app.domain.texture import classify, river_card_class, turn_card_class
+    from app.services.review import record_attempt
+
+    spot = build_river_barrel_spot(
+        random.Random(7), pairing=(Position.BTN, Position.BB), eff_bb=100.0
+    )
+    with Session(temp_engine) as s:
+        row = record_attempt(s, spot, "optimal", 205)
+        sig, tex, tclass, rclass = row.signature, row.texture_class, row.turn_class, row.river_class
+        assert row.street == "river"
+        assert tclass is not None  # S6 dimension persisted on river rows too
+        assert rclass is not None  # S7 dimension persisted, not write-only
+        row.due_date = date.today() - timedelta(days=1)  # backdate so it's due
+        s.add(row)
+        s.commit()
+
+    # Seed the router's RNG so rejection sampling is deterministic (this seed
+    # yields a tier-a exact archetype match among the 150 candidates).
+    drill._RNG.seed(20260710)
+    body = client.get("/api/v1/drill/next?mode=review").json()["spot"]
+    rebuilt = Spot.model_validate(body)
+    assert rebuilt.street.value == "river"
+    assert len(rebuilt.board) == 5
+    assert "river_barrel" in body["node_context"]
+    assert body["srs_signature"] == sig
+    assert classify(rebuilt.board[:3]).texture_class == tex  # flop texture matches
+    assert turn_card_class(rebuilt.board) == tclass  # turn-card class matches
+    assert river_card_class(rebuilt.board) == rclass  # river-card class matches
 
 
 def test_texture_quiz_round_trips(client, temp_engine):

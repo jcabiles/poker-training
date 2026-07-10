@@ -160,6 +160,45 @@ def test_unmade_oesd_is_still_draw():
     assert _hand_category(("Qc", "Jd"), ["Ah", "Kd", "2c"]) == "draw"
 
 
+# --- S7: 5-card-board _hand_category fixtures (roadmap regression guard) ---
+# `_hand_category`'s arithmetic is length-agnostic but was never exercised at
+# board len 5 before S7 (flop tests are 3-card, turn tests 4-card). These
+# fixtures spot-check the 4-flush/4-straight-completing-river cases the river
+# graders rely on for the busted-draw demotion (contract §4).
+
+
+def test_made_flush_on_5card_board_is_strong():
+    # Board carries 4 hearts (4-flush board); hero's Qh completes the 5th heart
+    # for a made flush on the river.
+    board = ["Ah", "Kh", "2h", "9h", "3c"]
+    assert _hand_category(("Qh", "Jh"), board) == "strong"
+
+
+def test_busted_flush_draw_on_5card_board_is_draw():
+    # Hero has 2 hearts, board has 2 hearts (4 total) and the river bricks with
+    # a non-heart -- the flush never completes. Documents WHY the river graders
+    # must demote this to "air" for merits/tags: raw _hand_category still
+    # returns "draw" (carrying _CAT_VALUE["draw"]=1.2, 2nd-highest value tier)
+    # even though zero outs remain once the river is dealt.
+    board = ["Ah", "Kh", "2c", "9d", "3c"]
+    assert _hand_category(("Qh", "7h"), board) == "draw"
+
+
+def test_made_straight_on_5card_board_is_strong():
+    # 5-6-7-8-9 across hole+board is a completed straight on a 5-card board.
+    board = ["9h", "8d", "7c", "2s", "4d"]
+    assert _hand_category(("6s", "5h"), board) == "strong"
+
+
+def test_busted_oesd_on_5card_board_is_draw():
+    # 4 consecutive ranks (J-Q-K-A) present, T missing, and the river bricks --
+    # the straight never completes. Documents the same overvaluation hazard as
+    # the busted flush draw above: raw _hand_category still returns "draw" with
+    # zero outs remaining.
+    board = ["Ah", "Kd", "2c", "9s", "3h"]
+    assert _hand_category(("Qc", "Jd"), board) == "draw"
+
+
 POST_LOSS_FLOOR = 0.6
 
 
