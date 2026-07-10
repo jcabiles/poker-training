@@ -38,9 +38,18 @@ class CompositeProvider:
     def __init__(self, preflop, postflop):
         self._preflop = preflop
         self._postflop = postflop
+        # Street-keyed dispatch seam. Today TURN/RIVER resolve to the flop
+        # provider (whose supports() gate rejects them -> NOT_FOUND), exactly
+        # as before. S6/S7 swap the TURN/RIVER entries here — _route stays put.
+        self._by_street = {
+            Street.PREFLOP: preflop,
+            Street.FLOP: postflop,
+            Street.TURN: postflop,
+            Street.RIVER: postflop,
+        }
 
     def _route(self, spot: Spot):
-        return self._preflop if spot.street == Street.PREFLOP else self._postflop
+        return self._by_street[spot.street]
 
     async def supports(self, spot: Spot) -> bool:
         return await self._route(spot).supports(spot)

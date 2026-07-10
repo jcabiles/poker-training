@@ -26,7 +26,7 @@ from app.domain.evaluation import (
     ProviderKind,
 )
 from app.domain.leaks import LeakCategory
-from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Spot
+from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Spot, Street
 from app.domain.texture import Texture, classify
 
 # --- N3: authored postflop rationale (content path) ---
@@ -329,6 +329,8 @@ def _bet_sizes(spot: Spot) -> tuple[float | None, float | None]:
 def grade_cbet(
     spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
 ) -> EvaluationResult:
+    if spot.street != Street.FLOP:
+        raise ValueError("grade_cbet is flop-only")
     board = spot.board[:3]
     tex = classify(board)
     ctx = spot.node_context[0] if spot.node_context else NodeContext.CBET
@@ -527,6 +529,8 @@ def _merits_vs_cbet(value: float, adv: str, price: float, texture: Texture, cat:
 def grade_vs_cbet(
     spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
 ) -> EvaluationResult:
+    if spot.street != Street.FLOP:
+        raise ValueError("grade_vs_cbet is flop-only")
     board = spot.board[:3]
     tex = classify(board)
     aggressor = spot.facing or _villain_pos(spot)
@@ -701,6 +705,8 @@ def _merits_vs_check_raise(
 def grade_vs_check_raise(
     spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
 ) -> EvaluationResult:
+    if spot.street != Street.FLOP:
+        raise ValueError("grade_vs_check_raise is flop-only")
     board = spot.board[:3]
     tex = classify(board)
     ctx = spot.node_context[0] if spot.node_context else NodeContext.VS_CHECK_RAISE

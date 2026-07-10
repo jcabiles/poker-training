@@ -187,3 +187,49 @@ def test_srs_signature_excluded_from_hash():
     )
     flop = _flop_spot(["As", "Kd", "2c"])
     assert spot_signature(flop) == spot_signature(flop.model_copy(update={"srs_signature": "x"}))
+
+
+# --- S5: pinned-hash tripwire ---
+#
+# These literals were computed ONCE from the canonical fixtures below and are
+# hardcoded on purpose. spot_signature() hashes are persisted as SRS item ids:
+# any reorder/insert/rename in the signature tuple silently orphans ALL stored
+# SM-2 history while every relative-comparison test above stays green. These
+# pins fail loudly instead. If one fails, you changed the persisted-data
+# contract — do NOT update the literal without an explicit migration decision.
+
+
+def test_pinned_hash_flop_cbet_signature():
+    assert spot_signature(_flop_spot(["As", "Kd", "2c"])) == "6832a54693ba5f6c"
+
+
+def test_pinned_hash_preflop_rfi_signature():
+    assert spot_signature(make_rfi_spot()) == "0cdf437e044b0bc5"
+
+
+# --- S5: turn/river signature fixtures ---
+#
+# Golden coverage that street (tuple index 2) separates streets in the hash.
+# These fixtures are for spot_signature() ONLY — they must never be passed to
+# grade_cbet/grade_vs_cbet/grade_vs_check_raise (flop-only; guarded).
+# spot_signature() internally calling texture.classify() on board[:3] is fine.
+
+
+def test_turn_signature_differs_from_flop():
+    from app.domain.spot import Street
+
+    flop = _flop_spot(["As", "Kd", "2c"])
+    turn = flop.model_copy(update={"street": Street.TURN, "board": ["As", "Kd", "2c", "7h"]})
+    assert spot_signature(turn) != spot_signature(flop)
+
+
+def test_river_signature_differs_from_flop_and_turn():
+    from app.domain.spot import Street
+
+    flop = _flop_spot(["As", "Kd", "2c"])
+    turn = flop.model_copy(update={"street": Street.TURN, "board": ["As", "Kd", "2c", "7h"]})
+    river = flop.model_copy(
+        update={"street": Street.RIVER, "board": ["As", "Kd", "2c", "7h", "9s"]}
+    )
+    assert spot_signature(river) != spot_signature(flop)
+    assert spot_signature(river) != spot_signature(turn)

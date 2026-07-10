@@ -107,7 +107,14 @@ def faced_bet_bucket(spot: Spot) -> str:
 def _postflop_signature(spot: Spot) -> str:
     """Postflop signature — keyed on texture CLASS + SPR bucket + faced-bet
     bucket, not the exact board or hole cards, so same-archetype flops collapse
-    to one SRS item (but small vs big faced bets stay separate)."""
+    to one SRS item (but small vs big faced bets stay separate).
+
+    APPEND RULE (persisted-data contract): the order of `parts` is hashed into
+    every stored SRS item id — reordering, renaming, or inserting fields
+    orphans all existing SM-2 history. New dimensions must be APPENDED after
+    `faced_bet_bucket` (the current last field) and must evaluate to a constant
+    for existing flop spots so their hashes are preserved. The pinned-hash test
+    in tests/test_signature.py is the tripwire for accidental changes."""
     from app.domain.texture import classify
 
     ctx = ",".join(sorted(c.value for c in spot.node_context))
