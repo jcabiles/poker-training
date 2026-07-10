@@ -1,4 +1,4 @@
-# Poker Trainer — local NLHE trainer
+# Poker Coach — local NLHE trainer
 
 A local web app to drill and train live No-Limit Texas Hold'em strategy, tailored
 for the $1/$2 → $2/$3 climb. Simplified-but-sound (not pure GTO), preflop first.
@@ -6,13 +6,13 @@ for the $1/$2 → $2/$3 climb. Simplified-but-sound (not pure GTO), preflop firs
 Plan: `docs/ai-dlc/roadmap.md` · Strategy research: `docs/research/` · Spec/tickets: `docs/ai-dlc/`.
 
 ## Quickstart
-After cloning, run these once — then `poker-trainer` launches the app from anywhere in the repo:
+After cloning, run these once — then `poker-coach` launches the app from anywhere in the repo:
 ```bash
 # 1. one-time setup (Python ≥ 3.12, Node ≥ 20)
 cd backend  && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && cd ..
 cd frontend && npm install && cd ..
 
-# 2. install direnv (the tool that exposes the `poker-trainer` command), once per machine
+# 2. install direnv (the tool that exposes the `poker-coach` command), once per machine
 brew install direnv                             # macOS; see direnv.net for other OSes
 echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc     # or ~/.bashrc for bash — then restart the shell
 
@@ -20,8 +20,8 @@ echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc     # or ~/.bashrc for bash — the
 direnv allow .
 
 # 4. run it
-poker-trainer            # start backend :8008 + frontend :5173 in the background
-poker-trainer stop       #   stop / restart / status also work
+poker-coach            # start backend :8008 + frontend :5173 in the background
+poker-coach stop       #   stop / restart / status also work
 ```
 Open <http://localhost:5173>. No direnv? Use `./scripts/serve.sh start` instead — same launcher. Full details below.
 
@@ -31,7 +31,7 @@ backend/   FastAPI API + pure domain core + SQLite/Alembic
 frontend/  React + Vite
 content/   strategy content packs + JSON schema
 docs/      research, roadmap, specs, tickets
-bin/       poker-trainer  (global launcher, via direnv)
+bin/       poker-coach  (global launcher, via direnv)
 scripts/   serve.sh, verify.sh
 ```
 
@@ -51,11 +51,11 @@ scripts/   serve.sh, verify.sh
 ## Setup & run
 
 Install and run steps live in [Quickstart](#quickstart) above — venv + `pip install -e ".[dev]"`,
-`npm install`, direnv, then `poker-trainer` (or `./scripts/serve.sh start` without direnv).
+`npm install`, direnv, then `poker-coach` (or `./scripts/serve.sh start` without direnv).
 
 API health: `http://localhost:8008/api/v1/health` · interactive docs at `/docs`.
 
-> Override ports with `BACKEND_PORT=8123 FRONTEND_PORT=5200 poker-trainer`. Logs
+> Override ports with `BACKEND_PORT=8123 FRONTEND_PORT=5200 poker-coach`. Logs
 > stream to `.backend.log` / `.frontend.log` at the repo root.
 
 Or run separately (two terminals):
