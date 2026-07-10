@@ -27,7 +27,8 @@ function toSpot(hand: SimulateHandView): Spot {
     effective_stack_bb: 100,
     to_act: hand.hero.position,
     legal_actions: [],
-    node_context: [],
+    // Non-empty so PokerTable's "{ctx} · {stakes}" header has no orphan separator.
+    node_context: ["cash"],
     limper_count: 0,
     action_history: [],
   };
@@ -43,6 +44,7 @@ export default function SimulateView() {
   const [hand, setHand] = useState<SimulateHandView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dealing, setDealing] = useState(false);
+  const dealingRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
 
   // Create a fresh session and adopt its first hand.
@@ -68,7 +70,10 @@ export default function SimulateView() {
   // "Next hand": deal on the current session; if the session was lost (404),
   // transparently create a fresh one so the tab keeps working after a restart.
   const nextHand = useCallback(async () => {
-    if (dealing) return;
+    // Ref guard: state updates are async, so a same-tick click burst would slip
+    // past a state-only check and deal several hands per user intent.
+    if (dealingRef.current) return;
+    dealingRef.current = true;
     setDealing(true);
     setError(null);
     try {
@@ -89,9 +94,10 @@ export default function SimulateView() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      dealingRef.current = false;
       setDealing(false);
     }
-  }, [dealing, startSession]);
+  }, [startSession]);
 
   return (
     <section className="simulate">
