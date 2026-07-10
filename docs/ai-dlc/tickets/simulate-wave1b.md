@@ -8,7 +8,7 @@
 > DAG: **T1 ‖ T2 ‖ T3 ‖ T4 all parallel** (T2/T3 author content to the frozen schema; T1's
 > loader validates them at fan-in). T5 = lead close-out.
 
-- [ ] **T1 — S3 engine + enum widening (heavy-worker).**
+- [x] **T1 — S3 engine + enum widening (heavy-worker).**
   Persona Pydantic models + loader (duplicate-coverage raises), `sample_preflop_action`
   (first-match-wins, rng-injected `choices`, limp→CALL translation), VillainType += TAG/MANIAC
   + `EXPLOIT_ARCHETYPES`, leak categories 304/305 + `_EXPLOIT_LEAK` entries, test decoupling,
@@ -22,15 +22,15 @@
   test_personas.py measured + reported.
   **No-gos:** no postflop logic; no ActionType changes; no exploit content authoring; no FE/DB.
 
-- [ ] **T2 — S3 packs A (implementer).** Author `content/personas/{passive_fish,calling_station,nit}.json`
+- [x] **T2 — S3 packs A (implementer).** Author `content/personas/{passive_fish,calling_station,nit}.json`
   to the frozen schema — doc-grounded, position-aware, genuinely mixed weights.
   **Done-check:** files parse as JSON and (at fan-in) validate via T1's loader with stat
   bands hit. **No-gos:** only these 3 files.
 
-- [ ] **T3 — S3 packs B (implementer).** Same for `content/personas/{tag,lag,maniac}.json`.
+- [x] **T3 — S3 packs B (implementer).** Same for `content/personas/{tag,lag,maniac}.json`.
   **No-gos:** only these 3 files.
 
-- [ ] **T4 — S5 seams + golden tests (heavy-worker).**
+- [x] **T4 — S5 seams + golden tests (heavy-worker).**
   Pinned-hash signature tests (flop + preflop literals), turn/river signature fixtures
   (turn ≠ flop), street guards on the 3 flop graders, street-keyed dispatch map in
   `CompositeProvider`, append-rule docstring. ZERO behavior change — the 3 provider
@@ -42,6 +42,6 @@
   **No-gos:** no signature-tuple changes; no grader logic; no `range_advantage`/
   `_rebuild_postflop` work (S6/S7).
 
-- [ ] **T5 — Lead close-out.** Fan-in: run T1's loader over T2/T3 packs; full Verify-by both
+- [x] **T5 — Lead close-out.** Fan-in: run T1's loader over T2/T3 packs; full Verify-by both
   specs; refuter on the combined diff; PR `feat/simulate-wave1b`; mark S3 + S5 `[x]` in the
   roadmap only after checks actually pass.
