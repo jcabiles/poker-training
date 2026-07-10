@@ -16,4 +16,13 @@ export default defineConfig({
       "/api": `http://localhost:${backendPort}`,
     },
   },
+  // vite preview does not inherit server.proxy — mirror it so a built bundle
+  // can be exercised against the real backend (used for design verification).
+  preview: {
+    port: 5301,
+    strictPort: true,
+    proxy: {
+      "/api": `http://localhost:${backendPort}`,
+    },
+  },
 });

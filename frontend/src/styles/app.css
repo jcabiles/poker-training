@@ -1769,3 +1769,39 @@ kbd {
     animation: reveal var(--dur-2) var(--ease-1);
   }
 }
+
+/* Short-viewport density (1024×768 gate: felt + decision bar visible without
+   scrolling). The club chrome (T2 masthead, T3 marquee, mode chips) added
+   ~58px of vertical rhythm over the pre-epic layout — reclaim it here by
+   tightening the stack's margins only; component internals are untouched. */
+@media (max-height: 820px) {
+  .app {
+    padding-top: var(--space-3);
+  }
+  .topbar {
+    margin-bottom: var(--space-2);
+  }
+  .nav-tabs {
+    margin-bottom: var(--space-3);
+  }
+  .nav-tab {
+    padding-bottom: var(--space-2);
+  }
+  .statstrip {
+    margin-bottom: var(--space-2);
+  }
+  .statstrip .stat {
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+  }
+  .mode-groups {
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .studytest {
+    margin-bottom: var(--space-2);
+  }
+  .decisionbar {
+    margin-top: var(--space-3);
+  }
+}
