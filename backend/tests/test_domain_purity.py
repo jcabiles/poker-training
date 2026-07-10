@@ -12,7 +12,7 @@ def test_domain_has_no_web_or_db_imports():
         "mods = ['app.domain.spot','app.domain.action','app.domain.evaluation',"
         "'app.domain.leaks','app.domain.srs','app.domain.content','app.domain.providers',"
         "'app.domain.scenarios','app.domain.grading','app.domain.hand_rank','app.domain.archetypes',"
-        "'app.domain.challenge','app.domain.table.deck']\n"
+        "'app.domain.challenge','app.domain.table.deck','app.domain.personas']\n"
         "for m in mods:\n"
         "    importlib.import_module(m)\n"
         "web_libs = ('fastapi', 'starlette', 'sqlmodel', 'sqlalchemy')\n"

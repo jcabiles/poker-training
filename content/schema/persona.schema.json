@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "PersonaActionMix": {
+      "properties": {
+        "combos": {
+          "title": "Combos",
+          "type": "string"
+        },
+        "weights": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Weights",
+          "type": "object"
+        }
+      },
+      "required": [
+        "combos",
+        "weights"
+      ],
+      "title": "PersonaActionMix",
+      "type": "object"
+    },
+    "PersonaNode": {
+      "properties": {
+        "facing": {
+          "enum": [
+            "unopened",
+            "vs_limpers",
+            "vs_rfi",
+            "vs_3bet",
+            "vs_4bet"
+          ],
+          "title": "Facing",
+          "type": "string"
+        },
+        "positions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Position"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Positions"
+        },
+        "mixes": {
+          "items": {
+            "$ref": "#/$defs/PersonaActionMix"
+          },
+          "title": "Mixes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "facing",
+        "mixes"
+      ],
+      "title": "PersonaNode",
+      "type": "object"
+    },
+    "PersonaSizing": {
+      "description": "Authored in S3, consumed in S4 (the S3 engine ignores it).",
+      "properties": {
+        "open_bb": {
+          "title": "Open Bb",
+          "type": "number"
+        },
+        "threebet_mult": {
+          "title": "Threebet Mult",
+          "type": "number"
+        },
+        "fourbet_mult": {
+          "title": "Fourbet Mult",
+          "type": "number"
+        }
+      },
+      "required": [
+        "open_bb",
+        "threebet_mult",
+        "fourbet_mult"
+      ],
+      "title": "PersonaSizing",
+      "type": "object"
+    },
+    "Position": {
+      "enum": [
+        "UTG",
+        "UTG1",
+        "UTG2",
+        "LJ",
+        "HJ",
+        "CO",
+        "BTN",
+        "SB",
+        "BB"
+      ],
+      "title": "Position",
+      "type": "string"
+    },
+    "VillainType": {
+      "enum": [
+        "calling_station",
+        "nit",
+        "lag",
+        "passive_fish",
+        "tag",
+        "maniac"
+      ],
+      "title": "VillainType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "domain": {
+      "const": "persona",
+      "title": "Domain",
+      "type": "string"
+    },
+    "persona": {
+      "$ref": "#/$defs/VillainType"
+    },
+    "display_name": {
+      "title": "Display Name",
+      "type": "string"
+    },
+    "sizing": {
+      "$ref": "#/$defs/PersonaSizing"
+    },
+    "preflop": {
+      "items": {
+        "$ref": "#/$defs/PersonaNode"
+      },
+      "title": "Preflop",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "domain",
+    "persona",
+    "display_name",
+    "sizing",
+    "preflop"
+  ],
+  "title": "PersonaPack",
+  "type": "object"
+}

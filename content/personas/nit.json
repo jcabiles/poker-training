@@ -1,0 +1,59 @@
+{
+  "id": "persona_nit",
+  "version": "1.0.0",
+  "domain": "persona",
+  "persona": "nit",
+  "display_name": "Nit",
+  "sizing": { "open_bb": 3.0, "threebet_mult": 3.5, "fourbet_mult": 2.3 },
+  "preflop": [
+    {
+      "facing": "unopened",
+      "positions": ["UTG"],
+      "mixes": [
+        { "combos": "TT+, AQs+, AKo", "weights": { "raise": 1.0 } },
+        { "combos": "22-66", "weights": { "limp": 0.4, "fold": 0.6 } }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": null,
+      "mixes": [
+        { "combos": "88+, AJs+, KQs, AJo+, KQo", "weights": { "raise": 1.0 } },
+        { "combos": "22-77", "weights": { "limp": 0.4, "fold": 0.6 } }
+      ]
+    },
+    {
+      "facing": "vs_limpers",
+      "positions": null,
+      "mixes": [
+        { "combos": "JJ+, AQs+, AKo", "weights": { "raise": 1.0 } },
+        { "combos": "22-77", "weights": { "limp": 0.3, "fold": 0.7 } }
+      ]
+    },
+    {
+      "facing": "vs_rfi",
+      "positions": null,
+      "mixes": [
+        { "combos": "AA, KK", "weights": { "3bet": 1.0 } },
+        { "combos": "QQ, AKs, AKo", "weights": { "3bet": 0.35, "call": 0.65 } },
+        { "combos": "88-JJ", "weights": { "call": 1.0 } },
+        { "combos": "AQs, AQo, KQs, KQo", "weights": { "call": 0.6, "fold": 0.4 } }
+      ]
+    },
+    {
+      "facing": "vs_3bet",
+      "positions": null,
+      "mixes": [
+        { "combos": "AA", "weights": { "4bet": 0.5, "call": 0.5 } },
+        { "combos": "KK", "weights": { "call": 1.0 } }
+      ]
+    },
+    {
+      "facing": "vs_4bet",
+      "positions": null,
+      "mixes": [
+        { "combos": "AA", "weights": { "5bet_shove": 0.6, "call": 0.4 } }
+      ]
+    }
+  ]
+}

@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.domain.archetypes import VillainType
+from app.domain.content.notation import parse_range
 from app.domain.spot import ActionType, NodeContext, Position
 
 # The 8 frontend drill Mode values (frontend/src/api/types.ts::Mode /
@@ -56,6 +57,101 @@ class ContentPack(BaseModel):
     entries: list[Entry] = Field(default_factory=list)
     sizing_rules: dict = Field(default_factory=dict)
     exploit_overlays: dict = Field(default_factory=dict)  # freeform stub in Phase 0/1
+
+
+# Persona packs (Simulate S3) — bot preflop strategy as data. Action-name
+# vocabulary is per node facing; names are CONTENT-level (limp/3bet/...) and
+# translated to wire ActionType by the engine (app/domain/personas.py).
+PersonaFacing = Literal["unopened", "vs_limpers", "vs_rfi", "vs_3bet", "vs_4bet"]
+
+_FACING_ACTIONS: dict[str, frozenset[str]] = {
+    "unopened": frozenset({"fold", "limp", "raise"}),
+    "vs_limpers": frozenset({"fold", "limp", "raise"}),  # limp = over-limp
+    "vs_rfi": frozenset({"fold", "call", "3bet"}),
+    "vs_3bet": frozenset({"fold", "call", "4bet"}),
+    "vs_4bet": frozenset({"fold", "call", "5bet_shove"}),
+}
+
+
+class PersonaActionMix(BaseModel):
+    combos: str  # range-notation string (see notation.parse_range)
+    # action-name -> probability; sum <= 1.0; remainder is an implicit fold.
+    weights: dict[str, float]
+
+    @field_validator("combos")
+    @classmethod
+    def _combos_parse(cls, v: str) -> str:
+        parse_range(v)  # raises ValueError on unsupported notation tokens
+        return v
+
+    @field_validator("weights")
+    @classmethod
+    def _weights_valid(cls, v: dict[str, float]) -> dict[str, float]:
+        for name, w in v.items():
+            if not 0.0 <= w <= 1.0:
+                raise ValueError(f"weight for {name!r} out of [0, 1]: {w}")
+        if sum(v.values()) > 1.0 + 1e-9:
+            raise ValueError(f"weights sum to {sum(v.values())} > 1.0")
+        return v
+
+
+class PersonaNode(BaseModel):
+    facing: PersonaFacing
+    positions: list[Position] | None = None  # None = wildcard (any position)
+    mixes: list[PersonaActionMix]  # FIRST MATCH WINS; unmatched hand-class => fold 1.0
+
+    @model_validator(mode="after")
+    def _action_vocabulary(self) -> PersonaNode:
+        allowed = _FACING_ACTIONS[self.facing]
+        for mix in self.mixes:
+            bad = set(mix.weights) - allowed
+            if bad:
+                raise ValueError(f"actions {sorted(bad)} not allowed facing {self.facing!r}")
+        return self
+
+
+class PersonaSizing(BaseModel):
+    """Authored in S3, consumed in S4 (the S3 engine ignores it)."""
+
+    open_bb: float
+    threebet_mult: float
+    fourbet_mult: float
+
+
+class PersonaPack(BaseModel):
+    id: str  # "persona_passive_fish" etc.
+    version: str
+    domain: Literal["persona"]
+    persona: VillainType  # the acting identity
+    display_name: str
+    sizing: PersonaSizing
+    preflop: list[PersonaNode]
+
+    @model_validator(mode="after")
+    def _node_ordering(self) -> PersonaPack:
+        """Per facing: explicit-position nodes BEFORE the (at most one) wildcard,
+        and explicit-position nodes may not overlap positions (lookup is
+        first-match-in-list-order; see personas.sample_preflop_action)."""
+        seen_positions: dict[str, set[Position]] = {}
+        wildcard_seen: set[str] = set()
+        for node in self.preflop:
+            if node.positions is None:
+                if node.facing in wildcard_seen:
+                    raise ValueError(f"more than one wildcard node facing {node.facing!r}")
+                wildcard_seen.add(node.facing)
+                continue
+            if node.facing in wildcard_seen:
+                raise ValueError(
+                    f"explicit-position node after wildcard facing {node.facing!r}"
+                )
+            prior = seen_positions.setdefault(node.facing, set())
+            overlap = prior & set(node.positions)
+            if overlap:
+                raise ValueError(
+                    f"duplicate position coverage facing {node.facing!r}: {sorted(overlap)}"
+                )
+            prior.update(node.positions)
+        return self
 
 
 class ConceptCard(BaseModel):

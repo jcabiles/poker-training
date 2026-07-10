@@ -1,0 +1,70 @@
+{
+  "id": "persona_passive_fish",
+  "version": "1.0.0",
+  "domain": "persona",
+  "persona": "passive_fish",
+  "display_name": "Passive Fish",
+  "sizing": { "open_bb": 4.0, "threebet_mult": 3.0, "fourbet_mult": 2.2 },
+  "preflop": [
+    {
+      "facing": "unopened",
+      "positions": ["UTG"],
+      "mixes": [
+        { "combos": "QQ+, AKs, AKo", "weights": { "raise": 1.0 } },
+        {
+          "combos": "22-JJ, A2s+, K8s+, Q9s+, J9s+, T8s+, 97s+, 87s, 76s, 65s, A9o+, KJo+, QJo",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "unopened",
+      "positions": null,
+      "mixes": [
+        { "combos": "TT+, AQs+, AKo", "weights": { "raise": 1.0 } },
+        {
+          "combos": "22-99, A2s+, K2s+, Q4s+, J6s+, T6s+, 95s+, 85s+, 74s+, 63s+, 53s, 43s, A2o+, K8o+, Q9o+, J9o+, T9o",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "vs_limpers",
+      "positions": null,
+      "mixes": [
+        { "combos": "QQ+, AKs, AKo", "weights": { "raise": 1.0 } },
+        {
+          "combos": "22-JJ, A2s+, K5s+, Q7s+, J7s+, T7s+, 96s+, 86s+, 75s+, 64s+, 54s, A9o+, KTo+, QTo+, JTo",
+          "weights": { "limp": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "vs_rfi",
+      "positions": null,
+      "mixes": [
+        { "combos": "AA, KK", "weights": { "3bet": 1.0 } },
+        {
+          "combos": "22-QQ, A2s+, K2s+, Q4s+, J6s+, T6s+, 95s+, 85s+, 74s+, 63s+, 53s, 43s, A2o+, K8o+, Q9o+, J9o+, T9o",
+          "weights": { "call": 1.0 }
+        }
+      ]
+    },
+    {
+      "facing": "vs_3bet",
+      "positions": null,
+      "mixes": [
+        { "combos": "AA", "weights": { "4bet": 0.5, "call": 0.5 } },
+        { "combos": "KK, QQ, AKs, AKo", "weights": { "call": 1.0 } }
+      ]
+    },
+    {
+      "facing": "vs_4bet",
+      "positions": null,
+      "mixes": [
+        { "combos": "AA", "weights": { "5bet_shove": 0.5, "call": 0.5 } },
+        { "combos": "KK", "weights": { "call": 1.0 } }
+      ]
+    }
+  ]
+}

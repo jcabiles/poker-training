@@ -155,7 +155,9 @@
         "calling_station",
         "nit",
         "lag",
-        "passive_fish"
+        "passive_fish",
+        "tag",
+        "maniac"
       ],
       "title": "VillainType",
       "type": "string"

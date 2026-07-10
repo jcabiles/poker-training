@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 
-TAXONOMY_VERSION = 2
+TAXONOMY_VERSION = 3
 
 
 class LeakCategory(IntEnum):
@@ -45,3 +45,5 @@ class LeakCategory(IntEnum):
     NIT_EXPLOIT = 301
     LAG_EXPLOIT = 302
     PASSIVE_FISH_EXPLOIT = 303
+    TAG_EXPLOIT = 304
+    MANIAC_EXPLOIT = 305

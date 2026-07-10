@@ -98,6 +98,8 @@ _EXPLOIT_LEAK = {
     VillainType.NIT: LeakCategory.NIT_EXPLOIT,
     VillainType.LAG: LeakCategory.LAG_EXPLOIT,
     VillainType.PASSIVE_FISH: LeakCategory.PASSIVE_FISH_EXPLOIT,
+    VillainType.TAG: LeakCategory.TAG_EXPLOIT,
+    VillainType.MANIAC: LeakCategory.MANIAC_EXPLOIT,
 }
 
 

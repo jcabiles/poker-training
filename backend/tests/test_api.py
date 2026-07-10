@@ -6,6 +6,7 @@ from sqlmodel import Session, create_engine, select
 from app.db.migrate import run_migrations
 from app.db.models import DrillAttempt, SRSItemRow
 from app.db.session import get_session
+from app.domain.archetypes import VillainType
 from app.domain.spot import Spot
 from app.main import app
 
@@ -63,7 +64,7 @@ def test_random_mode_never_returns_exploit_spot(client):
 
 def test_exploit_mode_sets_villain_type(client):
     spot = client.get("/api/v1/drill/next?mode=exploit").json()["spot"]
-    assert spot["villain_type"] in {"calling_station", "nit", "lag", "passive_fish"}
+    assert spot["villain_type"] in {v.value for v in VillainType}
     assert spot["node_context"]
 
 
