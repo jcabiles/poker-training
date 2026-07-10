@@ -194,6 +194,46 @@
   }
 }
 
+/* Practice stage — T4. The felt sits inside a near-black --stage-bg frame (a
+   lit stage, dark in BOTH themes), a radial spotlight glow behind it, and a
+   thin gilded rim. Drill-only: wraps PokerTable's .felt-staged (quizzes render
+   a bare .felt and restage in T7). The glow is composed from --page-glow +
+   --gold-glow washes over --stage-bg — no new colors. */
+.stage {
+  position: relative;
+  background:
+    radial-gradient(120% 90% at 50% 26%, var(--gold-glow), transparent 60%),
+    radial-gradient(90% 80% at 50% 46%, var(--page-glow), transparent 72%),
+    var(--stage-bg);
+  border: 1px solid color-mix(in srgb, var(--felt-text) 10%, transparent);
+  border-radius: calc(var(--radius) * 1.8);
+  /* Zero vertical padding — the felt-staged's own (trimmed) inset supplies the
+     frame reveal top/bottom; horizontal padding shows the black surround at the
+     sides. Keeps the staged footprint ≤ the pre-stage bare felt (1024×768
+     density gate — must not grow vertical footprint). */
+  padding: 0 var(--space-3);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--felt-text) 6%, transparent),
+    var(--shadow-card);
+  overflow: hidden;
+}
+/* The felt ellipse floats on the stage: its own edge vignette (below) plus the
+   stage spotlight read as a table under a lamp. Vertical padding trimmed from
+   the shared .felt's --space-4 to --space-3 so the stage frame adds NO net
+   vertical height over the pre-T4 bare felt. Scoped — quizzes' bare .felt keep
+   the original --space-4 padding untouched. */
+.felt-staged {
+  position: relative;
+  z-index: 1;
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent),
+    inset 0 2px 0 color-mix(in srgb, var(--felt-text) 12%, transparent),
+    inset 0 -14px 42px color-mix(in srgb, var(--felt-chip-bg) 80%, transparent),
+    0 18px 44px -20px color-mix(in srgb, var(--stage-bg) 90%, transparent);
+}
+
 /* Table — T5. The felt is the room's centerpiece: a faint lamp glow over the
    action area plus a darkened edge vignette give the surface depth, built
    ONLY from existing tokens (--felt, --felt-text, --felt-chip-bg) via
@@ -244,6 +284,14 @@
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--felt-text) 14%, transparent),
     inset 0 0 var(--space-6) color-mix(in srgb, var(--felt-chip-bg) 70%, transparent);
+}
+/* On the drill stage the rail earns an art-deco gilt rim + a tighter
+   spotlight-rim vignette, so the ellipse reads as a lit table under the lamp. */
+.felt-staged .rail {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--primary) 32%, transparent),
+    inset 0 0 0 5px color-mix(in srgb, var(--felt-chip-bg) 40%, transparent),
+    inset 0 0 var(--space-8) color-mix(in srgb, var(--felt-chip-bg) 88%, transparent);
 }
 .table-center {
   position: absolute;
@@ -349,7 +397,9 @@
 .tseat-folded .actchip {
   color: color-mix(in srgb, var(--felt-text) 62%, var(--felt));
 }
-/* Dealer button: brass disc engraved with D, riding the BTN pod label. */
+/* Dealer button: gilded foil disc engraved with D, riding the BTN pod label.
+   Bright-to-deep brass gradient reads as a struck token, with an inset top
+   highlight (the room's single metal voice). */
 .dealer {
   display: inline-flex;
   align-items: center;
@@ -357,10 +407,18 @@
   width: var(--space-4);
   height: var(--space-4);
   border-radius: 50%;
-  background: var(--primary);
+  background: linear-gradient(
+    180deg,
+    var(--gold-bright),
+    var(--primary) 65%,
+    color-mix(in srgb, var(--primary) 78%, var(--stage-bg))
+  );
   color: var(--primary-text);
   font-size: var(--text-2xs);
   font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--gold-bright) 70%, transparent),
+    0 1px 3px color-mix(in srgb, var(--stage-bg) 60%, transparent);
 }
 .herometa .dealer {
   margin-left: var(--space-1);
@@ -371,10 +429,30 @@
 .heroseat {
   width: max-content;
 }
+/* "You are to act" affordance: a soft gold spotlight blooms around the hero's
+   hole cards (reference .hero-ring), so the eye lands on the hand in play. */
+.hero-ring {
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: radial-gradient(
+    circle at 50% 0%,
+    var(--gold-glow),
+    transparent 72%
+  );
+}
 .heroseat .herometa {
   margin-top: var(--space-1);
   padding-bottom: var(--space-1);
   border-bottom: 2px solid var(--primary);
+}
+/* The turn cue itself, set in the room's gold caps — the gilded highlight the
+   seat text uses only for the action in play. */
+.toact {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  color: var(--gold-bright);
 }
 /* Pot line set like a stencil marking on the baize: letterspaced caps with
    short flanking hairlines (decorative pseudos — empty content, invisible
@@ -392,12 +470,22 @@
   font-variant-numeric: tabular-nums;
   color: color-mix(in srgb, var(--felt-text) 90%, var(--felt));
 }
+/* On the drill stage the pot marking is struck in gold foil — the amount is
+   the felt's headline (reference .pot-center). --gold-bright clears AA on the
+   dark felt in both themes. */
+.felt-staged .pot {
+  color: var(--gold-bright);
+}
 .pot::before,
 .pot::after {
   content: "";
   flex: 0 0 var(--space-8);
   height: 1px;
   background: color-mix(in srgb, var(--felt-text) 28%, transparent);
+}
+.felt-staged .pot::before,
+.felt-staged .pot::after {
+  background: color-mix(in srgb, var(--primary) 40%, transparent);
 }
 .cards {
   display: flex;
@@ -486,34 +574,62 @@
   color: var(--primary-text);
   border-color: var(--primary);
 }
-/* Full-width tactile console buttons: equal shares of the row, 48px tall
-   (well past the 24px floor — this is the app's core interaction), label +
-   engraved key hint centered. Primary = the room's single brass voice.
-   :active nudge is a static state change, not a transition (T8 owns motion). */
+/* Full-width tactile console buttons — the decision bar is a club control
+   panel below the stage. Equal shares of the row, ≥48px tall (well past the
+   24px floor — this is the app's core interaction), display-serif label over
+   an engraved key chip. Fold/Call are dark club buttons (--surface-2 with a
+   hairline); Raise is the room's single gilded voice (below). :active nudge is
+   a static state change, not a transition (T8 owns motion). */
 .decision-btn {
   flex: 1 1 0;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  min-height: calc(var(--space-8) + var(--space-4)); /* 48px */
-  padding: var(--space-2) var(--space-4);
+  gap: var(--space-1);
+  min-height: calc(var(--space-8) + var(--space-3)); /* 44px floor */
+  padding: var(--space-1) var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
   font-weight: 600;
+  line-height: 1.1;
   letter-spacing: 0.2px;
+  background: var(--surface-2);
+  border-color: var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text) 6%, transparent),
+    var(--shadow-panel);
 }
 .decision-btn:not(:disabled):hover {
-  background: color-mix(in srgb, var(--surface), var(--primary) 6%);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--surface-2), var(--primary) 8%);
 }
+/* Raise/bet: gilded primary — a struck brass plate with dark engraved ink and
+   a bright top highlight (reference .act-btn.primary). The room's one metal. */
 .decision-btn.btn-primary {
   font-weight: 700;
-  border-color: color-mix(in srgb, var(--primary) 80%, var(--text));
-  box-shadow: var(--shadow-card);
+  color: var(--primary-text);
+  background: linear-gradient(
+    180deg,
+    var(--gold-bright),
+    var(--primary) 62%,
+    color-mix(in srgb, var(--primary) 80%, var(--stage-bg))
+  );
+  border-color: color-mix(in srgb, var(--primary) 78%, var(--stage-bg));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--gold-bright) 60%, transparent),
+    var(--shadow-card);
 }
 .decision-btn.btn-primary:not(:disabled):hover {
-  /* mixes toward --text: lighter brass at night, deeper bronze by day */
-  background: color-mix(in srgb, var(--primary) 88%, var(--text));
+  /* brightens the foil: the bright step carries further down the plate */
+  background: linear-gradient(
+    180deg,
+    var(--gold-bright),
+    var(--gold-bright) 30%,
+    var(--primary) 78%
+  );
+  border-color: var(--primary);
 }
 .decision-btn:not(:disabled):active {
   transform: translateY(1px);
@@ -528,17 +644,20 @@ kbd {
   margin-left: 6px;
   opacity: 0.8;
 }
-/* Key hints on button surfaces: full opacity + currentColor ring so the
-   hint inherits the button ink's AA ratio (the generic 0.8-opacity kbd
-   fails 4.5:1 on brass). Covers DecisionBar and FeedbackPanel's Next. */
+/* Key hints on button surfaces: engraved chips — full opacity + a currentColor
+   ring and a faint recessed fill so the letter reads as pressed into the plate.
+   Inheriting the button ink keeps AA (the generic 0.8-opacity kbd fails 4.5:1
+   on brass). Covers DecisionBar and FeedbackPanel's Next. */
 .decision-btn kbd,
 .btn-primary kbd {
   opacity: 1;
   color: inherit;
+  letter-spacing: 0.08em;
+  background: color-mix(in srgb, currentColor 10%, transparent);
   border-color: color-mix(in srgb, currentColor 40%, transparent);
 }
 .decision-btn kbd {
-  margin-left: 0; /* the flex gap owns spacing */
+  margin-left: 0; /* the flex column gap owns spacing */
 }
 
 /* Panels / feedback */
@@ -1057,22 +1176,39 @@ kbd {
   gap: calc(var(--space) * 1.5);
   margin-bottom: calc(var(--space) * 2);
 }
-/* Mode buttons as chips: visually subordinate to the .nav-tabs rail (they
-   pick a drill flavor, not a destination). Overrides .btn — same specificity,
-   later in the file. */
+/* Mode buttons as club chips: recessed --surface-2 pills subordinate to the
+   .nav-tabs rail (they pick a drill flavor, not a destination). Active chip
+   takes the room's gilded voice. Overrides .btn — same specificity, later in
+   the file. */
 .mode-chip {
   min-height: var(--space-6); /* ≥24px target incl. padding + border */
   padding: var(--space-1) var(--space-3);
   font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--muted);
+  background: var(--surface-2);
   border-radius: var(--radius-pill);
 }
+.mode-chip:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+/* Active chip — gilded, after :hover so brass wins on hover too. */
+.mode-chip.btn-primary,
+.mode-chip.btn-primary:hover {
+  color: var(--primary-text);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+/* Group labels set as gold smallcaps — the room's ledger voice over each row. */
 .mode-group-label {
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--muted);
+  font-weight: 700;
+  color: var(--primary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 0 6px;
+  letter-spacing: 0.14em;
+  margin: 0 0 var(--space-2);
 }
 
 /* Study / Test toggle (CW-6/T6) — a segmented pill control: recessed track
@@ -1096,8 +1232,10 @@ kbd {
 .studytest-toggle .btn {
   min-height: var(--space-6); /* 24px target */
   padding: var(--space-1) var(--space-4);
-  font-size: var(--text-md);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--muted);
   background: transparent;
   border-color: transparent;

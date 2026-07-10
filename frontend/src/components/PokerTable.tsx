@@ -61,15 +61,16 @@ export default function PokerTable({ spot }: { spot: Spot }) {
   const seats = ring.map((_, i) => byPos.get(ring[(heroIdx + i) % ring.length])!);
 
   return (
-    <div className="felt">
-      <div className="ctx">
-        {spot.node_context.join(", ")} · {spot.game.stakes.sb}/{spot.game.stakes.bb} ·{" "}
-        {spot.game.table_size}-max · {spot.effective_stack_bb}bb deep
-      </div>
-      {spot.villain_type && (
-        <div className="villain">Villain: {spot.villain_type.replace(/_/g, " ")}</div>
-      )}
-      <div className="tablering" role="group" aria-label="table seats">
+    <div className="stage">
+      <div className="felt felt-staged">
+        <div className="ctx">
+          {spot.node_context.join(", ")} · {spot.game.stakes.sb}/{spot.game.stakes.bb} ·{" "}
+          {spot.game.table_size}-max · {spot.effective_stack_bb}bb deep
+        </div>
+        {spot.villain_type && (
+          <div className="villain">Villain: {spot.villain_type.replace(/_/g, " ")}</div>
+        )}
+        <div className="tablering" role="group" aria-label="table seats">
         <div className="rail" aria-hidden="true" />
         <div className="table-center">
           {spot.board.length > 0 && (
@@ -90,10 +91,12 @@ export default function PokerTable({ spot }: { spot: Spot }) {
             return (
               <div className="tseat heroseat" key={p.position} style={slotStyle(i, seats.length)}>
                 {act && <span className={"actchip act-" + act.kind}>{act.label}</span>}
-                <div className="cards">
-                  {spot.hero.hole_cards.map((c, j) => (
-                    <Card key={j} card={c} />
-                  ))}
+                <div className="hero-ring">
+                  <div className="cards">
+                    {spot.hero.hole_cards.map((c, j) => (
+                      <Card key={j} card={c} />
+                    ))}
+                  </div>
                 </div>
                 <div className="herometa">
                   {spot.hero.position}
@@ -102,7 +105,8 @@ export default function PokerTable({ spot }: { spot: Spot }) {
                       D
                     </span>
                   )}{" "}
-                  · {spot.hero.stack_bb}bb · you are to act
+                  · {spot.hero.stack_bb}bb ·{" "}
+                  <span className="toact">you are to act</span>
                 </div>
               </div>
             );
@@ -132,6 +136,7 @@ export default function PokerTable({ spot }: { spot: Spot }) {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
