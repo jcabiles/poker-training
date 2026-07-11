@@ -195,17 +195,61 @@ export interface ReviewPlanResponse {
   items: DuePlanItem[];
 }
 
-// Simulate S1 — hand-authored mirror of backend/app/schemas/simulate.py.
-// The domain PlayerState/Hero shapes ARE the wire contract (same shapes the
-// drill Spot already inlines). Only hero hole_cards are on the wire in S1 —
-// villain cards and the board are dealt server-side but never serialized.
-export interface SimulateHandView {
-  hand_no: number; // 1-based, increments per hand
-  players: { position: string; stack_bb: number; is_hero: boolean; status: string }[];
-  hero: { position: string; hole_cards: [string, string]; stack_bb: number };
+// Simulate S9 — hand-authored mirror of backend/app/schemas/simulate.py (the
+// superset that REPLACES the S1 shape). The playable, persistent session: per
+// -seat stacks/status/ledger, revealed board, hero action bar, bot event log,
+// and showdown reveals. Privacy invariant is structural on the wire: the ONLY
+// hole cards present are `hero.hole_cards` plus, at showdown, each
+// `ShowdownSeatView.hole_cards`. Folded villains are never revealed.
+
+// One seat, all 9 present every response. `persona_type` is the villain-bot
+// archetype (badge); null for the hero. `status` is IN | FOLDED | ALLIN.
+export interface SeatView {
+  seat_index: number; // 0..8; hero is seat 0
+  position: string; // UTG..BB
+  persona_type: string | null; // villain archetype badge; null = hero
+  is_hero: boolean;
+  stack_bb: number; // carry-over current stack
+  status: string; // "IN" | "FOLDED" | "ALLIN"
+  invested_street_bb: number; // this street's commitment (chips-in-front)
+  net_bb: number; // stack_bb - buyins_bb (ledger P&L)
 }
 
-export interface SimulateSessionResponse {
+// Only present for seats that reached showdown (settlement.showdown_seats).
+// Folded villains never appear here — this is the sole villain-card reveal.
+export interface ShowdownSeatView {
+  seat_index: number;
+  hole_cards: [string, string];
+  delta_bb: number; // this seat's chip delta for the hand
+}
+
+// A single bot action since the last hero decision (static event log; S9 has
+// no pacing/animation). No hole cards — safe to serialize.
+export interface EventView {
+  seat_index: number;
+  position: string;
+  action: string; // "fold" | "check" | "call" | "bet" | "raise" | "post"
+  amount_bb: number;
+  street: string;
+}
+
+export interface SimulateHandView {
+  hand_no: number; // 1-based, increments per hand
+  button_seat: number; // seat index holding the dealer button
+  street: string; // "preflop" | "flop" | "turn" | "river"
+  board: string[]; // REVEALED community cards only (never the full board)
+  pot_bb: number;
+  seats: SeatView[]; // all 9 seats
+  hero: { position: string; hole_cards: [string, string]; stack_bb: number };
+  to_act_seat: number | null; // seat index to act, or null when hand_over
+  is_hero_turn: boolean; // hero action bar shows iff true
+  legal_actions: LegalAction[]; // populated only when is_hero_turn
+  events: EventView[]; // bot actions since the last hero decision
+  hand_over: boolean;
+  showdown: ShowdownSeatView[]; // [] until hand_over; folded villains never listed
+}
+
+export interface SessionView {
   session_id: string; // uuid4 hex
   hand: SimulateHandView;
 }

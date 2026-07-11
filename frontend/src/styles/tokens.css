@@ -133,6 +133,16 @@
   --dur-1: 120ms; /* hover/focus/active micro-transitions */
   --dur-2: 200ms; /* panel + disclosure reveals */
   --ease-1: ease-out;
+
+  /* Simulate S9 — semantic aliases for the table's new surfaces (ledger P&L,
+     showdown deltas, chips-in-front, live-seat cue). Mapped onto the already
+     contrast-verified tone/primary tokens so they inherit AA in both themes and
+     stay independently tunable. --sim-net-* render on --surface panels (day:
+     good 4.7:1, bad 4.9:1, muted 5.5:1 on --bg/--surface). */
+  --sim-net-up: var(--good); /* winning seat P&L */
+  --sim-net-down: var(--bad); /* losing seat P&L */
+  --sim-net-even: var(--muted); /* break-even */
+  --sim-live: var(--primary); /* the seat/hero cue when it is their turn */
 }
 
 [data-theme="dark"] {
@@ -171,6 +181,13 @@
   --shadow-card: 0 2px 6px rgba(2, 6, 4, 0.55), 0 8px 20px rgba(2, 6, 4, 0.35);
   --shadow-overlay: 0 12px 32px rgba(1, 4, 3, 0.7);
   --shadow: var(--shadow-panel);
+
+  /* Simulate S9 aliases — night values. --good/--bad/--muted here clear AA on
+     the dark --surface (good 5.6:1, bad 5.8:1, muted 8.4:1). */
+  --sim-net-up: var(--good);
+  --sim-net-down: var(--bad);
+  --sim-net-even: var(--muted);
+  --sim-live: var(--primary);
 }
 
 * {

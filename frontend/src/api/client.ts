@@ -12,8 +12,7 @@ import type {
   QuizResult,
   RecapResponse,
   ReviewPlanResponse,
-  SimulateHandView,
-  SimulateSessionResponse,
+  SessionView,
   Spot,
   StatsSummary,
 } from "./types";
@@ -89,12 +88,45 @@ export async function matchCard(
   return json(await fetch(`${BASE}/cards/match?${params.toString()}`));
 }
 
-// Simulate S1 — lazy session create + deal-next-hand. No request body; the
-// server seeds each hand server-side (seed never on the wire).
-export async function postSimulateSession(): Promise<SimulateSessionResponse> {
+// Simulate S9 — playable, persistent session. The server seeds each hand and
+// advances all bots up to the hero's turn (or hand end) within each request;
+// no seed/full-board/villain hole cards ever cross the wire. All five calls
+// return the full SessionView (its `hand` is the live decision point).
+
+// Create a fresh session (mints a session_id; deals hand 1; advances to hero).
+export async function postSimulateSession(): Promise<SessionView> {
   return json(await fetch(`${BASE}/simulate/session`, { method: "POST" }));
 }
 
-export async function postSimulateHand(sessionId: string): Promise<SimulateHandView> {
+// Restore an existing session by id (reload recovery). Throws "... -> 404" when
+// the session is missing or ended — SimulateView clears storage on that.
+export async function getSession(sessionId: string): Promise<SessionView> {
+  return json(await fetch(`${BASE}/simulate/session/${sessionId}`));
+}
+
+// Apply the hero's chosen action; the server resolves bots to the next hero
+// turn (or hand-over) and returns the resulting live view.
+export async function postHeroAction(
+  sessionId: string,
+  action: Decision,
+): Promise<SessionView> {
+  return json(
+    await fetch(`${BASE}/simulate/session/${sessionId}/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(action),
+    }),
+  );
+}
+
+// Deal the next hand (only after the current hand is complete) — carries over
+// stacks, moves the button, increments hand_no.
+export async function postNextHand(sessionId: string): Promise<SessionView> {
   return json(await fetch(`${BASE}/simulate/session/${sessionId}/hand`, { method: "POST" }));
+}
+
+// Leave the table: ends the session server-side (subsequent restore → 404).
+export async function leaveSession(sessionId: string): Promise<void> {
+  const r = await fetch(`${BASE}/simulate/session/${sessionId}/leave`, { method: "POST" });
+  if (!r.ok) throw new Error(`${r.url} -> ${r.status}`);
 }
