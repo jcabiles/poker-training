@@ -1,92 +1,62 @@
-"""Simulate endpoints.
+"""Simulate endpoints (S9 — hero plays / session persistence / stacks / ledger).
 
-POST /simulate/session               -> create a session + deal hand 1.
-POST /simulate/session/{id}/hand     -> advance the button one seat, deal
-                                         the next hand.
+POST /simulate/session               -> create a session, deal hand 1.
+GET  /simulate/session/{id}          -> restore the live decision point.
+POST /simulate/session/{id}/action   -> hero acts; bots advance to the next
+                                         hero decision (or hand end).
+POST /simulate/session/{id}/hand     -> deal the next hand (carry-over stacks).
+POST /simulate/session/{id}/leave    -> end the session (no longer restorable).
 
-Table-walking skeleton only: no betting, chips, or persistence. Sessions
-live in a module-level dict (mirrors `drill.py`'s singleton precedent) and
-are lost on restart — accepted for S1. Per-hand seeding is independent of
-`drill.py`'s shared `_RNG`: `random.Random(secrets.randbits(256))`, seed
-logged server-side, never on the wire (see
-`docs/ai-dlc/specs/simulate-s1.md`).
+All state lives in the DB (`app.services.sim_session`); this module only
+translates HTTP <-> service calls. No auth: `owner_id=""`. See
+`docs/ai-dlc/specs/simulate-s9.md`.
 """
 
 from __future__ import annotations
 
-import logging
-import random
-import secrets
-import uuid
-from dataclasses import dataclass
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session
 
-from fastapi import APIRouter, HTTPException
-
-from app.domain.spot import Hero, PlayerState
-from app.domain.table import deal_hand, positions_for_button
-from app.schemas.simulate import SimulateHandView, SimulateSessionResponse
+from app.db.session import get_session
+from app.domain.action import Decision
+from app.schemas.simulate import SessionView
+from app.services import sim_session
 
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 
-logger = logging.getLogger(__name__)
-
-_SEATS = 9
-_STACK_BB = 100.0
+_OWNER_ID = ""
 
 
-@dataclass
-class SimSession:
-    button_seat: int
-    hand_no: int
-    seed: int  # most recently dealt hand's seed, kept server-side only
+@router.post("/session", response_model=SessionView)
+async def create_session(db: Session = Depends(get_session)) -> SessionView:
+    return sim_session.create_session(db, owner_id=_OWNER_ID)
 
 
-_SESSIONS: dict[str, SimSession] = {}
-
-
-def _deal_and_build(session_id: str, session: SimSession) -> SimulateHandView:
-    seed = secrets.randbits(256)
-    session.seed = seed
-    logger.info(
-        "simulate hand seed session=%s hand=%s seed=%s",
-        session_id,
-        session.hand_no,
-        seed,
-    )
-    rng = random.Random(seed)
-    dealt = deal_hand(rng)
-    positions = positions_for_button(session.button_seat)
-
-    players = [
-        PlayerState(
-            position=positions[seat],
-            stack_bb=_STACK_BB,
-            is_hero=(seat == 0),
-        )
-        for seat in range(_SEATS)
-    ]
-    hero = Hero(
-        position=positions[0],
-        hole_cards=dealt.hole_cards[0],
-        stack_bb=_STACK_BB,
-    )
-    return SimulateHandView(hand_no=session.hand_no, players=players, hero=hero)
-
-
-@router.post("/session", response_model=SimulateSessionResponse)
-async def create_session() -> SimulateSessionResponse:
-    session_id = uuid.uuid4().hex
-    session = SimSession(button_seat=secrets.randbelow(_SEATS), hand_no=1, seed=0)
-    _SESSIONS[session_id] = session
-    hand = _deal_and_build(session_id, session)
-    return SimulateSessionResponse(session_id=session_id, hand=hand)
-
-
-@router.post("/session/{session_id}/hand", response_model=SimulateHandView)
-async def next_hand(session_id: str) -> SimulateHandView:
-    session = _SESSIONS.get(session_id)
-    if session is None:
+@router.get("/session/{session_id}", response_model=SessionView)
+async def get_session_view(
+    session_id: str, db: Session = Depends(get_session)
+) -> SessionView:
+    view = sim_session.restore_session(db, session_id, owner_id=_OWNER_ID)
+    if view is None:
         raise HTTPException(status_code=404, detail="session not found")
-    session.button_seat = (session.button_seat + 1) % _SEATS
-    session.hand_no += 1
-    return _deal_and_build(session_id, session)
+    return view
+
+
+@router.post("/session/{session_id}/action", response_model=SessionView)
+async def post_hero_action(
+    session_id: str, decision: Decision, db: Session = Depends(get_session)
+) -> SessionView:
+    try:
+        return sim_session.apply_hero_action(db, session_id, decision, owner_id=_OWNER_ID)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/session/{session_id}/hand", response_model=SessionView)
+async def next_hand(session_id: str, db: Session = Depends(get_session)) -> SessionView:
+    return sim_session.deal_next_hand(db, session_id, owner_id=_OWNER_ID)
+
+
+@router.post("/session/{session_id}/leave", status_code=204)
+async def leave(session_id: str, db: Session = Depends(get_session)) -> None:
+    sim_session.leave_session(db, session_id, owner_id=_OWNER_ID)
