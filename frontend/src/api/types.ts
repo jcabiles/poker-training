@@ -210,7 +210,7 @@ export interface SeatView {
   persona_type: string | null; // villain archetype badge; null = hero
   is_hero: boolean;
   stack_bb: number; // carry-over current stack
-  status: string; // "IN" | "FOLDED" | "ALLIN"
+  status: "in" | "folded" | "allin"; // PlayerStatus StrEnum — lowercase on the wire
   invested_street_bb: number; // this street's commitment (chips-in-front)
   net_bb: number; // stack_bb - buyins_bb (ledger P&L)
 }

@@ -69,8 +69,8 @@ export default function SimTable({ hand }: { hand: SimulateHandView }) {
 
           {ordered.map((seat, i) => {
             const isButton = seat.seat_index === button_seat;
-            const folded = seat.status === "FOLDED";
-            const allin = seat.status === "ALLIN";
+            const folded = seat.status === "folded";
+            const allin = seat.status === "allin";
             const isToAct = to_act_seat != null && seat.seat_index === to_act_seat;
             const reveal = showdownBySeat.get(seat.seat_index);
             const style = slotStyle(i, ordered.length);
