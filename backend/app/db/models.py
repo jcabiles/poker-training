@@ -37,6 +37,49 @@ class DrillAttempt(SQLModel, table=True):
     hand_class: str | None = Field(default=None)
 
 
+class SimSession(SQLModel, table=True):
+    """One persistent Simulate table session (S9)."""
+
+    __tablename__ = "sim_session"
+
+    id: str = Field(primary_key=True)  # uuid4 hex
+    # Ownership seam: '' = the local user (no accounts yet, sentinel only).
+    owner_id: str = Field(default="", index=True)
+    button_seat: int
+    hand_no: int
+    status: str = Field(default="active")  # "active" | "ended"
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class SimSeat(SQLModel, table=True):
+    """Per-seat carry-over stack + buy-in ledger; 9 rows per session."""
+
+    __tablename__ = "sim_seat"
+
+    session_id: str = Field(primary_key=True, foreign_key="sim_session.id")
+    seat_index: int = Field(primary_key=True)  # 0..8 (composite PK)
+    is_hero: bool
+    persona_type: str | None = Field(default=None)  # VillainType value; None = hero
+    stack_bb: float  # carry-over current stack
+    buyins_bb: float  # cumulative chips brought in
+
+
+class SimHand(SQLModel, table=True):
+    """One dealt hand; `state_json` holds the live HandState (server-side ONLY —
+    all 9 seats' hole cards + full_board; never serialized to the wire)."""
+
+    __tablename__ = "sim_hand"
+
+    id: int | None = Field(default=None, primary_key=True)  # autoincrement
+    session_id: str = Field(foreign_key="sim_session.id", index=True)
+    hand_no: int
+    button_seat: int
+    rng_seed: str  # 256-bit deal seed (str: overflows SQLite INTEGER)
+    status: str = Field(default="in_progress")  # "in_progress" | "complete"
+    state_json: str | None = None  # serialized live HandState
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class SRSItemRow(SQLModel, table=True):
     """SM-2 spaced-repetition state, one row per spot archetype (signature)."""
 
