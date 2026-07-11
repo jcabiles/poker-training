@@ -146,6 +146,21 @@ def test_404_on_ended_session(client):
     assert resp.json()["detail"] == "session not found"
 
 
+def test_404_on_missing_session_for_action(client):
+    resp = client.post(
+        "/api/v1/simulate/session/does-not-exist/action",
+        json={"action": "fold"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "session not found"
+
+
+def test_404_on_missing_session_for_hand(client):
+    resp = client.post("/api/v1/simulate/session/does-not-exist/hand")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "session not found"
+
+
 def test_illegal_hero_action_returns_400(client):
     create = client.post("/api/v1/simulate/session").json()
     session_id = create["session_id"]
@@ -179,7 +194,9 @@ def test_next_hand_carries_over_stacks_and_advances_button(client):
     hand2 = body["hand"]
     assert hand2["hand_no"] == 2
     assert hand2["button_seat"] == (btn1 + 1) % 9
-    # Carry-over: no seat resets to a fresh 100bb unless it busted+rebought.
+    # Carry-over: stacks reflect the previous hand's result, not a blanket
+    # reset to 100bb (a winner may legitimately hold >100bb).
+    assert any(seat["stack_bb"] != 100.0 for seat in hand2["seats"])
     for seat in hand2["seats"]:
-        assert seat["stack_bb"] <= 100.0 + 1e-6
+        assert seat["stack_bb"] >= 0.0
     _assert_no_leaked_hole_cards(body)

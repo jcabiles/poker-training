@@ -20,7 +20,7 @@ class SeatView(BaseModel):
     persona_type: str | None  # badge; None for hero
     is_hero: bool
     stack_bb: float
-    status: str  # IN / FOLDED / ALLIN
+    status: str  # in / folded / allin
     invested_street_bb: float  # this street's commitment (chips-in-front display)
     net_bb: float  # stack_bb - buyins_bb (ledger)
 

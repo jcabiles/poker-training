@@ -21,6 +21,7 @@ from app.db.session import get_session
 from app.domain.action import Decision
 from app.schemas.simulate import SessionView
 from app.services import sim_session
+from app.services.sim_session import SessionNotFound
 
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 
@@ -48,13 +49,18 @@ async def post_hero_action(
 ) -> SessionView:
     try:
         return sim_session.apply_hero_action(db, session_id, decision, owner_id=_OWNER_ID)
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="session not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/session/{session_id}/hand", response_model=SessionView)
 async def next_hand(session_id: str, db: Session = Depends(get_session)) -> SessionView:
-    return sim_session.deal_next_hand(db, session_id, owner_id=_OWNER_ID)
+    try:
+        return sim_session.deal_next_hand(db, session_id, owner_id=_OWNER_ID)
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="session not found") from exc
 
 
 @router.post("/session/{session_id}/leave", status_code=204)
