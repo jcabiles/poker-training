@@ -16,7 +16,7 @@ import hashlib
 
 from pydantic import BaseModel, Field
 
-from app.domain.spot import ActionType, Spot, Street
+from app.domain.spot import ActionType, Spot, Street, players_in_pot
 
 DEFAULT_EASE = 2.5
 
@@ -115,12 +115,14 @@ def _postflop_signature(spot: Spot) -> str:
     ALSO changes the hash, even a constant placeholder ("-"), because the join
     adds a separator. So new dimensions must be CONDITIONALLY appended: OMITTED
     entirely for the spots that already exist (flop stays byte-identical at its
-    original element count) and appended only for the streets the dimension
-    actually describes. Two conditional dims exist today, in a FIXED order:
-    turn_card_class (S6, appended for turn/river) then river_card_class (S7,
-    appended for river only) — flop stays at 9 elements, turn at 10, river at
-    11. No aliasing risk: street sits at tuple index 2, so parts lists from
-    different streets can never collide despite differing lengths. The
+    original element count) and appended only for the spots the dimension
+    actually describes. Three conditional dims exist today, in a FIXED order:
+    turn_card_class (S6, appended for turn/river), then river_card_class (S7,
+    appended for river only), then "mw" (S8, appended only for multiway spots —
+    players_in_pot > 2 — so every heads-up spot, i.e. every persisted spot,
+    stays byte-identical). Element counts: flop 9/10, turn 10/11, river 11/12
+    (HU/MW). No aliasing risk: street sits at tuple index 2, so parts lists
+    from different streets can never collide despite differing lengths. The
     pinned-hash tests in tests/test_signature.py are the tripwire for
     accidental changes."""
     from app.domain.texture import classify
@@ -152,6 +154,11 @@ def _postflop_signature(spot: Spot) -> str:
         from app.domain.texture import river_card_class
 
         parts.append(river_card_class(spot.board))
+    if players_in_pot(spot) > 2:
+        # S8 multiway dimension — CONDITIONAL append AFTER river_class (see
+        # APPEND RULE above): heads-up spots (count == 2 — every persisted
+        # spot) never reach here, so their parts lists stay byte-identical.
+        parts.append("mw")
     raw = "|".join(parts)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 

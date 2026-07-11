@@ -156,3 +156,17 @@ class Spot(BaseModel):
     @classmethod
     def _validate_board(cls, v):
         return [validate_card(c) for c in v]
+
+
+def players_in_pot(spot: Spot) -> int:
+    """Count seats still contesting the pot (hero + live villains).
+
+    Heads-up spots (every existing postflop fixture via `_hu_srp_seats`) == 2.
+    Pure helper on the frozen Spot schema — S8 adds NO field to `Spot`.
+    """
+    return sum(1 for p in spot.players if p.status in (PlayerStatus.IN, PlayerStatus.ALLIN))
+
+
+def is_multiway(spot: Spot) -> bool:
+    """True for 3+ live players (binary bucket: heads-up vs multiway, S8)."""
+    return players_in_pot(spot) > 2

@@ -360,10 +360,36 @@ def _hu_srp_seats(
     return players, history
 
 
+def _multiway_seats(
+    players: list[PlayerState],
+    *,
+    players_in_pot: int,
+    opener: Position,
+    caller: Position,
+) -> list[PlayerState]:
+    """S8 multiway seam: promote (players_in_pot - 2) of `_hu_srp_seats`'s FOLDED
+    seats to live IN callers, at unused positions — NEVER touching the opener/
+    caller principals that `_villain_pos`/`spot.facing` key on. Default
+    players_in_pot=2 returns the seats unchanged (heads-up byte-identical).
+    Action history is deliberately left alone: graders and spot_signature read
+    only seat STATUSES and hero's own street actions, never a non-hero seat's
+    preflop line."""
+    extra = players_in_pot - 2
+    if extra <= 0:
+        return players
+    # `players` is already in _SEAT_ORDER order — take the first unused seats.
+    promoted = set([p.position for p in players if p.position not in (opener, caller)][:extra])
+    return [
+        p.model_copy(update={"status": PlayerStatus.IN}) if p.position in promoted else p
+        for p in players
+    ]
+
+
 def build_cbet_spot(
     rng: random.Random,
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
+    players_in_pot: int = 2,
 ) -> Spot:
     from app.domain.equity import combos_for_range
 
@@ -392,6 +418,9 @@ def build_cbet_spot(
         opener_stack=remaining,
         caller_stack=remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
 
     return Spot(
@@ -431,6 +460,7 @@ def build_vs_cbet_spot(
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
     cbet_frac: float | None = None,
+    players_in_pot: int = 2,
 ) -> Spot:
     from app.domain.equity import combos_for_range
 
@@ -463,6 +493,9 @@ def build_vs_cbet_spot(
         opener_stack=villain_remaining,
         caller_stack=hero_remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
     history.append(
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet)
@@ -511,6 +544,7 @@ def build_check_raise_spot(
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
     raise_mult: float | None = None,
+    players_in_pot: int = 2,
 ) -> Spot:
     from app.domain.equity import combos_for_range
 
@@ -547,6 +581,9 @@ def build_check_raise_spot(
         opener_stack=hero_remaining,
         caller_stack=villain_remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
     history += [
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
@@ -595,6 +632,7 @@ def build_turn_barrel_spot(
     *,
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
+    players_in_pot: int = 2,
 ) -> Spot:
     """Hero = IP opener who c-bet the flop and got called; BB checks the turn
     and hero decides whether to fire the 2nd barrel (check / bet small / big)."""
@@ -627,6 +665,9 @@ def build_turn_barrel_spot(
         opener_stack=remaining,
         caller_stack=remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
     history += [
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
@@ -663,6 +704,7 @@ def build_vs_turn_bet_spot(
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
     bet_frac: float | None = None,
+    players_in_pot: int = 2,
 ) -> Spot:
     """Hero = BB defender who called the flop c-bet and now faces the opener's
     turn bet (fold / call / raise). `bet_frac` sizes the TURN bet as a fraction
@@ -702,6 +744,9 @@ def build_vs_turn_bet_spot(
         opener_stack=villain_remaining,
         caller_stack=hero_remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
     history += [
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
@@ -745,6 +790,7 @@ def build_river_barrel_spot(
     *,
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
+    players_in_pot: int = 2,
 ) -> Spot:
     """Hero = IP opener who c-bet the flop AND barreled the turn, called both
     times; BB checks the river and hero decides whether to fire the 3rd barrel
@@ -784,6 +830,9 @@ def build_river_barrel_spot(
         opener_stack=remaining,
         caller_stack=remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
     history += [
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
@@ -825,6 +874,7 @@ def build_vs_river_bet_spot(
     pairing: tuple[Position, Position] | None = None,
     eff_bb: float = 100.0,
     bet_frac: float | None = None,
+    players_in_pot: int = 2,
 ) -> Spot:
     """Hero = BB defender who called the flop c-bet AND the turn barrel, and now
     faces the opener's river bet (fold / call / raise). `bet_frac` sizes the
@@ -873,6 +923,9 @@ def build_vs_river_bet_spot(
         opener_stack=villain_remaining,
         caller_stack=hero_remaining,
         eff_bb=eff_bb,
+    )
+    players = _multiway_seats(
+        players, players_in_pot=players_in_pot, opener=opener, caller=caller
     )
     history += [
         HistoryAction(street=Street.FLOP, position=opener, action=ActionType.BET, amount_bb=cbet),
