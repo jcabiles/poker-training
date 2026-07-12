@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 import type { GradeView, SeatView, ShowdownSeatView, SimulateHandView } from "../../api/types";
 import Card from "../Card";
-import { tierOf } from "./simGrade";
+import { fmtBb, tierOf } from "./simGrade";
 
 // Simulate S9 table. A purpose-built felt for the persistent session: it reuses
 // PokerTable's felt/ring/rail CSS classes and elliptical geometry verbatim (so
@@ -103,7 +103,7 @@ export default function SimTable({
                 ))}
               </div>
             )}
-            <div className="pot">Pot {pot_bb}bb</div>
+            <div className="pot">Pot {fmtBb(pot_bb)}bb</div>
           </div>
 
           {ordered.map((seat, i) => {
@@ -126,7 +126,7 @@ export default function SimTable({
             const chips =
               revealed && seat.invested_street_bb > 0 && !folded ? (
                 <span className="sim-chips" title="chips in front">
-                  {seat.invested_street_bb}bb
+                  {fmtBb(seat.invested_street_bb)}bb
                 </span>
               ) : null;
 
@@ -154,7 +154,7 @@ export default function SimTable({
                         D
                       </span>
                     )}{" "}
-                    · <span className="sim-stack num">{hero.stack_bb}bb</span>
+                    · <span className="sim-stack num">{fmtBb(hero.stack_bb)}bb</span>
                     {isToAct && (
                       <>
                         {" "}
@@ -206,7 +206,7 @@ export default function SimTable({
                   </span>
                 )}
                 <span className="stack num">
-                  {seat.stack_bb}bb
+                  {fmtBb(seat.stack_bb)}bb
                   {allin && <span className="sim-allin"> all-in</span>}
                 </span>
               </div>

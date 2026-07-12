@@ -46,3 +46,11 @@ export function streetLabel(street: string): string {
 export function fmtEvLoss(bb: number): string {
   return `≈${bb.toFixed(1)}bb`;
 }
+
+// Stack / chips / pot figures. Backend big-blind counts are floats, so a
+// subtraction can surface a binary-float tail (e.g. "93.52000000000001"). Round
+// to ≤2 decimals and trim trailing zeros so the felt shows "93.52" / "40" —
+// never a float smear. One formatter for every raw bb figure the table renders.
+export function fmtBb(bb: number): string {
+  return String(Number(bb.toFixed(2)));
+}

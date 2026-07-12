@@ -1,4 +1,5 @@
 import type { SeatView, ShowdownSeatView } from "../../api/types";
+import { fmtBb } from "./simGrade";
 import Card from "../Card";
 
 // Simulate S9 hand-over recap — the settlement slip. Lists the seats that
@@ -10,7 +11,7 @@ import Card from "../Card";
 
 function fmtDelta(delta: number): string {
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
-  return `${sign}${Math.abs(delta)}`;
+  return `${sign}${fmtBb(Math.abs(delta))}`;
 }
 
 export default function SimShowdown({

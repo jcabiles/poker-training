@@ -2590,7 +2590,11 @@ kbd {
 /* Topbar: the room's serif title and the discreet "Leave table" exit. */
 .sim-topbar {
   display: flex;
-  align-items: baseline;
+  /* Center-align: the right cluster carries a two-line speed control (SPEED
+     caption over its pill), so a baseline anchor pinned the heading to the tiny
+     caption line and left it floating high. Centering settles the serif heading
+     against the full control cluster — one level row. */
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
 }
@@ -2659,14 +2663,26 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Folded persona steps back but must stay legible on the lighter NIGHT felt
+   (#1b563e): the base 60% mix measured 3.82:1 there — under AA. Lifted to 72%
+   → 4.73:1 on Night, and Day (near-black felt) rises further from its already
+   -passing 5.9:1. Sim-owned selector; the shared base .tseat rules are untouched. */
 .tseat-folded .sim-persona {
-  color: color-mix(in srgb, var(--felt-text) 60%, var(--felt));
+  color: color-mix(in srgb, var(--felt-text) 72%, var(--felt));
 }
 /* Simulate stack figures read one step larger than the shared felt's --text-xs
    (11px) — --text-sm (12px) tabular mono, legible on the rim. Scoped to
    .sim-seat so PokerTable's drill/quiz felt keeps its own sizing. */
 .sim-seat .stack {
   font-size: var(--text-sm);
+}
+/* Folded stack figures on the lighter NIGHT felt: the shared base
+   .tseat-folded .stack (62% mix) measured 3.96:1 here — under AA. This
+   sim-scoped selector (.tseat-folded.sim-seat) out-specifies the base without
+   editing it, lifting to 72% → 4.73:1 on Night (Day stays well clear). Only the
+   Simulate felt is retimed; Practice/Quiz keep the shared base value. */
+.tseat-folded.sim-seat .stack {
+  color: color-mix(in srgb, var(--felt-text) 72%, var(--felt));
 }
 
 /* Chips-in-front — this street's commitment as a gilt puck set toward the table
@@ -3005,10 +3021,15 @@ kbd {
    <input>s are visually hidden but keep native keyboard + a11y semantics; the
    .sim-speed-face spans carry the segmented look. */
 .sim-speed {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  /* fieldset reset — it must read as a compact inline control, not a form box */
+  /* A <legend> can't join a flex/inline row, so the SPEED caption stacks above
+     its pill by design — the same caption-over-controls idiom the stats bar's
+     "TOP LEAKS" uses. Stack it deliberately so the caption→pill gap is on the
+     spacing scale rather than the legend's default leading. */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  /* fieldset reset — it must read as a compact caption + control, not a form box */
   margin: 0;
   padding: 0;
   border: 0;
@@ -3019,7 +3040,9 @@ kbd {
   font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 600;
-  letter-spacing: 0.4px;
+  /* 0.3px matches the room's panel-title captions (ledger/report/recap) so every
+     uppercase Fraunces caption shares one letterspacing voice. */
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   color: var(--muted);
 }
