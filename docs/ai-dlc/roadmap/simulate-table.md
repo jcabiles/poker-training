@@ -288,6 +288,33 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   per-session filtering; leak-category drill-down. *Open questions:* how much does the S10
   minimal report already answer (review after ~2 weeks of real use); charting approach
   (tokens-only CSS bars vs a library — library needs ask-first).
+- **Collapsible hero preflop range chart (point-of-need).** *(user request 2026-07-12;
+  gate decision: baseline chart + exploit note — NOT persona-adjusted squares, which would
+  collide with the heuristic-only no-go and belongs to a Later bet after exploit-aware
+  grading.)* *Evidence:* the pieces exist — baseline preflop packs
+  (`content/preflop/*.json`), `RangeGrid.tsx` (Practice's 13×13 chart), and S10's spot
+  mapper for current-spot lookup. Collapsed panel in Simulate; uncollapse → the baseline
+  action-mix chart for hero's current preflop spot PLUS a one-line persona-aware note from
+  `exploit.json` ("vs a Calling Station: value wider, bluff less"). Unmappable/off-content
+  spots render "no chart for this spot yet" — never fabricate. Point-of-need only (current
+  spot), so it stays inside the no-browsable-lessons-library no-go the same way concept
+  cards do. *Candidate slices:* chart panel (reuse RangeGrid + mapper); exploit-note
+  wiring. *Open questions:* which villain's note wins in multiway; collapse-state
+  persistence.
+- **Villain range reveal — live, per-action updates, all streets.** *(user request
+  2026-07-12; gate decision: all streets from day one, postflop explicitly labeled an
+  ESTIMATE.)* *Evidence:* persona preflop play is explicit-range-based (`personas.py`
+  samples from parsed combo ranges) ⇒ the preflop reveal is EXACT conditioning — each
+  raise/3-bet/4-bet filters the persona's own range and the chart narrows (the user's
+  BTN-raise-wide vs BTN-4-bet-narrow example). Postflop bots decide via the merit ladder,
+  not ranges ⇒ postflop chart = approximate category-weight conditioning, ≈-labeled.
+  Button-gated per villain; folded villains excluded; updates as each villain acts on each
+  street. *Candidate slices:* preflop-exact range tracker + per-villain RangeGrid overlay;
+  postflop approximate conditioning; pacing-lockstep staging (S11's staged index governs
+  when the chart may update). *Open questions:* combo-weight representation + per-action
+  perf; disclaimer wording; interplay with hidden-persona mode (a reveal button is a
+  training wheel that mode would gate); does always-available reveal soften the
+  read-development goal.
 - **Simulate mobile responsiveness.** *(design-review 2026-07-11; deferred by the
   desktop-primary decision — desktop + tablet 768px ship premium/clean.)* *Evidence:* at
   ≤~600px the 9-seat felt collapses into overlap (measured 30 overlapping seat pairs at 375px;
