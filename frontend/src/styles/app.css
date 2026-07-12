@@ -3574,10 +3574,14 @@ kbd {
   margin-top: 2px;
   min-height: 24px;
   padding: 2px var(--space-2);
-  border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
   border-radius: var(--radius-pill);
   background: var(--felt-chip-bg);
-  color: color-mix(in srgb, var(--primary) 82%, var(--felt-text));
+  /* Ink rides the felt-text (near-white) with a gold tint rather than the
+     theme primary: Day's dark-bronze primary fell to ~2.6:1 over the felt's
+     lighter gradient regions (design-review med-1). Verified >=4.5:1 over the
+     brightest felt region, both themes. */
+  color: color-mix(in srgb, var(--felt-text) 82%, var(--gold-bright));
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: 700;

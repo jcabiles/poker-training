@@ -64,12 +64,25 @@ export default function SimVillainRange({
   const MIN_OPACITY = 0.16;
 
   return (
-    <section className="sim-vrange" aria-labelledby={TITLE_ID}>
+    <section
+      className="sim-vrange"
+      aria-labelledby={TITLE_ID}
+      onKeyDown={(e) => {
+        // Esc closes the panel when focus is inside it (design-review low-3;
+        // non-modal, so this is a convenience, not a focus trap).
+        if (e.key === "Escape") onClose();
+      }}
+    >
       <header className="sim-vrange-head">
         <div className="sim-vrange-title" id={TITLE_ID}>
           <span className="sim-vrange-pos num">{position}</span>
           {persona && <span className="sim-vrange-persona">{persona}</span>}
-          <span className="sim-vrange-kicker">estimated range</span>
+          <span className="sim-vrange-kicker">
+            {/* "estimated" only when the math actually is (postflop) — a
+                preflop-exact range saying "estimated" contradicted the absent
+                amber tag (design-review low-2). */}
+            {estimated ? "estimated range" : "range"}
+          </span>
         </div>
         <div className="sim-vrange-head-aside">
           {estimated && (

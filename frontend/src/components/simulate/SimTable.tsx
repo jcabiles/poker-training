@@ -234,7 +234,9 @@ export default function SimTable({
                     }
                     onClick={() => onToggleRange(seat.seat_index)}
                     aria-pressed={openRangeSeat === seat.seat_index}
-                    aria-label={`Show estimated range for ${seat.position}`}
+                    aria-label={`${
+                      openRangeSeat === seat.seat_index ? "Hide" : "Show"
+                    } estimated range for ${seat.position}`}
                   >
                     range
                   </button>
