@@ -2573,31 +2573,386 @@ kbd {
   }
 }
 
-/* Simulate S1 — the walking-skeleton tab. The dealt felt table is the focal
-   point (rendered by the shared PokerTable); this is only the thin control
-   rail above it — a hand counter and the "Next hand" deal button. Serif label
-   in the club register, mono for the numeric counter (the app's numeric-data
-   idiom), the gilded .btn-primary as the single deal control. Tokens only; the
-   button inherits the global :focus-visible ring. */
-.simulate-bar {
-  /* Below the felt, centered under the hero seat — the slot S9's real action
-     buttons will occupy. */
+/* ── Simulate S9 — the playable table ──────────────────────────────────────
+   "Midnight Club rail sheet": the persistent session extends the club room with
+   its ruled accounting book. The felt (SimTable) reuses the drill stage's
+   classes verbatim; S9 adds the persona-badged seats, chips-in-front pucks, the
+   hero action console, a bot-action call sheet, a showdown settlement slip, and
+   the rail-sheet ledger — the P&L book that distinguishes Simulate from
+   Practice. Tokens only; every tone cue is redundant with a sign/word so color
+   is never load-bearing. AA + visible focus verified in both themes. */
+
+.simulate {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-6);
-  margin-top: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-4);
 }
-.simulate-count {
+/* Topbar: the room's serif title and the discreet "Leave table" exit. */
+.sim-topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.sim-heading {
+  margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  color: var(--muted);
-}
-.simulate-count-no {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.2px;
   color: var(--text);
 }
+.sim-leave-btn {
+  display: inline-flex;
+  align-items: center;
+  /* ≥32px target — it ends the session, so a comfortable hit area matters
+     (--space-8 = 32px min-height; horizontal padding unchanged). */
+  min-height: var(--space-8);
+  font-size: var(--text-md);
+  padding: var(--space-1) var(--space-3);
+  color: var(--muted);
+}
+.sim-leave-btn:not(:disabled):hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+/* Layout: the table + its console on the left, the call sheet + rail sheet on
+   the right — a two-column reading like a felt and its side table. Collapses to
+   one column on the narrow gate (below). */
+.sim-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-w);
+  gap: var(--space-6);
+  align-items: start;
+}
+.sim-main {
+  min-width: 0;
+}
+.sim-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Felt context line — mono hand counter inside the room's ctx stencil. */
+.sim-ctx-no {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+
+/* Per-seat persona badge — the villain archetype engraved on a scrim puck below
+   the seat's position chip. Small caps, letterspaced, felt-toned so it sits
+   quietly under the position (≥4.5:1 on felt via the 82% mix, both themes).
+   Set at --text-xs (11px) so the archetype stays legible on the rim, not a
+   decorative whisper. */
+.sim-persona {
+  max-width: calc(var(--card-w) * 2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--felt-text) 82%, var(--felt));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tseat-folded .sim-persona {
+  color: color-mix(in srgb, var(--felt-text) 60%, var(--felt));
+}
+/* Simulate stack figures read one step larger than the shared felt's --text-xs
+   (11px) — --text-sm (12px) tabular mono, legible on the rim. Scoped to
+   .sim-seat so PokerTable's drill/quiz felt keeps its own sizing. */
+.sim-seat .stack {
+  font-size: var(--text-sm);
+}
+
+/* Chips-in-front — this street's commitment as a gilt puck set toward the table
+   center, above the seat's cards. A struck brass token (the room's one metal),
+   dark engraved figure. Ordered first in the pod's flex column (below). */
+.sim-chips {
+  order: -1; /* renders first in the column flow (above the cards) */
+  /* Pull the puck down toward its own cards so it hugs the seat rather than
+     reaching in toward the centered POT readout (keeps the pot label clear —
+     the crowding is worst at an all-in showdown when every seat is committed). */
+  margin-bottom: calc(-1 * var(--space-1));
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: var(--primary-text);
+  background: linear-gradient(
+    180deg,
+    var(--gold-bright),
+    var(--primary) 70%
+  );
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--gold-bright) 60%, transparent),
+    0 1px 3px color-mix(in srgb, var(--stage-bg) 55%, transparent);
+}
+/* Once the hand is over the committed chips have been swept into the pot, so
+   the per-seat "chips in front" pucks are redundant with the POT readout — and
+   they're exactly what crowds it at an all-in showdown. Fade them to a quiet
+   ghost so the settled pot stays the felt's headline. */
+.sim-ring-over .sim-chips {
+  opacity: 0.35;
+}
+
+/* Live seat cue — the seat whose turn it is gets a soft gold outline ring, so
+   the eye lands on the actor even before reading. Redundant with the felt's
+   "your turn" text on the hero pod; villains never linger (bots act instantly)
+   so this is chiefly a hero affordance. */
+.sim-ring-live {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sim-live) 60%, transparent);
+}
+.sim-stack {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.sim-allin {
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-size: var(--text-2xs);
+  color: var(--gold-bright);
+}
+
+/* Showdown reveal ON the felt — the villain's revealed hole cards at their pod,
+   rendered at the same tilt idiom as held cards but half-scale (they share the
+   pod footprint with the seat label). */
+.sim-reveal .card {
+  width: calc(var(--card-w) * 0.6);
+  height: calc(var(--card-h) * 0.6);
+}
+
+/* Action console — the hero's decision bar reuses .decisionbar/.decision-btn
+   verbatim; sim-actionbar only ensures the top margin reads under the felt. */
+.sim-actionbar {
+  margin-top: var(--space-4);
+}
+
+/* Between-turn / dealing placeholder line. */
+.sim-waiting {
+  margin-top: var(--space-4);
+  text-align: center;
+  color: var(--muted);
+  font-style: italic;
+}
+/* First-visit empty state (before the first hand adopts). */
 .simulate-empty {
   color: var(--muted);
+}
+
+/* ── Call sheet (bot action log) ──────────────────────────────────────────
+   A dealer's running call of the action since the hero last acted. Compact
+   rows: position chip + verb. Static list, no motion (S9 has no pacing). */
+.sim-log {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-panel);
+}
+.sim-log-title,
+.sim-ledger-title {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sim-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.sim-log-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-md);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.sim-log-item:last-child {
+  border-bottom: none;
+}
+.sim-log-pos {
+  flex: none;
+  min-width: calc(var(--card-w) * 0.7);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text);
+}
+.sim-log-verb {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+/* Folds recede; aggressive lines wear the room's terracotta pip — a leading
+   dot, redundant with the verb text (color is never the only cue). */
+.sim-log-fold .sim-log-verb {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+.sim-log-bet .sim-log-pos::before,
+.sim-log-raise .sim-log-pos::before {
+  content: "";
+  display: inline-block;
+  width: var(--space-1);
+  height: var(--space-1);
+  margin-right: var(--space-1);
+  border-radius: 50%;
+  background: var(--act-raise);
+  vertical-align: middle;
+}
+
+/* ── Rail sheet (ledger) ──────────────────────────────────────────────────
+   The club's ruled P&L book: one row per seat, hero pinned first and gilt
+   -marked, net_bb in mono tabular figures under a gilt column rule. The
+   authored move that gives Simulate its own identity. */
+.sim-ledger {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-panel);
+}
+.sim-ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-md);
+}
+.sim-ledger-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 0 var(--space-1);
+  /* the gilt column rule under the header — the ledger's ruled line */
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.sim-ledger-table .sim-led-net {
+  text-align: right;
+}
+.sim-led-row td {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+.sim-led-row:last-child td {
+  border-bottom: none;
+}
+.sim-led-seat {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  width: calc(var(--card-w) * 0.9);
+}
+.sim-led-who {
+  color: var(--muted);
+}
+.sim-led-net {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Hero row: a faint gilt wash + a left rule, so "You" reads as the ledger's
+   own line without a second color voice. */
+.sim-led-hero td {
+  background: var(--gold-glow);
+}
+.sim-led-hero .sim-led-seat {
+  box-shadow: inset 2px 0 0 var(--primary);
+  padding-left: var(--space-2);
+}
+.sim-led-hero .sim-led-who {
+  color: var(--text);
+  font-weight: 600;
+}
+/* Net tones — shared with the showdown deltas. Sign + word carry the meaning;
+   the tint is redundant. */
+.sim-net-up {
+  color: var(--sim-net-up);
+}
+.sim-net-down {
+  color: var(--sim-net-down);
+}
+.sim-net-even {
+  color: var(--sim-net-even);
+}
+
+/* ── Settlement slip (hand-over showdown) ─────────────────────────────────
+   Reuses .panel; a top gilt rule marks it as the hand's closing record. Each
+   row: position, revealed cards, chip delta. The gilded deal control closes it.
+   Folded villains never appear here (privacy). */
+.sim-showdown {
+  border-top: 3px solid var(--primary);
+}
+.sim-showdown-title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sim-showdown-list {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.sim-showdown-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.sim-showdown-pos {
+  flex: none;
+  min-width: calc(var(--card-w) * 1.1);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--text);
+}
+.sim-showdown-cards {
+  gap: var(--space-1);
+}
+.sim-showdown-cards .card {
+  width: calc(var(--card-w) * 0.72);
+  height: calc(var(--card-h) * 0.72);
+}
+.sim-showdown-delta {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sim-showdown-fold {
+  margin: 0 0 var(--space-4);
+  color: var(--muted);
+  font-style: italic;
+}
+.sim-deal-btn {
+  width: 100%;
+}
+
+/* Narrow gate — collapse to a single column; the side table drops below the
+   felt. Matches the drill stage's 1024×768 density philosophy. */
+@media (max-width: 900px) {
+  .sim-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

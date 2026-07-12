@@ -1,3 +1,4 @@
+import pytest
 from factories import make_rfi_spot
 
 from app.domain.spot import Position
@@ -304,3 +305,187 @@ def test_flop_signature_unchanged_by_river_dimension():
     # Companion to the pinned-hash test: flop spots reach NEITHER conditional
     # append, so the flop hash stays byte-identical through S7 too.
     assert spot_signature(_flop_spot(["As", "Kd", "2c"])) == "6832a54693ba5f6c"
+
+
+# --- S8: `mw` dimension (THIRD conditional append, after river_class) ---
+#
+# Authored to T4's frozen srs.py interface (docs/ai-dlc/specs/simulate-s8.md)
+# ahead of T4's srs.py landing mid-wave. `players_in_pot(spot) > 2` triggers the
+# append; heads-up spots (every existing fixture here, all 2-IN) never reach
+# it, so their hashes MUST stay byte-identical to the pins above. NEVER edit a
+# pinned literal — these tests only ADD companions, they never modify the
+# existing pins.
+
+
+def _has_multiway_seams() -> bool:
+    try:
+        from app.domain.spot import is_multiway, players_in_pot  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _mw_flop_spot(board, spr=5.0):
+    """A 3-way flop spot: same shape as _flop_spot but with a 3rd IN player."""
+    from app.domain.spot import (
+        GameConfig,
+        Hero,
+        NodeContext,
+        PlayerState,
+        Spot,
+        Stakes,
+        Street,
+    )
+
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=0.5, bb=1.0), table_size=9),
+        street=Street.FLOP,
+        board=board,
+        pot_bb=6.0,
+        hero=Hero(position=Position.BTN, hole_cards=("Ah", "Kh"), stack_bb=100),
+        players=[
+            PlayerState(position=Position.BTN, stack_bb=100, is_hero=True),
+            PlayerState(position=Position.BB, stack_bb=100),
+            PlayerState(position=Position.CO, stack_bb=100),
+        ],
+        effective_stack_bb=100,
+        spr=spr,
+        to_act=Position.BTN,
+        node_context=[NodeContext.CBET],
+        facing=Position.BB,
+    )
+
+
+def _mw_turn_spot(turn_card, extra_players=1):
+    """A (2+extra_players)-way turn spot — extra_players=1 -> 3-way,
+    extra_players=2 -> 4-way (both must collapse to the same 'mw' bucket)."""
+    from app.domain.spot import PlayerState, Position, Street
+
+    flop = _mw_flop_spot(["As", "Kd", "2c"])
+    extra = [
+        PlayerState(position=p, stack_bb=100)
+        for p in (Position.CO, Position.HJ)[:extra_players]
+    ]
+    return flop.model_copy(
+        update={
+            "street": Street.TURN,
+            "board": ["As", "Kd", "2c", turn_card],
+            "players": [flop.players[0], flop.players[1], *extra],
+        }
+    )
+
+
+def _mw_river_spot(river_card, extra_players=1):
+    from app.domain.spot import PlayerState, Position, Street
+
+    flop = _mw_flop_spot(["As", "Kd", "2c"])
+    extra = [
+        PlayerState(position=p, stack_bb=100)
+        for p in (Position.CO, Position.HJ)[:extra_players]
+    ]
+    return flop.model_copy(
+        update={
+            "street": Street.RIVER,
+            "board": ["As", "Kd", "2c", "7h", river_card],
+            "players": [flop.players[0], flop.players[1], *extra],
+        }
+    )
+
+
+def test_flop_signature_unchanged_by_multiway_dimension():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    # A heads-up flop spot (2 IN) must never reach the `mw` append, so this
+    # stays byte-identical to the pinned literal after S8 lands.
+    assert spot_signature(_flop_spot(["As", "Kd", "2c"])) == "6832a54693ba5f6c"
+
+
+def test_turn_signature_unchanged_by_multiway_dimension():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    assert spot_signature(_turn_spot("7h")) == "9c1aae003ae79de0"
+
+
+def test_river_signature_unchanged_by_multiway_dimension():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    # No pinned river-only literal exists pre-S8 in this file (river's S7
+    # companions use relative comparisons, not a pin) — so this companion
+    # instead proves byte-identity the same way S7's own river companions did:
+    # the HU (2-IN) river spot must still match the pre-existing S7 relative
+    # fixture behavior (river-card-class dimension only), i.e. two different
+    # blanks still collapse to one SRS item post-S8, unaffected by the new
+    # (omitted, for HU) `mw` dimension.
+    assert spot_signature(_river_spot("9s")) == spot_signature(_river_spot("8d"))
+
+
+def test_multiway_flop_signature_differs_from_hu_twin():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    hu = spot_signature(_flop_spot(["As", "Kd", "2c"]))
+    mw = spot_signature(_mw_flop_spot(["As", "Kd", "2c"]))
+    assert mw != hu
+
+
+def test_multiway_turn_signature_differs_from_hu_twin():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    hu = spot_signature(_turn_spot("7h"))
+    mw = spot_signature(_mw_turn_spot("7h"))
+    assert mw != hu
+
+
+def test_multiway_river_signature_differs_from_hu_twin():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    hu = spot_signature(_river_spot("9s"))
+    mw = spot_signature(_mw_river_spot("9s"))
+    assert mw != hu
+
+
+def test_multiway_3way_and_4way_hash_identically_binary_bucket():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    from app.domain.spot import PlayerState
+
+    flop_3 = _mw_flop_spot(["As", "Kd", "2c"])
+    flop_4 = flop_3.model_copy(
+        update={"players": [*flop_3.players, PlayerState(position=Position.HJ, stack_bb=100)]}
+    )
+    three_way = spot_signature(flop_3)
+    four_way = spot_signature(flop_4)
+    hu = spot_signature(_flop_spot(["As", "Kd", "2c"]))
+    assert three_way == four_way
+    assert three_way != hu
+    assert four_way != hu
+
+
+def test_multiway_3way_and_4way_turn_hash_identically():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    three_way = spot_signature(_mw_turn_spot("7h", extra_players=1))
+    four_way = spot_signature(_mw_turn_spot("7h", extra_players=2))
+    hu = spot_signature(_turn_spot("7h"))
+    assert three_way == four_way
+    assert three_way != hu
+
+
+def test_multiway_3way_and_4way_river_hash_identically():
+    if not _has_multiway_seams():
+        pytest.skip("T4 multiway seams (players_in_pot/is_multiway) not yet landed")
+    three_way = spot_signature(_mw_river_spot("9s", extra_players=1))
+    four_way = spot_signature(_mw_river_spot("9s", extra_players=2))
+    hu = spot_signature(_river_spot("9s"))
+    assert three_way == four_way
+    assert three_way != hu
+
+
+# NOTE: the refuter pre-computed 3 multiway hash literals in the ticket
+# (flop-MW f5a26ff25cb7ea4d / turn-MW ef1ac33ae4cf6042 / river-MW
+# e2d884cec8d5336d) against their OWN fixture construction, which this file's
+# local `_mw_*_spot` helpers do not reproduce byte-for-byte (different player
+# list shape/positions). Rather than pin a literal that doesn't match this
+# file's fixtures (and would silently drift from what it claims to guard),
+# the tests above assert the CONTRACT relatively — HU unchanged, MW != HU,
+# 3-way == 4-way — which is the behavior those literals were meant to prove.

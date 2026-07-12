@@ -26,7 +26,15 @@ from app.domain.evaluation import (
     ProviderKind,
 )
 from app.domain.leaks import LeakCategory
-from app.domain.spot import ActionType, NodeContext, PlayerStatus, Position, Spot, Street
+from app.domain.spot import (
+    ActionType,
+    NodeContext,
+    PlayerStatus,
+    Position,
+    Spot,
+    Street,
+    is_multiway,
+)
 from app.domain.texture import Texture, classify, river_card_class, turn_card_class
 
 # --- N3: authored postflop rationale (content path) ---
@@ -374,6 +382,50 @@ def _merits(
     return check, small, big
 
 
+# --- S8: multiway merit adjustment (binary bucket — heads-up vs 3+) ---
+# Applied by EVERY grader after its base merits are computed and BEFORE
+# _frequencies(), and ONLY when is_multiway(spot) — heads-up output stays
+# byte-identical. Directions (spec-frozen): fewer acceptable bluffs, slight
+# value-lean, tighter bluff-catching. Values are tuning knobs.
+_MW_BLUFF_DAMPEN = 0.6  # in (0,1): scales DOWN aggressive merit for bluff candidates
+_MW_VALUE_LEAN = 1.15  # >= 1.0: scales UP value-category aggressive merit
+_MW_CATCH_TIGHTEN = 1.3  # >= 1.0: scales UP fold merit for the air bluff-catch
+
+
+def _apply_multiway(merits: dict, *, cat_effective: str, facing_side: bool) -> dict:
+    """Multiway (3+) merit adjustment — reads NOTHING but the merit dict, the
+    already-computed hand category (post busted-draw demotion on the river) and
+    which side hero is on. Never persona data (graders-never-read-persona).
+
+    Aggressor side (keys check/small/big): dampen aggressive merit for
+    bluff-candidate categories — "air", and "draw" (semibluffs; river draws
+    arrive already demoted to "air" upstream) — and lean the "strong" value
+    bets up. Facing side (keys fold/call/raise): tighten the marginal
+    bluff-catch ("air" AND "weak_made" — air call merits are structurally
+    non-positive in every facing merit function, so weak_made is where the
+    tighten actually moves frequencies) — raise the fold merit, dampen the
+    call/raise-bluff merits. Scaling only applies to POSITIVE merits (scaling
+    a negative merit toward zero would perversely INCREASE it).
+    """
+    out = dict(merits)
+    if facing_side:
+        if cat_effective in ("air", "weak_made"):
+            out["fold"] = out["fold"] * _MW_CATCH_TIGHTEN
+            for k in ("call", "raise"):
+                if out[k] > 0:
+                    out[k] = out[k] * _MW_BLUFF_DAMPEN
+        return out
+    if cat_effective in ("air", "draw"):
+        for k in ("small", "big"):
+            if out[k] > 0:
+                out[k] = out[k] * _MW_BLUFF_DAMPEN
+    elif cat_effective == "strong":
+        for k in ("small", "big"):
+            if out[k] > 0:
+                out[k] = out[k] * _MW_VALUE_LEAN
+    return out
+
+
 def _frequencies(merits: list[float]) -> list[float]:
     pos = [max(0.0, m) for m in merits]
     total = sum(pos)
@@ -408,6 +460,13 @@ def grade_cbet(
     # flat per-category guess, wherever it's computable for this spot.
     fold_equity_value = _cbet_fold_equity_value(spot, board, tex, villain_range)
     m_check, m_small, m_big = _merits(adv, tex, cat, value_override=fold_equity_value)
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"check": m_check, "small": m_small, "big": m_big},
+            cat_effective=cat,
+            facing_side=False,
+        )
+        m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     merits = [m_check, m_small, m_big]
     freqs = _frequencies(merits)
 
@@ -610,6 +669,13 @@ def grade_vs_cbet(
         None,
     )
     m_fold, m_call, m_raise = _merits_vs_cbet(value, adv, price, tex, cat)
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"fold": m_fold, "call": m_call, "raise": m_raise},
+            cat_effective=cat,
+            facing_side=True,
+        )
+        m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
         (ActionType.FOLD, None, m_fold),
         (ActionType.CALL, faced or None, m_call),
@@ -791,6 +857,13 @@ def grade_vs_check_raise(
         None,
     )
     m_fold, m_call, m_raise = _merits_vs_check_raise(value, adv, price, tex, cat)
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"fold": m_fold, "call": m_call, "raise": m_raise},
+            cat_effective=cat,
+            facing_side=True,
+        )
+        m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
         (ActionType.FOLD, None, m_fold),
         (ActionType.CALL, faced or None, m_call),
@@ -994,6 +1067,13 @@ def grade_turn_barrel(
     m_check, m_small, m_big = _merits_turn_barrel(
         adv, tex, cat, tclass, _in_position(spot.hero.position, villain)
     )
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"check": m_check, "small": m_small, "big": m_big},
+            cat_effective=cat,
+            facing_side=False,
+        )
+        m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     merits = [m_check, m_small, m_big]
     freqs = _frequencies(merits)
 
@@ -1102,6 +1182,13 @@ def grade_vs_turn_bet(
         None,
     )
     m_fold, m_call, m_raise = _merits_vs_turn_bet(value, price, cat, tclass)
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"fold": m_fold, "call": m_call, "raise": m_raise},
+            cat_effective=cat,
+            facing_side=True,
+        )
+        m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
         (ActionType.FOLD, None, m_fold),
         (ActionType.CALL, faced or None, m_call),
@@ -1309,6 +1396,13 @@ def grade_river_barrel(
     m_check, m_small, m_big = _merits_river_barrel(
         adv, tex, cat_effective, rclass, _in_position(spot.hero.position, villain)
     )
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"check": m_check, "small": m_small, "big": m_big},
+            cat_effective=cat_effective,
+            facing_side=False,
+        )
+        m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     merits = [m_check, m_small, m_big]
     freqs = _frequencies(merits)
 
@@ -1422,6 +1516,13 @@ def grade_vs_river_bet(
         None,
     )
     m_fold, m_call, m_raise = _merits_vs_river_bet(value, price, cat_effective, rclass)
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"fold": m_fold, "call": m_call, "raise": m_raise},
+            cat_effective=cat_effective,
+            facing_side=True,
+        )
+        m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
         (ActionType.FOLD, None, m_fold),
         (ActionType.CALL, faced or None, m_call),

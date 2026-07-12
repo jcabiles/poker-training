@@ -196,7 +196,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       green.
       **Appetite:** ~1 large epic. **No-gos:** multiway (S8); no solver EVs; approximate labels.
 
-- [ ] **S8 — Multiway grading extension.** ICE 7·5·3. *(Track D, W4 — strictly after S7; same files as C track)*
+- [x] **S8 — Multiway grading extension.** *(done 2026-07-11, wave 4: binary HU/multiway via `players_in_pot()`/`is_multiway()` derived from PlayerState liveness — NO `Spot` field. `_apply_multiway` merit scaling (`_MW_BLUFF_DAMPEN=0.6`/`_MW_VALUE_LEAN=1.15`/`_MW_CATCH_TIGHTEN=1.3`) inside all 7 graders behind the `is_multiway` gate — aggressor dampens bluff-candidate merit, facing tightens **weak_made** bluff-catch (NOT air — air folds anyway; maker overrode the brief's `cat=="air"` per the spec's "marginal catchers"; combined-refuter verified ~1700 weak_made samples 100% tighter MW, 0% looser). Third conditional `"mw"` signature append after river_class (flop 9/10, turn 10/11, river 11/12); pins 6832…/0cdf…/9c1a… byte-identical (recomputed); scales only positive merits; graders read no persona data. **Scope property:** MW spots never persist in v1 (Practice HU-only + no Simulate SRS) ⇒ NO migration/model/rebuild/leak change, `TAXONOMY_VERSION` stays 5. Direction tests non-tautological (fail under no-op dampen). Combined-refuter PASS.)* ICE 7·5·3. *(Track D, W4)*
       **Problem:** live-texture tables are multiway-heavy; HU graders would mis-teach
       (bluff frequencies collapse multiway). **Outcome-link:** grading coverage where the sim
       actually lives. **Solution:** multiway adjustments (player-count-aware c-bet/barrel/
@@ -209,7 +209,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       beyond player count); if a spot still doesn't map, it stays "no baseline yet" — never
       silently HU-graded.
 
-- [ ] **S9 — Hero plays: session persistence, stacks, ledger.** ICE 9·7·4. *(Track E, W4 — strictly after S4: full hands need postflop bots)*
+- [x] **S9 — Hero plays: session persistence, stacks, ledger.** *(done 2026-07-11, wave 4: playable/persistent Simulate — `domain/table/play.py` (bot-driving loop mirroring the S4 `test_personas_postflop` harness PER-DECISION, stops at `hero_seat`; purity-allowlisted) + `sim_session`/`sim_seat`/`sim_hand` tables (migration 0009; rng_seed str, state_json text, SimSeat composite PK, owner_id '' sentinel) + `services/sim_session.py`. **FULL mid-hand restore** (persist live HandState JSON at every hero-boundary/hand-over — bots resolve atomically per request ⇒ no mid-bot checkpoints; rehydrate → exact decision point). Carry-over stacks + auto-rebuy (stack<1.0→100, `buyins+=100−stack`, 2dp) + net-BB ledger. Bot-action RNG = fresh `secrets.randbits(256)` per `advance_to_hero` (deal reproducible from rng_seed; full-hand bot replay = Later item). Hero-only wire privacy structural (SeatView + showdown-only reveals — refuter: 5 hands, zero leak). FE "Midnight Club rail sheet" table (SimTable/ActionBar/Ledger/EventLog/Showdown) + localStorage restore + 404 recovery. **sim_decision DEFERRED to S10** (interview). Fixes folded: SimTable wire-status case (lowercase enum), 404 seam (`SessionNotFound`), carry-over test assertion, badge/leave/puck polish. Design-review: desktop+tablet premium/ship (AA both themes, focus, privacy verified); **mobile 375px deferred → NEXT** (felt collapse + pre-existing shared-masthead scroll). 427 backend tests + verify.sh + FE typecheck/build green.)* ICE 9·7·4. *(Track E, W4)*
       **Problem:** engine + bots exist but the user can't sit down; nothing survives reload.
       **Outcome-link:** the actual product surface.
       **Solution:** hero seat + action buttons (Practice's decision component pattern);
@@ -270,6 +270,17 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   replay with verdicts.
 - **Hidden-persona mode + read tagging.** *Evidence:* gate decision — visible badges v1,
   read-development later. *Open questions:* does tagging need showdown-history support.
+- **Simulate mobile responsiveness.** *(design-review 2026-07-11; deferred by the
+  desktop-primary decision — desktop + tablet 768px ship premium/clean.)* *Evidence:* at
+  ≤~600px the 9-seat felt collapses into overlap (measured 30 overlapping seat pairs at 375px;
+  hero cards over the pot; persona meta chopped by card pucks), and a **pre-existing shared
+  masthead** (`.masthead-right` EV-ledger widget, `flex-wrap:nowrap` at 416px — NOT S9 code)
+  forces horizontal body scroll ≤~400px on *every* route (body scrollWidth 583 @375). Also a
+  cramped stats-strip at mobile (app-shell). *Candidate slices:* felt `min-width` +
+  horizontal-scroll wrapper OR a sub-600px compact/vertical seat layout; a shared app-shell
+  mobile breakpoint (masthead wrap + stats reflow) — **note the masthead fix is app-wide, not
+  Simulate-only**, so it wants its own design-review across Practice/Quiz too. *Open
+  questions:* is portrait phone/tablet a real usage context for a localhost desktop trainer.
 
 ## LATER — bets / outcomes (unexplored · NO hard dates)
 

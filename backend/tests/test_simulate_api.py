@@ -1,23 +1,20 @@
+"""API tests for the S9 simulate endpoints.
+
+Exercises the wire contract, not the service internals (those are
+`test_sim_session.py`, owned by T1). Depends on T1's DB-backed
+`app.services.sim_session` + `app.db.models.SimSession/SimSeat/SimHand` +
+migration `0009_sim_tables` — if those aren't committed yet, these tests will
+fail at collection/import time (expected mid-wave; see the wave-4 ticket).
+"""
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, create_engine
 
 from app.db.migrate import run_migrations
 from app.db.session import get_session
-from app.domain.spot import Position, validate_card
+from app.domain.spot import ActionType, validate_card
 from app.main import app
-
-_RING_ORDER = [
-    Position.UTG,
-    Position.UTG1,
-    Position.UTG2,
-    Position.LJ,
-    Position.HJ,
-    Position.CO,
-    Position.BTN,
-    Position.SB,
-    Position.BB,
-]
 
 
 @pytest.fixture
@@ -38,78 +35,23 @@ def client(temp_engine):
     app.dependency_overrides.clear()
 
 
-def _seat_of_btn(players: list[dict]) -> int:
-    btn = [i for i, p in enumerate(players) if p["position"] == "BTN"]
-    assert len(btn) == 1
-    return btn[0]
-
-
-def test_session_create_returns_valid_hand(client):
-    resp = client.post("/api/v1/simulate/session")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert "session_id" in body
+def _assert_no_leaked_hole_cards(body: dict) -> None:
+    """No non-hero, non-showdown hole cards; no state_json/full_board, ever."""
     hand = body["hand"]
-    assert hand["hand_no"] == 1
+    assert "state_json" not in hand
+    assert "full_board" not in hand
+    hero_cards = set(hand["hero"]["hole_cards"])
 
-    players = hand["players"]
-    assert len(players) == 9
-
-    btn_positions = [p for p in players if p["position"] == "BTN"]
-    assert len(btn_positions) == 1
-
-    hero_players = [p for p in players if p["is_hero"]]
-    assert len(hero_players) == 1
-    assert hero_players[0]["position"] == hand["hero"]["position"]
-
-    for p in players:
-        assert p["stack_bb"] == 100
-
-    hero_cards = hand["hero"]["hole_cards"]
-    assert len(hero_cards) == 2
-    for c in hero_cards:
-        validate_card(c)  # raises ValueError if invalid
-    assert hand["hero"]["stack_bb"] == 100
-
-
-def test_next_hand_advances_button_one_seat_and_increments_hand_no(client):
-    create = client.post("/api/v1/simulate/session").json()
-    session_id = create["session_id"]
-    hand1_players = create["hand"]["players"]
-    btn_seat_1 = _seat_of_btn(hand1_players)
-
-    resp = client.post(f"/api/v1/simulate/session/{session_id}/hand")
-    assert resp.status_code == 200
-    hand2 = resp.json()
-    assert hand2["hand_no"] == 2
-    btn_seat_2 = _seat_of_btn(hand2["players"])
-
-    assert btn_seat_2 == (btn_seat_1 + 1) % 9
-
-    # Every emitted position is a valid RING member, exactly one BTN.
-    positions = [p["position"] for p in hand2["players"]]
-    assert all(pos in {p.value for p in _RING_ORDER} for pos in positions)
-    assert positions.count("BTN") == 1
-
-
-def test_next_hand_deals_different_hero_cards_across_hands(client):
-    session_id = client.post("/api/v1/simulate/session").json()["session_id"]
-    hero_hands = set()
-    for _ in range(3):
-        resp = client.post(f"/api/v1/simulate/session/{session_id}/hand")
-        hero_hands.add(tuple(resp.json()["hero"]["hole_cards"]))
-    # Overwhelmingly unlikely all 3 draws collide if seeded independently.
-    assert len(hero_hands) > 1
-
-
-def test_response_has_no_board_or_villain_cards(client):
-    resp = client.post("/api/v1/simulate/session")
-    body = resp.json()
+    showdown_cards: set[str] = set()
+    for sd in hand["showdown"]:
+        showdown_cards.update(sd["hole_cards"])
 
     def _walk(obj):
         if isinstance(obj, dict):
-            assert "board" not in obj
-            assert "hole_cards" not in obj or obj is body["hand"]["hero"]
+            assert "state_json" not in obj
+            assert "full_board" not in obj
+            if "hole_cards" in obj and obj is not hand["hero"] and obj not in hand["showdown"]:
+                raise AssertionError(f"unexpected hole_cards field: {obj}")
             for v in obj.values():
                 _walk(v)
         elif isinstance(obj, list):
@@ -118,12 +60,143 @@ def test_response_has_no_board_or_villain_cards(client):
 
     _walk(body)
 
-    # players carry no hole-card field at all (PlayerState has none).
-    for p in body["hand"]["players"]:
-        assert "hole_cards" not in p
+    # seats never carry a hole_cards field at all (SeatView has none).
+    for seat in hand["seats"]:
+        assert "hole_cards" not in seat
+
+    for c in hero_cards:
+        validate_card(c)
+    for c in showdown_cards:
+        validate_card(c)
 
 
-def test_unknown_session_id_returns_404(client):
+def _play_hand_to_completion(client: TestClient, session_id: str) -> dict:
+    """Drive hero actions (fold when it's hero's turn) until hand_over."""
+    body = client.get(f"/api/v1/simulate/session/{session_id}").json()
+    for _ in range(500):
+        hand = body["hand"]
+        _assert_no_leaked_hole_cards(body)
+        if hand["hand_over"]:
+            return body
+        assert hand["is_hero_turn"]
+        # Prefer check/fold to end the hand quickly.
+        kinds = {la["action"] for la in hand["legal_actions"]}
+        action = "check" if "check" in kinds else "fold"
+        resp = client.post(
+            f"/api/v1/simulate/session/{session_id}/action",
+            json={"action": action},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+    raise AssertionError("hand did not complete within 500 hero actions")
+
+
+def test_create_returns_valid_session(client):
+    resp = client.post("/api/v1/simulate/session")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "session_id" in body
+    hand = body["hand"]
+    assert hand["hand_no"] == 1
+    assert len(hand["seats"]) == 9
+    hero_seats = [s for s in hand["seats"] if s["is_hero"]]
+    assert len(hero_seats) == 1
+    assert hero_seats[0]["persona_type"] is None
+    assert len(hand["hero"]["hole_cards"]) == 2
+    _assert_no_leaked_hole_cards(body)
+
+
+def test_create_act_showdown_happy_path(client):
+    create = client.post("/api/v1/simulate/session").json()
+    session_id = create["session_id"]
+    final = _play_hand_to_completion(client, session_id)
+    assert final["hand"]["hand_over"] is True
+    _assert_no_leaked_hole_cards(final)
+
+
+def test_restore_returns_live_decision_point(client):
+    create = client.post("/api/v1/simulate/session").json()
+    session_id = create["session_id"]
+
+    restored = client.get(f"/api/v1/simulate/session/{session_id}")
+    assert restored.status_code == 200
+    body = restored.json()
+    assert body["session_id"] == session_id
+    assert body["hand"]["hand_no"] == create["hand"]["hand_no"]
+    assert body["hand"]["to_act_seat"] == create["hand"]["to_act_seat"]
+    assert body["hand"]["is_hero_turn"] == create["hand"]["is_hero_turn"]
+    _assert_no_leaked_hole_cards(body)
+
+
+def test_404_on_missing_session(client):
+    resp = client.get("/api/v1/simulate/session/does-not-exist")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "session not found"
+
+
+def test_404_on_ended_session(client):
+    create = client.post("/api/v1/simulate/session").json()
+    session_id = create["session_id"]
+
+    leave_resp = client.post(f"/api/v1/simulate/session/{session_id}/leave")
+    assert leave_resp.status_code == 204
+
+    resp = client.get(f"/api/v1/simulate/session/{session_id}")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "session not found"
+
+
+def test_404_on_missing_session_for_action(client):
+    resp = client.post(
+        "/api/v1/simulate/session/does-not-exist/action",
+        json={"action": "fold"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "session not found"
+
+
+def test_404_on_missing_session_for_hand(client):
     resp = client.post("/api/v1/simulate/session/does-not-exist/hand")
     assert resp.status_code == 404
     assert resp.json()["detail"] == "session not found"
+
+
+def test_illegal_hero_action_returns_400(client):
+    create = client.post("/api/v1/simulate/session").json()
+    session_id = create["session_id"]
+    hand = create["hand"]
+    assert hand["is_hero_turn"]
+    legal_kinds = {la["action"] for la in hand["legal_actions"]}
+    # RAISE is never legal preflop for the first-to-act hero without a size,
+    # and if it happens to be legal, an absurd out-of-range size is illegal.
+    if ActionType.RAISE.value in legal_kinds:
+        payload = {"action": "raise", "size_bb": 100000.0}
+    else:
+        payload = {"action": "raise", "size_bb": 4.0}
+
+    resp = client.post(
+        f"/api/v1/simulate/session/{session_id}/action",
+        json=payload,
+    )
+    assert resp.status_code == 400
+
+
+def test_next_hand_carries_over_stacks_and_advances_button(client):
+    create = client.post("/api/v1/simulate/session").json()
+    session_id = create["session_id"]
+    btn1 = create["hand"]["button_seat"]
+
+    _play_hand_to_completion(client, session_id)
+
+    resp = client.post(f"/api/v1/simulate/session/{session_id}/hand")
+    assert resp.status_code == 200
+    body = resp.json()
+    hand2 = body["hand"]
+    assert hand2["hand_no"] == 2
+    assert hand2["button_seat"] == (btn1 + 1) % 9
+    # Carry-over: stacks reflect the previous hand's result, not a blanket
+    # reset to 100bb (a winner may legitimately hold >100bb).
+    assert any(seat["stack_bb"] != 100.0 for seat in hand2["seats"])
+    for seat in hand2["seats"]:
+        assert seat["stack_bb"] >= 0.0
+    _assert_no_leaked_hole_cards(body)

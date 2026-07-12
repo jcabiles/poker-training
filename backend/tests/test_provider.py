@@ -358,3 +358,30 @@ def test_river_provider_rejects_board_len_four():
         # board deliberately left at length 4
     )
     assert _run(p.supports(short_river)) is False
+
+
+# --- S8: a multiway c-bet is graded (FOUND freq+EV), never NOT_FOUND ---
+# Authored to T4's frozen `players_in_pot` builder kwarg
+# (docs/ai-dlc/specs/simulate-s8.md) ahead of T4's scenarios.py landing
+# mid-wave. Import/TypeError here (kwarg not yet added) is EXPECTED — report,
+# do not patch T4's files.
+
+
+def test_composite_routes_multiway_cbet_to_graded_verdict_not_not_found():
+    import random
+
+    from app.domain.scenarios import build_cbet_spot
+
+    try:
+        spot = build_cbet_spot(random.Random(9), eff_bb=100.0, players_in_pot=3)
+    except TypeError:
+        import pytest
+
+        pytest.skip("T4 multiway seams (players_in_pot kwarg) not yet landed")
+
+    p = get_provider()
+    assert _run(p.supports(spot)) is True
+    res = _run(p.optimal(spot))
+    assert res.coverage == Coverage.FULL
+    assert res.coverage != Coverage.NOT_FOUND
+    assert res.provider == ProviderKind.HEURISTIC
