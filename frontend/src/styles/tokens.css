@@ -144,6 +144,24 @@
   --sim-net-down: var(--bad); /* losing seat P&L */
   --sim-net-even: var(--muted); /* break-even */
   --sim-live: var(--primary); /* the seat/hero cue when it is their turn */
+
+  /* S10 verdict tiers — the grading badge/recap/report vocabulary. Each tier is
+     a WORD-on-chip: an opaque fill + a same-family ink, so the badge stays AA on
+     the (always-dark) felt independent of what's under it (color is redundant —
+     the word always shows). All pairs WCAG-verified both themes: best 5.0 day /
+     7.5 night, mistake 5.2/7.8, blunder 5.0/6.6, ok text/surface-2 13.5/15.1,
+     none muted/surface-2 5.3/7.9; every chip clears 1.7:1 vs felt so it reads as
+     a struck token. --*-ink is the word; --*-fill is the chip. */
+  --sim-tier-good-ink: var(--good);
+  --sim-tier-good-fill: var(--good-bg);
+  --sim-tier-warn-ink: var(--warn);
+  --sim-tier-warn-fill: var(--warn-bg);
+  --sim-tier-bad-ink: var(--bad);
+  --sim-tier-bad-fill: var(--bad-bg);
+  --sim-tier-neutral-ink: var(--text);
+  --sim-tier-neutral-fill: var(--surface-2);
+  --sim-tier-muted-ink: var(--muted);
+  --sim-tier-muted-fill: var(--surface-2);
 }
 
 [data-theme="dark"] {
@@ -189,6 +207,19 @@
   --sim-net-down: var(--bad);
   --sim-net-even: var(--muted);
   --sim-live: var(--primary);
+
+  /* S10 verdict tiers — night values (mapped onto the night tone tokens; the
+     AA figures above cover both themes). */
+  --sim-tier-good-ink: var(--good);
+  --sim-tier-good-fill: var(--good-bg);
+  --sim-tier-warn-ink: var(--warn);
+  --sim-tier-warn-fill: var(--warn-bg);
+  --sim-tier-bad-ink: var(--bad);
+  --sim-tier-bad-fill: var(--bad-bg);
+  --sim-tier-neutral-ink: var(--text);
+  --sim-tier-neutral-fill: var(--surface-2);
+  --sim-tier-muted-ink: var(--muted);
+  --sim-tier-muted-fill: var(--surface-2);
 }
 
 * {

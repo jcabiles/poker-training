@@ -233,6 +233,43 @@ export interface EventView {
   street: string;
 }
 
+// Simulate S10 grading — one graded hero decision. `correctness` null means
+// "no baseline yet" (the spot was multiway / off-pack / unmappable, so the
+// grader never ran); such rows carry ev_loss_bb 0 and no verdict/reasoning, and
+// are EXCLUDED from any accuracy / EV-loss summary (they'd dilute the numbers).
+// `verdict`/`reasoning` are the tiered teaching text and only survive on the
+// live path (last_grade + the current session's accumulation) — a mid-session
+// reload loses them and the recap degrades to numbers-only rows.
+export interface GradeView {
+  street: string; // "preflop" | "flop" | "turn" | "river"
+  ordinal: number; // 0-based decision index within the hand
+  chosen_action: string; // the action the hero took
+  correctness: "optimal" | "acceptable" | "mistake" | "blunder" | null;
+  ev_loss_bb: number; // ≈ approximate (heuristic provider); 0 for no-baseline
+  coverage: string; // "full" | "partial" | "not_found" | "unmappable"
+  verdict: string | null; // tiered verdict line; null when no baseline / reloaded
+  reasoning: string | null; // the "why"; recap expands it for mistakes+ only
+}
+
+// Simulate S10 all-time per-street report. ALWAYS all four streets in order.
+// Rates the FE derives (accuracy) EXCLUDE no_baseline rows; no_baseline is its
+// own count so sparse v1 coverage reads honestly instead of hiding.
+export interface StreetReportRow {
+  street: string; // "preflop" | "flop" | "turn" | "river"
+  graded: number; // decisions with a baseline verdict
+  optimal: number;
+  acceptable: number;
+  mistake: number;
+  blunder: number;
+  ev_loss_bb: number; // ≈ sum over graded rows
+  no_baseline: number; // not_found + unmappable rows
+}
+
+export interface StreetReportView {
+  rows: StreetReportRow[]; // street order: preflop, flop, turn, river (all four)
+  total_decisions: number; // graded + no_baseline across all streets
+}
+
 export interface SimulateHandView {
   hand_no: number; // 1-based, increments per hand
   button_seat: number; // seat index holding the dealer button
@@ -247,6 +284,14 @@ export interface SimulateHandView {
   events: EventView[]; // bot actions since the last hero decision
   hand_over: boolean;
   showdown: ShowdownSeatView[]; // [] until hand_over; folded villains never listed
+  // S10 grading. `last_grade` is the verdict for the decision JUST taken (null
+  // when this response wasn't a graded hero action, e.g. a deal). `recap` is the
+  // finished hand's full per-decision list ([] until hand_over) — ordinal order.
+  // Persisted recap rows carry no verdict/reasoning text (only freq/EV survive a
+  // reload); SimulateView merges the live-path last_grade tiers back in so the
+  // "why" shows for mistakes/blunders on the live path.
+  last_grade?: GradeView | null;
+  recap?: GradeView[];
 }
 
 export interface SessionView {

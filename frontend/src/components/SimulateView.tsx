@@ -7,12 +7,14 @@ import {
   postNextHand,
   postSimulateSession,
 } from "../api/client";
-import type { ActionType, SessionView } from "../api/types";
+import type { ActionType, GradeView, SessionView } from "../api/types";
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
 import SimLedger from "./simulate/SimLedger";
+import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
 import SimSpeedPicker, { type SimSpeed } from "./simulate/SimSpeedPicker";
+import SimStreetReport from "./simulate/SimStreetReport";
 import SimTable from "./simulate/SimTable";
 
 // Simulate S9 — the playable, persistent table. Hero acts via predetermined
@@ -112,6 +114,29 @@ export default function SimulateView() {
     setStagedIndex(n);
   }, []);
 
+  // ── S10 grading state ─────────────────────────────────────────────────────
+  // The just-taken decision's verdict, shown as a seal on the hero pod. The hero
+  // acts by their own click (not part of the bot playback), so the badge may
+  // appear immediately — but it's cleared the moment the next action starts and
+  // whenever a fresh hand deals, so it never bleeds onto a later decision.
+  const [heroBadge, setHeroBadge] = useState<GradeView | null>(null);
+
+  // Tier accumulation (refuter reality): persisted recap rows carry NO
+  // verdict/reasoning text — only the live `last_grade` on each action response
+  // does. So we stash each hand's live grades by ordinal here and merge them
+  // back into the hand-over recap, so mistakes/blunders show their "why" on the
+  // live path. Reset per hand (a new hand_no). A ref (not state): it's read at
+  // render time from the current view and never needs to trigger its own render.
+  const tiersByOrdinal = useRef<Map<number, GradeView>>(new Map());
+  const gradedHandNo = useRef<number | null>(null);
+  // The hand_no we've already refetched the report for, so a restore/re-render
+  // of an already-finished hand doesn't refetch on every adopt.
+  const reportedHandNo = useRef<number | null>(null);
+
+  // Bumped whenever a hand completes so the all-time per-street report refetches
+  // its aggregate. Also nudged on mount by the report's own effect.
+  const [reportKey, setReportKey] = useState(0);
+
   const clearTimer = useCallback(() => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
@@ -184,6 +209,27 @@ export default function SimulateView() {
       // Private-mode / disabled storage: play still works this session, only
       // reload-restore is lost. Non-fatal.
     }
+
+    // S10 grade bookkeeping. A new hand_no resets the per-hand tier accumulator
+    // (each hand's "why" text is independent). Then stash this response's
+    // live grade (if any) by ordinal so the hand-over recap can merge in the
+    // tiers the persisted rows lack, and surface it as the hero-pod badge.
+    const hand = res.hand;
+    if (gradedHandNo.current !== hand.hand_no) {
+      tiersByOrdinal.current = new Map();
+      gradedHandNo.current = hand.hand_no;
+    }
+    const grade = hand.last_grade ?? null;
+    if (grade) tiersByOrdinal.current.set(grade.ordinal, grade);
+    setHeroBadge(grade);
+
+    // A finished hand's decisions have persisted — refetch the all-time report
+    // (once per hand_no, so a reload of an already-over hand doesn't re-fetch).
+    if (hand.hand_over && reportedHandNo.current !== hand.hand_no) {
+      reportedHandNo.current = hand.hand_no;
+      setReportKey((k) => k + 1);
+    }
+
     setView(res);
   }, []);
 
@@ -341,6 +387,24 @@ export default function SimulateView() {
 
   const hand = view?.hand ?? null;
 
+  // Merge the finished hand's persisted recap with the live tiers we accumulated
+  // this hand (persisted rows lack verdict/reasoning text; the live grades carry
+  // it). Match by ordinal; the live entry wins where present so misses show
+  // their "why" on the live path. On a mid-session reload the accumulator is
+  // empty, so this degrades to the numbers-only persisted rows — accepted v1.
+  const mergedRecap = useMemo<GradeView[]>(() => {
+    const rows = hand?.recap ?? [];
+    return rows.map((r) => tiersByOrdinal.current.get(r.ordinal) ?? r);
+    // hand?.recap identity changes per view; the accumulator is a ref read live.
+  }, [hand?.recap]);
+
+  // Pacing gate (S11 lockstep philosophy — nothing on screen may lead the log):
+  // during staged bot playback the hand may already be hand_over server-side,
+  // but the recap and the felt's final grades must stay hidden until playback
+  // completes. The hero's OWN badge is exempt — the hero acted by their own
+  // click, not the bot playback, so it may show immediately.
+  const revealHandEnd = !playing;
+
   return (
     <section className="simulate">
       <div className="sim-topbar">
@@ -369,7 +433,12 @@ export default function SimulateView() {
       {hand ? (
         <div className="sim-layout">
           <div className="sim-main">
-            <SimTable hand={hand} stagedIndex={stagedIndex} revealAt={revealAt} />
+            <SimTable
+              hand={hand}
+              stagedIndex={stagedIndex}
+              revealAt={revealAt}
+              lastGrade={heroBadge}
+            />
 
             {hand.is_hero_turn && (
               <SimActionBar
@@ -379,13 +448,19 @@ export default function SimulateView() {
               />
             )}
 
-            {hand.hand_over && (
-              <SimShowdown
-                showdown={hand.showdown}
-                seats={hand.seats}
-                onNextHand={nextHand}
-                dealing={busy || playing}
-              />
+            {/* Hand-over surfaces gate on playback: the recap and settlement
+                slip appear only once the bot playback finishes (revealHandEnd),
+                so nothing leads the log. */}
+            {hand.hand_over && revealHandEnd && (
+              <>
+                <SimShowdown
+                  showdown={hand.showdown}
+                  seats={hand.seats}
+                  onNextHand={nextHand}
+                  dealing={busy}
+                />
+                <SimRecap recap={mergedRecap} />
+              </>
             )}
 
             {!hand.is_hero_turn && !hand.hand_over && (
@@ -397,13 +472,22 @@ export default function SimulateView() {
 
           <aside className="sim-side">
             <SimEventLog events={hand.events} stagedIndex={stagedIndex} />
+            <SimStreetReport refreshKey={reportKey} />
             <SimLedger seats={hand.seats} />
           </aside>
         </div>
       ) : (
         !error && (
-          <div className="panel simulate-empty" role="status">
-            Taking a seat…
+          <div className="sim-empty-shell">
+            <div className="panel simulate-empty" role="status">
+              Taking a seat…
+            </div>
+            {/* The all-time report is session-independent — show it even before
+                the first hand adopts (spec: visible with or without a live
+                session). */}
+            <aside className="sim-side sim-side-empty">
+              <SimStreetReport refreshKey={reportKey} />
+            </aside>
           </div>
         )
       )}

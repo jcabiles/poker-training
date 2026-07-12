@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 
-import type { SeatView, ShowdownSeatView, SimulateHandView } from "../../api/types";
+import type { GradeView, SeatView, ShowdownSeatView, SimulateHandView } from "../../api/types";
 import Card from "../Card";
+import { tierOf } from "./simGrade";
 
 // Simulate S9 table. A purpose-built felt for the persistent session: it reuses
 // PokerTable's felt/ring/rail CSS classes and elliptical geometry verbatim (so
@@ -43,6 +44,7 @@ export default function SimTable({
   hand,
   stagedIndex,
   revealAt,
+  lastGrade,
 }: {
   hand: SimulateHandView;
   // How many of the current events batch have been narrated (shared with the
@@ -54,6 +56,11 @@ export default function SimTable({
   // ahead of the log. Positions absent from the map settled before this batch
   // (hero, seats already folded) → revealed from the start.
   revealAt: Map<string, number>;
+  // S10 verdict for the hero's just-taken action, or null. SimulateView owns
+  // the gating: it passes the grade only once it's safe to show (the hero's own
+  // decision isn't part of the bot playback, so this can appear immediately —
+  // but SimulateView still withholds it once the NEXT view lands / on a deal).
+  lastGrade: GradeView | null;
 }) {
   const { seats, board, pot_bb, hero, to_act_seat, button_seat } = hand;
   const showdownBySeat = new Map<number, ShowdownSeatView>(
@@ -155,6 +162,7 @@ export default function SimTable({
                       </>
                     )}
                   </div>
+                  {lastGrade && <SimVerdictBadge grade={lastGrade} />}
                 </div>
               );
             }
@@ -206,6 +214,34 @@ export default function SimTable({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// S10 verdict seal on the hero pod — the struck ruling for the action the hero
+// just took. The tier WORD always carries the meaning; the tone tint is
+// redundant (color is never the only cue). A "no baseline yet" grade (multiway
+// / off-pack / unmappable spot) renders as its own muted state, never faked
+// into a tier. Non-fold graded rows carry the ≈EV-loss so the cost is legible
+// at the table; the recap is where the full "why" lives.
+function SimVerdictBadge({ grade }: { grade: GradeView }) {
+  const meta = tierOf(grade.correctness);
+  const graded = grade.correctness != null;
+  const showLoss = graded && grade.ev_loss_bb > 0;
+  return (
+    <div
+      className={"sim-badge sim-tier-" + meta.tone}
+      role="status"
+      aria-label={
+        graded
+          ? `Verdict: ${meta.label}${showLoss ? `, gave up about ${grade.ev_loss_bb.toFixed(1)} big blinds` : ""}`
+          : "No baseline for this spot yet"
+      }
+    >
+      <span className="sim-badge-word">{meta.label}</span>
+      {showLoss && (
+        <span className="sim-badge-ev num">≈{grade.ev_loss_bb.toFixed(1)}bb</span>
+      )}
     </div>
   );
 }
