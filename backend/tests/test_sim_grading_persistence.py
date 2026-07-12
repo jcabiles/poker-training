@@ -19,6 +19,7 @@ suspenders) — exercised via `_seed_practice_and_sim_rows` below.
 
 from __future__ import annotations
 
+import asyncio
 import random
 from datetime import date
 
@@ -145,7 +146,10 @@ def test_simulate_session_creates_zero_srs_rows(engine):
                 view = deal_next_hand(s, view.session_id)
                 continue
             assert view.hand.is_hero_turn
-            view = apply_hero_action(s, view.session_id, _fold_or_check_decision(view))
+            # apply_hero_action went async in S10 T1 (awaits the grading provider).
+            view = asyncio.run(
+                apply_hero_action(s, view.session_id, _fold_or_check_decision(view))
+            )
         srs_rows = list(s.exec(select(SRSItemRow)))
         assert srs_rows == []
 

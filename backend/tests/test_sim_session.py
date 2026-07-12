@@ -5,6 +5,7 @@ per-decision parity between `app.domain.table.play` and the S4 harness
 
 from __future__ import annotations
 
+import asyncio
 import random
 
 import pytest
@@ -24,12 +25,17 @@ from app.domain.table.engine import legal_actions as engine_legal_actions
 from app.services import sim_session
 from app.services.sim_session import (
     SessionNotFound,
-    apply_hero_action,
     create_session,
     deal_next_hand,
     leave_session,
     restore_session,
 )
+
+
+def apply_hero_action(*args, **kwargs):
+    """Sync driver: S10 made the service async (it awaits the grading
+    provider); these S9 tests still exercise it synchronously."""
+    return asyncio.run(sim_session.apply_hero_action(*args, **kwargs))
 
 
 @pytest.fixture
