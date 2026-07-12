@@ -11,6 +11,7 @@ import type { ActionType, GradeView, SessionView } from "../api/types";
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
 import SimLedger from "./simulate/SimLedger";
+import SimRangeChart from "./simulate/SimRangeChart";
 import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
 import SimSpeedPicker, { type SimSpeed } from "./simulate/SimSpeedPicker";
@@ -460,6 +461,18 @@ export default function SimulateView() {
                 legalActions={hand.legal_actions}
                 disabled={busy || playing}
                 onDecide={decide}
+              />
+            )}
+
+            {/* Point-of-need baseline range chart (C2). Preflop hero turns only,
+                and never during bot playback (pacing). The identity key stamps
+                the chart fetch with (session, hand_no, is_hero_turn) so a stale
+                response for an already-resolved decision is discarded. */}
+            {hand.is_hero_turn && hand.street === "preflop" && !playing && view && (
+              <SimRangeChart
+                sessionId={view.session_id}
+                identityKey={`${view.session_id}#${hand.hand_no}#${hand.is_hero_turn}`}
+                heroCards={hand.hero.hole_cards}
               />
             )}
 

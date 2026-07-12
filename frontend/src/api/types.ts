@@ -298,3 +298,22 @@ export interface SessionView {
   session_id: string; // uuid4 hex
   hand: SimulateHandView;
 }
+
+// Simulate preflop chart (C1/C2) — point-of-need baseline range chart for the
+// hero's CURRENT preflop decision. Mirror of backend/app/schemas/simulate.py.
+// `available` is a 200-body concern (never a fetch error): false — with a null
+// grid — when it isn't the hero's preflop turn, the hand is over, or the spot is
+// unmappable (multiway / off-pack). The grid, when present, is the SAME
+// handclass -> {action: freq} shape RangeGrid renders. `exploit_note` is the
+// live villain's persona-keyed read line, null when no authored pair exists.
+export interface ExploitNoteView {
+  villain_label: string; // the actual opponent seat's persona_type
+  rationale: string;
+}
+
+export interface PreflopChartView {
+  available: boolean;
+  node_label: string | null;
+  grid: Record<string, Record<string, number>> | null; // hand -> {action: freq}, ≈ baseline
+  exploit_note: ExploitNoteView | null;
+}
