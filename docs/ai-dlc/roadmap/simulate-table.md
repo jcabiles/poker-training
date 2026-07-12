@@ -234,13 +234,20 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       mistakes/blunders; attempts recorded tagged `source=simulate` — **`drill_attempt` has
       no `source` column today (verified), so this slice ships an additive Alembic migration
       adding it (default `'practice'`)** and threads it through `record_attempt` in
-      `services/review.py` + stats reads; **no SRS writes**.
+      `services/review.py` + stats reads; **no SRS writes**; PLUS *(scope add 2026-07-12,
+      user vision)* a **minimal per-street report**: one aggregate endpoint over
+      `sim_decision` (all-time, grouped by street: graded count, verdict-tier mix, EV-loss
+      sum, no-baseline count) + a compact read-only panel in the Simulate view — numbers
+      only, no charts.
       **Pass/fail:** a deliberately-bad preflop play shows a red badge + blunder recap with
       reasoning; unmapped spot renders "no baseline yet"; migration applies up/down clean and
       existing attempt rows read back unchanged; attempt rows carry the simulate tag and
-      appear in stats; zero SRS rows created (test); `verify.sh` + build green.
-      **Appetite:** ~1 epic. **No-gos:** no exploit-aware verdicts; no SRS; recap only —
-      no session-report view.
+      appear in stats; zero SRS rows created (test); per-street report shows the played
+      decisions bucketed by street with rates that EXCLUDE no-baseline rows (shown as
+      coverage count instead); `verify.sh` + build green.
+      **Appetite:** ~1 epic (+ the small report stretch). **No-gos:** no exploit-aware
+      verdicts; no SRS; no charts/winrate graphs/positional breakdowns (NEXT: session
+      analytics).
 
 - [ ] **S11 — Pacing + table feel polish.** ICE 6·8·6. *(Track E, W6 — last)*
       **Problem:** instant 8-bot action is unreadable; folded hands waste time.
@@ -272,6 +279,15 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   replay with verdicts.
 - **Hidden-persona mode + read tagging.** *Evidence:* gate decision — visible badges v1,
   read-development later. *Open questions:* does tagging need showdown-history support.
+- **Session analytics view (per-street decision quality).** *(promoted from Later
+  2026-07-12 — explicit user vision: "track my decisions at each street, then show me
+  analytics on whether I made good/bad/acceptable decisions at each street.")* *Evidence:*
+  S10's `sim_decision` rows carry street + verdict tier + EV-loss per decision — the data
+  exists the moment S10 ships; S10 includes only a minimal numbers-only per-street report.
+  *Candidate slices:* winrate/EV-loss trend graph; per-street + per-position breakdown;
+  per-session filtering; leak-category drill-down. *Open questions:* how much does the S10
+  minimal report already answer (review after ~2 weeks of real use); charting approach
+  (tokens-only CSS bars vs a library — library needs ask-first).
 - **Simulate mobile responsiveness.** *(design-review 2026-07-11; deferred by the
   desktop-primary decision — desktop + tablet 768px ship premium/clean.)* *Evidence:* at
   ≤~600px the 9-seat felt collapses into overlap (measured 30 overlapping seat pairs at 375px;
@@ -293,9 +309,8 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 - **Bet: depth-aware persona ranges + depth-aware grading** (beyond SPR commit logic).
   *Confidence:* lo · assumptions to test: how far stacks actually drift in real sessions
   (ledger data will show) · review-by: after carry-over sessions accumulate.
-- **Bet: session analytics** (winrate graph, positional/street breakdown per session).
-  *Confidence:* med · assumptions to test: does the recap + leak stats already answer it ·
-  review-by: after S10 ships.
+- ~~Bet: session analytics~~ *(promoted 2026-07-12: minimal per-street report folded into
+  S10; the richer view — graphs, positional/session breakdowns — is now a NEXT item.)*
 - **Bet: solver-grade baseline (Phase 3, unchanged)** — would upgrade both Practice and
   Simulate verdicts on the same `StrategyProvider` seam. *Confidence:* med · review-by:
   after heuristic turn/river grading proves/disproves sufficient.
