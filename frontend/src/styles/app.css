@@ -3173,11 +3173,19 @@ kbd {
   color: var(--sim-tier-muted-ink);
 }
 
-/* Hero-pod verdict seal — sits just under the hero's meta line. The word
-   inherits its tier ink; the chip fill keeps it legible on felt. Entrance is a
-   gentle struck-in (scale + fade), reduced-motion-guarded below. */
+/* Hero-pod verdict seal — a side-flag beside the hero's cards, NOT below the
+   meta line: the hero pod already hangs below the rail by design, and anything
+   appended under .herometa lands in .stage's overflow:hidden clip band (final
+   design review high-1: up to 13px of the badge sheared at 1440×900).
+   Absolute takes it out of the pod's flex flow (pod height unchanged ⇒ no
+   clip); the wide felt has ample horizontal room to the pod's right before
+   the BB pod. The word inherits its tier ink; entrance is
+   reduced-motion-guarded below. */
 .heroseat .sim-badge {
-  margin-top: var(--space-1);
+  position: absolute;
+  left: calc(100% + var(--space-2));
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* ── Decision recap — the coach's margin ledger ─────────────────────────────
@@ -3460,13 +3468,16 @@ kbd {
     animation: sim-badge-strike var(--dur-2) var(--ease-1) both;
   }
   @keyframes sim-badge-strike {
+    /* Keyframe transform REPLACES the base rule's — carry the side-flag's
+       translateY through both frames or `both` fill pins the badge back to
+       the clip band it was just rescued from. */
     from {
       opacity: 0;
-      transform: scale(0.86);
+      transform: translateY(-50%) scale(0.86);
     }
     to {
       opacity: 1;
-      transform: scale(1);
+      transform: translateY(-50%) scale(1);
     }
   }
   .sim-recap-why {
