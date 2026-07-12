@@ -9,6 +9,9 @@ POST /simulate/session/{id}/leave    -> end the session (no longer restorable).
 GET  /simulate/report/streets        -> all-time per-street grading report (S10).
 GET  /simulate/{id}/preflop-chart    -> baseline range chart for the hero's
                                          current preflop decision (chart slice C1).
+GET  /simulate/{id}/villain-range/{seat} -> live estimated hand-range for a
+                                         non-hero, non-folded villain seat
+                                         (villain-range V2).
 
 All state lives in the DB (`app.services.sim_session`); this module only
 translates HTTP <-> service calls. No auth: `owner_id=""`. See
@@ -22,7 +25,7 @@ from sqlmodel import Session
 
 from app.db.session import get_session
 from app.domain.action import Decision
-from app.schemas.simulate import PreflopChartView, SessionView, StreetReportView
+from app.schemas.simulate import PreflopChartView, SessionView, StreetReportView, VillainRangeView
 from app.services import sim_session
 from app.services.sim_session import SessionNotFound
 
@@ -84,5 +87,22 @@ async def preflop_chart(
     # 200-body concern; 404 stays SessionNotFound-only.
     try:
         return sim_session.preflop_chart(db, session_id, owner_id=_OWNER_ID)
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="session not found") from exc
+
+
+@router.get("/{session_id}/villain-range/{seat_index}", response_model=VillainRangeView)
+async def villain_range(
+    session_id: str,
+    seat_index: int,
+    through_action: int | None = None,
+    db: Session = Depends(get_session),
+) -> VillainRangeView:
+    # Availability (hero seat / folded / hand over / no persona) is a
+    # 200-body concern; 404 stays SessionNotFound-only (spec refuter low-1).
+    try:
+        return sim_session.villain_range(
+            db, session_id, seat_index, through_action=through_action, owner_id=_OWNER_ID
+        )
     except SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="session not found") from exc

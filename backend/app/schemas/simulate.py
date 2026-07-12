@@ -122,3 +122,19 @@ class PreflopChartView(BaseModel):
     node_label: str | None = None
     grid: dict[str, dict[str, float]] | None = None  # hand -> {action: freq}, ≈ baseline
     exploit_note: ExploitNoteView | None = None  # None when no authored pair exists
+
+
+class VillainRangeView(BaseModel):
+    """Live per-villain range estimate (villain-range V2). available=false
+    (no weights) for the hero's own seat, a folded seat (staged-fold gating
+    is a FE concern; this is the SERVER-truth fold state), a finished hand
+    (showdown reveals real cards), or a seat with no persona — never a
+    fabricated chart. Availability is a 200-body concern; 404 stays reserved
+    for a missing/ended session (spec refuter low-1)."""
+
+    available: bool
+    seat_index: int
+    persona_label: str | None = None
+    street: str | None = None
+    exact: bool = False
+    weights: dict[str, float] | None = None  # hand class -> weight; zero-weight omitted
