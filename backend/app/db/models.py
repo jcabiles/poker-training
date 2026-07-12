@@ -35,6 +35,9 @@ class DrillAttempt(SQLModel, table=True):
     # Hand class (e.g. "AKo", "77") derived from hero's hole cards at grade time
     # (Phase: Challenge mode T1). Nullable — not backfilled for historical rows.
     hand_class: str | None = Field(default=None)
+    # Attempt origin (S10): 'practice' (default, matches all historical rows) or
+    # 'simulate'. Practice stats reads filter on it so sim rows never skew them.
+    source: str = Field(default="practice")
 
 
 class SimSession(SQLModel, table=True):
@@ -77,6 +80,35 @@ class SimHand(SQLModel, table=True):
     rng_seed: str  # 256-bit deal seed (str: overflows SQLite INTEGER)
     status: str = Field(default="in_progress")  # "in_progress" | "complete"
     state_json: str | None = None  # serialized live HandState
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class SimDecision(SQLModel, table=True):
+    """One graded hero decision inside a Simulate hand (S10).
+
+    Every hero decision gets a row — including spots the grader can't map or
+    has no baseline for (coverage 'unmappable' / 'not_found', correctness
+    None), so the recap and per-street report can show honest coverage. Only
+    baseline-graded rows ALSO produce a tagged DrillAttempt(source='simulate').
+    """
+
+    __tablename__ = "sim_decision"
+
+    id: int | None = Field(default=None, primary_key=True)
+    # Ownership seam: '' = the local user (no accounts yet, sentinel only).
+    owner_id: str = Field(default="")
+    session_id: str = Field(foreign_key="sim_session.id", index=True)
+    sim_hand_id: int = Field(foreign_key="sim_hand.id", index=True)
+    street: str  # preflop / flop / turn / river
+    ordinal: int  # 0-based decision order within the hand
+    chosen_action: str
+    # None = "no baseline yet" (coverage not_found or unmappable).
+    correctness: str | None = Field(default=None)
+    ev_loss_bb: float = 0.0
+    leak_category: int | None = Field(default=None)
+    # Coverage.value ('full'/'partial'/'not_found') or 'unmappable' (the spot
+    # mapper returned None — no canonical Spot could be built at all).
+    coverage: str
     created_at: datetime = Field(default_factory=_utcnow)
 
 
