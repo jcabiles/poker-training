@@ -288,7 +288,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   per-session filtering; leak-category drill-down. *Open questions:* how much does the S10
   minimal report already answer (review after ~2 weeks of real use); charting approach
   (tokens-only CSS bars vs a library — library needs ask-first).
-- **Collapsible hero preflop range chart (point-of-need).** *(user request 2026-07-12;
+- ~~Collapsible hero preflop range chart~~ **DONE 2026-07-12 → PR #36** *(built autonomously under the user's proceed-with-everything instruction: grade_map extended to vs_3bet/vs_4bet/vs_limpers (C0 — also widens S10 grading), GET /simulate/{id}/preflop-chart (grid byte-identical to Practice via the same _INDEX + range_grid; exploit note resolved facing→sim_seat persona, vs_limpers honestly note-less), SimRangeChart collapsed-default panel (fetch-on-expand, pot_bb-keyed per-decision refetch — refuter caught a same-hand stale-chart high), design-review SHIP zero issues; 504 tests green.)* *(user request 2026-07-12;
   gate decision: baseline chart + exploit note — NOT persona-adjusted squares, which would
   collide with the heuristic-only no-go and belongs to a Later bet after exploit-aware
   grading.)* *Evidence:* the pieces exist — baseline preflop packs
@@ -301,7 +301,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   cards do. *Candidate slices:* chart panel (reuse RangeGrid + mapper); exploit-note
   wiring. *Open questions:* which villain's note wins in multiway; collapse-state
   persistence.
-- **Villain range reveal — live, per-action updates, all streets.** *(user request
+- ~~Villain range reveal~~ **DONE 2026-07-12 → PR #37** *(range_estimate.py: card-free PublicActionHistory projection + chip-walk replay proven equivalent to live playouts; preflop EXACT pack posterior, postflop ≈ via sample_postflop_decision capture-rng; 11ms/estimate; NO-PEEK test-enforced (swapped villain cards ⇒ identical weights); through_action lockstep (domain_index = 2 + narrated count, FE cumulative bookkeeping proven 169→5 at the raise threshold); heat panel w/ staged-fold gating + hand-boundary close; refuter + design-review rounds all folded; 523 tests green.)* *(user request
   2026-07-12; gate decision: all streets from day one, postflop explicitly labeled an
   ESTIMATE.)* *Evidence:* persona preflop play is explicit-range-based (`personas.py`
   samples from parsed combo ranges) ⇒ the preflop reveal is EXACT conditioning — each

@@ -258,6 +258,22 @@ body {
   --act-on: #0a0d0b; /* label ink — near-black green, NOT white */
 }
 
+/* Simulate villain-range heat (V2) — theme-independent, like the action-chip
+   colors above. The weighted 13×13 estimate is drawn on IVORY card stock in
+   BOTH themes (--sim-vrange-mat, matched to --card-bg — the grid reads as a
+   physical chart, and a fixed light ground keeps the near-black --act-on label
+   legible at every weight regardless of theme). --sim-vrange-heat is the one
+   metal voice: a warm brass wash whose OPACITY tracks the class weight. At full
+   opacity over the ivory mat it stays a mid-tone brass — --act-on on it clears
+   7.2:1; every lower-weight blend sits between ivory (13:1) and that, so the
+   label never drops below AA. Verified both themes (the tokens don't change per
+   theme, and the ivory ground doesn't either). Empty (zero-weight) cells stay
+   bare mat. */
+:root {
+  --sim-vrange-mat: #f9f4e4; /* ivory chart ground (= --card-bg, theme-invariant) */
+  --sim-vrange-heat: #c39a4a; /* brass heat wash — --act-on 7.2:1 at full opacity */
+}
+
 /* Dark scrims for chips/labels laid on top of the (always-dark) felt surface
    in both themes; theme-independent like the action colors above. Green-black
    rather than pure black; darkening only raises --felt-text contrast. */

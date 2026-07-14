@@ -17,6 +17,7 @@ import type {
   Spot,
   StatsSummary,
   StreetReportView,
+  VillainRangeView,
 } from "./types";
 
 const BASE = "/api/v1"; // proxied to FastAPI :8008 in dev
@@ -138,4 +139,31 @@ export async function leaveSession(sessionId: string): Promise<void> {
 // when a hand completes. Always returns all four street rows.
 export async function getStreetReport(): Promise<StreetReportView> {
   return json(await fetch(`${BASE}/simulate/report/streets`));
+}
+
+// Preflop chart (C1/C2) — the baseline range chart for the hero's CURRENT
+// preflop decision on this session. Server-side state only (no spot params):
+// the endpoint reads the live decision point. `available=false` (with a null
+// grid) is a normal 200 body for a non-hero-preflop / unmappable spot — only a
+// missing/ended session 404s. The panel fetches this on first expand and
+// refetches per new hero preflop turn while expanded.
+export async function getPreflopChart(sessionId: string): Promise<PreflopChartView> {
+  return json(await fetch(`${BASE}/simulate/${sessionId}/preflop-chart`));
+}
+
+// Villain-range (V2) — the live estimated hand-range for one villain seat on
+// this session. `throughAction` is the CUMULATIVE narrated (non-POST) action
+// count for the WHOLE hand so far (hero's own + every villain's, chronological);
+// the server truncates the estimate to that prefix so the chart never leads the
+// event log (lockstep). Omit it for the fully-resolved posterior. `available=
+// false` (with null weights) is a normal 200 body for the hero seat / a folded
+// seat / a finished hand / a personaless seat — only a missing/ended session
+// 404s. The panel fetches this on open and refetches as the count advances.
+export async function getVillainRange(
+  sessionId: string,
+  seatIndex: number,
+  throughAction?: number,
+): Promise<VillainRangeView> {
+  const q = throughAction != null ? `?through_action=${throughAction}` : "";
+  return json(await fetch(`${BASE}/simulate/${sessionId}/villain-range/${seatIndex}${q}`));
 }

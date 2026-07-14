@@ -2,20 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getSession,
+  getVillainRange,
   leaveSession,
   postHeroAction,
   postNextHand,
   postSimulateSession,
 } from "../api/client";
-import type { ActionType, GradeView, SessionView } from "../api/types";
+import type { ActionType, GradeView, SessionView, VillainRangeView } from "../api/types";
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
 import SimLedger from "./simulate/SimLedger";
+import SimRangeChart from "./simulate/SimRangeChart";
 import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
 import SimSpeedPicker, { type SimSpeed } from "./simulate/SimSpeedPicker";
 import SimStreetReport from "./simulate/SimStreetReport";
 import SimTable from "./simulate/SimTable";
+import SimVillainRange from "./simulate/SimVillainRange";
 
 // Simulate S9 — the playable, persistent table. Hero acts via predetermined
 // -sizing buttons; bots resolve instantly (server-side, within each request),
@@ -139,6 +142,32 @@ export default function SimulateView() {
   // its aggregate. Also nudged on mount by the report's own effect.
   const [reportKey, setReportKey] = useState(0);
 
+  // ── Villain-range (V2) ──────────────────────────────────────────────────────
+  // Cumulative narrated-action bookkeeping for the range endpoint's lockstep
+  // `through_action` param (the WHOLE-hand count of non-POST actions narrated so
+  // far — hero's own + every villain's). The endpoint maps it to the domain's
+  // POST-inclusive index (`domain_index = 2 + through_action`), so an off-by-one
+  // here shows up as a chart one action ahead of / behind the log.
+  //
+  // `narratedBase` = the count of narrated actions BEFORE the current batch's
+  // staged events; `narratedCount = narratedBase + stagedIndex`. Within one hand
+  // every re-adopt is a hero action (next-hand/initial deal start a new
+  // hand_no), and the hero's own action is itself exactly one narrated row that
+  // precedes this batch's events — so the recurrence is: new hand ⇒ base 0;
+  // same-hand hero action ⇒ base = prevBase + prevEventCount + 1. Held in a ref
+  // (read at fetch time) plus mirrored context for reset detection.
+  const narratedBaseRef = useRef(0);
+  const narratedHandRef = useRef<string | null>(null);
+  const prevEventCountRef = useRef(0);
+
+  // Which villain seat's estimated-range panel is open (one at a time), plus the
+  // resolved estimate + its fetch status. openRangeSeat drives the SimTable
+  // button pressed-state and the panel mount; the rest is the panel's data.
+  const [openRangeSeat, setOpenRangeSeat] = useState<number | null>(null);
+  const [villainRange, setVillainRange] = useState<VillainRangeView | null>(null);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeErrored, setRangeErrored] = useState(false);
+
   const clearTimer = useCallback(() => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
@@ -236,8 +265,36 @@ export default function SimulateView() {
       setReportKey((k) => k + 1);
     }
 
+    // Villain-range narrated-count bookkeeping (see the refs' comment). A fresh
+    // hand resets the base to 0; a same-hand re-adopt is always a hero action,
+    // whose single narrated row precedes this batch's events — so the new base
+    // is the previous batch's fully-revealed total (prevBase + prevEventCount)
+    // plus that one hero row. The count is only ever CONSUMED while playback is
+    // active (see `rangeThrough`); on a settled/restored turn the full history
+    // is requested instead, so a mid-hand reload (events=[], no hero action)
+    // never needs an accurate base.
+    const newBatch = res.hand.events?.length ?? 0;
+    if (narratedHandRef.current !== gradeKey) {
+      narratedHandRef.current = gradeKey;
+      narratedBaseRef.current = 0;
+      // Any hand transition closes an open villain-range panel — including
+      // hand endings whose hand_over view was never adopted (the hero-fold
+      // shortcut jumps straight to the next deal; without this a panel open on
+      // a NON-folding villain silently carried across the hand boundary —
+      // villain-range refuter med-1).
+      setOpenRangeSeat(null);
+    } else {
+      narratedBaseRef.current = narratedBaseRef.current + prevEventCountRef.current + 1;
+    }
+    prevEventCountRef.current = newBatch;
+    // Reset the staged index ATOMICALLY with the base bump: the playback
+    // effect also resets it, but that runs a flush later — in between,
+    // rangeThrough would read newBase + the OLD batch's terminal stagedIndex
+    // and fire one inflated lockstep request (refuter low-1).
+    setStaged(0);
+
     setView(res);
-  }, []);
+  }, [setStaged]);
 
   const clearStored = useCallback(() => {
     sessionIdRef.current = null;
@@ -420,6 +477,84 @@ export default function SimulateView() {
   // click, not the bot playback, so it may show immediately.
   const revealHandEnd = !playing;
 
+  // ── Villain-range panel: open/close + lockstep fetch (V2) ───────────────────
+  // The narrated count that gates the estimate. While playback runs, it's the
+  // per-hand cumulative count of narrated actions the log has revealed so far
+  // (base + stagedIndex) — passed as `through_action` so the chart conditions on
+  // exactly the visible prefix and NEVER leads the log. When NOT playing the log
+  // is fully caught up (or this is a restored/settled turn), so we request the
+  // full history (undefined) — which also sidesteps a mid-hand reload's
+  // untracked base.
+  const narratedCount = narratedBaseRef.current + stagedIndex;
+  const rangeThrough = playing ? narratedCount : undefined;
+
+  // The open seat's live SeatView (server truth) and its STAGED reveal state —
+  // the same staged-fold computation SimTable's button uses, so the panel closes
+  // in lockstep with the fold narration, not the instant server-truth flips.
+  const openSeat =
+    openRangeSeat != null ? hand?.seats.find((s) => s.seat_index === openRangeSeat) : undefined;
+  const openSeatStagedFolded =
+    openSeat != null &&
+    (() => {
+      const threshold = revealAt.get(openSeat.position);
+      const revealed = threshold == null || stagedIndex >= threshold;
+      return revealed && openSeat.status === "folded";
+    })();
+
+  const toggleRange = useCallback((seatIndex: number) => {
+    setOpenRangeSeat((prev) => (prev === seatIndex ? null : seatIndex));
+  }, []);
+  const closeRange = useCallback(() => setOpenRangeSeat(null), []);
+
+  // Auto-close: the open villain's staged fold narrates, or the hand ends
+  // (hand_over reveals real cards — an estimate beside the truth is noise). Both
+  // are lockstep-aware: hand_over's felt reveal is itself gated behind playback,
+  // and the fold uses the staged computation above.
+  useEffect(() => {
+    if (openRangeSeat == null) return;
+    if (hand?.hand_over || openSeat == null || openSeatStagedFolded) {
+      setOpenRangeSeat(null);
+    }
+  }, [openRangeSeat, hand?.hand_over, openSeat, openSeatStagedFolded]);
+
+  // Fetch on open + REFETCH as the narrated count advances while open (lockstep
+  // narrowing). Stale-response guard mirrors SimRangeChart: each request is
+  // stamped with the (seat, through) live at fire time; a late response for a
+  // superseded stamp is discarded. Fire-and-forget — never blocks the table.
+  const rangeStampRef = useRef<string>("");
+  useEffect(() => {
+    if (openRangeSeat == null || view == null) return;
+    const stamp = `${view.session_id}#${openRangeSeat}#${rangeThrough ?? "full"}`;
+    rangeStampRef.current = stamp;
+    let cancelled = false;
+    setRangeLoading(true);
+    setRangeErrored(false);
+    getVillainRange(view.session_id, openRangeSeat, rangeThrough)
+      .then((res) => {
+        if (cancelled || rangeStampRef.current !== stamp) return;
+        setVillainRange(res);
+        setRangeLoading(false);
+      })
+      .catch(() => {
+        if (cancelled || rangeStampRef.current !== stamp) return;
+        setVillainRange(null);
+        setRangeErrored(true);
+        setRangeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Refetch on: open seat change, count advance (lockstep narrowing), or a
+    // 404-recovery into a fresh session (session_id).
+  }, [openRangeSeat, rangeThrough, view]);
+
+  // Drop stale panel data the instant the open seat changes / closes, so the
+  // next open never flashes the previous villain's grid before its fetch lands.
+  useEffect(() => {
+    setVillainRange(null);
+    setRangeErrored(false);
+  }, [openRangeSeat]);
+
   return (
     <section className="simulate">
       <div className="sim-topbar">
@@ -453,7 +588,24 @@ export default function SimulateView() {
               stagedIndex={stagedIndex}
               revealAt={revealAt}
               lastGrade={heroBadge}
+              openRangeSeat={openRangeSeat}
+              onToggleRange={toggleRange}
             />
+
+            {/* Villain-range panel (V2) — one open villain at a time, keyed by
+                the open seat so a seat switch remounts a fresh grid. Sits under
+                the felt so it doesn't crowd the seat pods. Auto-closes on the
+                villain's staged fold / hand_over (effects above). */}
+            {openSeat && !openSeatStagedFolded && !hand.hand_over && (
+              <SimVillainRange
+                key={openSeat.seat_index}
+                position={openSeat.position}
+                range={villainRange}
+                loading={rangeLoading}
+                errored={rangeErrored}
+                onClose={closeRange}
+              />
+            )}
 
             {hand.is_hero_turn && (
               <SimActionBar
@@ -463,19 +615,21 @@ export default function SimulateView() {
               />
             )}
 
-            {/* Hand-over surfaces gate on playback: the recap and settlement
-                slip appear only once the bot playback finishes (revealHandEnd),
-                so nothing leads the log. */}
-            {hand.hand_over && revealHandEnd && (
-              <>
-                <SimShowdown
-                  showdown={hand.showdown}
-                  seats={hand.seats}
-                  onNextHand={nextHand}
-                  dealing={busy}
-                />
-                <SimRecap recap={mergedRecap} />
-              </>
+            {/* Point-of-need baseline range chart (C2). Preflop hero turns only,
+                and never during bot playback (pacing). The identity key must
+                change PER DECISION POINT, not per hand: two hero preflop turns
+                in one hand (open → villain 3-bets → hero faces it) would
+                otherwise share a key and keep the FIRST decision's chart on
+                screen for the second (chart refuter high-1). pot_bb strictly
+                grows between consecutive preflop hero decisions, so it is the
+                per-decision discriminator; is_hero_turn added nothing (always
+                true when mounted). */}
+            {hand.is_hero_turn && hand.street === "preflop" && !playing && view && (
+              <SimRangeChart
+                sessionId={view.session_id}
+                identityKey={`${view.session_id}#${hand.hand_no}#${hand.pot_bb}`}
+                heroCards={hand.hero.hole_cards}
+              />
             )}
 
             {/* Hand-over surfaces gate on playback: the recap and settlement

@@ -43,7 +43,10 @@
       "gh pr view*",
       "gh pr list*",
       "gh auth status*",
-      "git push origin*"
+      "git push origin*",
+      "git push -u origin*",
+      "git fetch*",
+      "git pull origin*"
     ],
     "network": {
       "allowLocalBinding": true,

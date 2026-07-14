@@ -32,9 +32,11 @@ from app.domain.action import Decision
 from app.domain.archetypes import VillainType
 from app.domain.content.models import PersonaPack
 from app.domain.content.notation import hole_cards_to_class
+from app.domain.content.registry import lookup
 from app.domain.evaluation import Coverage, EvaluationResult, FeedbackTiers
+from app.domain.grading import range_grid
 from app.domain.personas import load_persona_packs
-from app.domain.spot import Hero, NodeContext, Spot, Street
+from app.domain.spot import Hero, NodeContext, PlayerStatus, Spot, Street
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
     HandState,
@@ -46,15 +48,23 @@ from app.domain.table.engine import (
 )
 from app.domain.table.grade_map import map_decision_point
 from app.domain.table.play import ActionEvent, advance_to_hero, assign_lineup
+from app.domain.table.range_estimate import (
+    PublicAction,
+    PublicActionHistory,
+    estimate_range,
+)
 from app.schemas.simulate import (
     EventView,
+    ExploitNoteView,
     GradeView,
+    PreflopChartView,
     SeatView,
     SessionView,
     ShowdownSeatView,
     SimulateHandView,
     StreetReportRow,
     StreetReportView,
+    VillainRangeView,
 )
 
 HERO_SEAT = 0
@@ -467,6 +477,188 @@ def street_report(db: Session, owner_id: str = "") -> StreetReportView:
     return StreetReportView(
         rows=[StreetReportRow(street=s, **by_street[s]) for s in _STREET_ORDER],
         total_decisions=sum(a["graded"] + a["no_baseline"] for a in by_street.values()),
+    )
+
+
+def _content_index() -> dict:
+    """The ONE content index singleton Practice's drill grid is built from —
+    reusing it (not a second build_index) guarantees the chart grid is
+    byte-identical to the Practice drill grid for the same Spot. Lazy import
+    for the same circularity reason as _grading_provider."""
+    from app.api.v1.drill import _INDEX
+
+    return _INDEX
+
+
+def _node_label(spot: Spot) -> str:
+    ctx = spot.node_context[0]
+    pos = spot.hero.position.value
+    if ctx is NodeContext.RFI:
+        return f"{pos} open (RFI)"
+    if ctx is NodeContext.VS_LIMPERS:
+        n = spot.limper_count or 0
+        return f"{pos} vs {n} limper{'' if n == 1 else 's'}"
+    facing = spot.facing.value if spot.facing is not None else "?"
+    if ctx is NodeContext.VS_3BET:
+        return f"{pos} vs {facing} 3-bet"
+    if ctx is NodeContext.VS_4BET:
+        return f"{pos} vs {facing} 4-bet"
+    return f"{pos} vs {facing} open"  # VS_RFI / BLIND_DEFENSE
+
+
+def _exploit_note(
+    spot: Spot, state: HandState, seats: list[SimSeat]
+) -> ExploitNoteView | None:
+    """The authored exploit rationale for (mapped node, LIVE villain persona).
+
+    Villain resolution (spec med-1): the mapped Spot carries villain_type=None;
+    the villain is the seat sitting at the Spot's `facing` position in the LIVE
+    hand — its persona_type keys the registry lookup. Spots without a facing
+    position (RFI, vs_limpers — content keys limpers by count, not seat) carry
+    no single resolvable villain seat ⇒ no note; ditto any missing authored
+    pair. The note is omitted, never guessed."""
+    if spot.facing is None:
+        return None
+    villain_seat = next(s.seat for s in state.seats if s.position is spot.facing)
+    persona = seats[villain_seat].persona_type
+    if persona is None:
+        return None
+    entry = lookup(_content_index(), spot, villain_type=VillainType(persona))
+    if entry is None or entry.rationale is None:
+        return None
+    return ExploitNoteView(villain_label=persona, rationale=entry.rationale)
+
+
+def preflop_chart(db: Session, session_id: str, owner_id: str = "") -> PreflopChartView:
+    """Read-only: the baseline chart for the hero's CURRENT preflop decision.
+
+    available=false when it is not the hero's preflop turn, the hand is over,
+    or the decision point is unmappable — chart availability ≡ gradeability
+    (same map_decision_point gate), never a fabricated grid."""
+    session = _get_session(db, session_id, owner_id)
+    if session is None:
+        raise SessionNotFound(session_id)
+    hand = _current_hand(db, session)
+    if hand is None or hand.state_json is None:
+        return PreflopChartView(available=False)
+    state = HandState.model_validate_json(hand.state_json)
+    if (
+        state.hand_over
+        or state.street is not Street.PREFLOP
+        or state.to_act_seat != HERO_SEAT
+    ):
+        return PreflopChartView(available=False)
+    spot = map_decision_point(state, HERO_SEAT)
+    if spot is None:
+        return PreflopChartView(available=False)
+    # Exactly api/v1/drill.py's preflop-grid pattern, on the same singletons.
+    grid = range_grid(lookup(_content_index(), spot))
+    return PreflopChartView(
+        available=True,
+        node_label=_node_label(spot),
+        grid=grid,
+        exploit_note=_exploit_note(spot, state, _load_seats(db, session_id)),
+    )
+
+
+def _public_history(state: HandState) -> PublicActionHistory:
+    """Card-free projection of `state` (villain-range V2, spec structural
+    no-peek §high-3). Built ONLY from `state.action_history`/`state.board`/
+    `state.seats[*].position`/`state.seats[*].stack_bb`+`invested_total_bb` —
+    never `SeatState.hole_cards`, never passed as a `SeatState` object. Each
+    seat's pre-hand starting stack is stack_bb + invested_total_bb (nothing
+    resets invested_total_bb mid-hand, so the sum recovers the hand's opening
+    stack without a separate persisted snapshot)."""
+    pos2seat = {s.position: s.seat for s in state.seats}
+    starting = [0.0] * len(state.seats)
+    for s in state.seats:
+        starting[s.seat] = round(s.stack_bb + s.invested_total_bb, 2)
+    return PublicActionHistory(
+        button_seat=state.button_seat,
+        starting_stacks_bb=tuple(starting),
+        board=tuple(state.board),
+        actions=tuple(
+            PublicAction(
+                seat=pos2seat[h.position],
+                position=h.position,
+                street=h.street,
+                action=h.action,
+                amount_bb=h.amount_bb,
+            )
+            for h in state.action_history
+        ),
+    )
+
+
+def villain_range(
+    db: Session,
+    session_id: str,
+    seat_index: int,
+    through_action: int | None = None,
+    owner_id: str = "",
+) -> VillainRangeView:
+    """Read-only: the live estimated hand-range for a villain seat (spec
+    `simulate-villain-range.md`). NO-PEEK is structural — `state` (which
+    holds every seat's hole cards) is stripped to a `PublicActionHistory`
+    projection by `_public_history` BEFORE `estimate_range` ever sees it;
+    dead cards are the hero's own hole cards plus the revealed board only.
+
+    available=false (200 body) when the seat is the hero, is FOLDED per
+    SERVER truth (the FE's staged/lag gating is a display concern layered on
+    top, not this), the hand is over (showdown reveals real cards), or the
+    seat has no persona (should not happen for a live non-hero seat, but
+    checked defensively). 404 stays reserved for SessionNotFound.
+
+    `through_action`: the wire unit is a NARRATED action count — the number
+    of non-POST public actions (hero's own + every villain's) that have
+    happened so far in the hand, in chronological order — because that's
+    what a client-side event log naturally tracks. `action_history` always
+    opens with exactly 2 POST rows (SB, BB) before any narrated action, and
+    every subsequent apply() (hero or bot) appends exactly one row, so the
+    translation to V1's POST-inclusive `estimate_range(through_action=...)`
+    index is a constant offset: `domain_index = 2 + narrated_count`. `None`
+    means "full history so far" (no truncation). Clamped to
+    `[0, len(action_history)]` so an out-of-range count degrades to the
+    nearest valid prefix rather than erroring.
+    """
+    session = _get_session(db, session_id, owner_id)
+    if session is None:
+        raise SessionNotFound(session_id)
+    hand = _current_hand(db, session)
+    if hand is None or hand.state_json is None:
+        return VillainRangeView(available=False, seat_index=seat_index)
+    state = HandState.model_validate_json(hand.state_json)
+    if (
+        seat_index == HERO_SEAT
+        or state.hand_over
+        or state.seats[seat_index].status is PlayerStatus.FOLDED
+    ):
+        return VillainRangeView(available=False, seat_index=seat_index)
+    seats = _load_seats(db, session_id)
+    persona_type = seats[seat_index].persona_type
+    if persona_type is None:
+        return VillainRangeView(available=False, seat_index=seat_index)
+    pack = _packs()[VillainType(persona_type)]
+
+    history = _public_history(state)
+    total = len(history.actions)
+    domain_through: int | None = None
+    if through_action is not None:
+        domain_through = max(0, min(2 + through_action, total))
+    dead_cards = tuple(state.seats[HERO_SEAT].hole_cards)
+    estimate = estimate_range(
+        pack, history, seat_index, dead_cards=dead_cards, through_action=domain_through
+    )
+    n = total if domain_through is None else domain_through
+    street = history.actions[n - 1].street if n > 0 else Street.PREFLOP
+    weights = {cls: w for cls, w in estimate.class_weights.items() if w > 0.0}
+    return VillainRangeView(
+        available=True,
+        seat_index=seat_index,
+        persona_label=pack.display_name,
+        street=street.value,
+        exact=estimate.exact,
+        weights=weights,
     )
 
 

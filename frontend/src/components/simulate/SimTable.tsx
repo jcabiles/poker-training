@@ -45,6 +45,8 @@ export default function SimTable({
   stagedIndex,
   revealAt,
   lastGrade,
+  openRangeSeat,
+  onToggleRange,
 }: {
   hand: SimulateHandView;
   // How many of the current events batch have been narrated (shared with the
@@ -61,6 +63,14 @@ export default function SimTable({
   // decision isn't part of the bot playback, so this can appear immediately —
   // but SimulateView still withholds it once the NEXT view lands / on a deal).
   lastGrade: GradeView | null;
+  // Villain-range reveal (V2): the seat_index whose estimated-range panel is
+  // currently open (one at a time), or null. SimTable renders a small "range"
+  // affordance on live (non-hero, non-STAGED-folded) villain pods; clicking
+  // toggles that seat via onToggleRange. The button uses the SAME staged fold
+  // computation the pod display uses — never raw seat.status — so it must not
+  // vanish before the fold is narrated (spec low-2).
+  openRangeSeat: number | null;
+  onToggleRange: (seatIndex: number) => void;
 }) {
   const { seats, board, pot_bb, hero, to_act_seat, button_seat } = hand;
   const showdownBySeat = new Map<number, ShowdownSeatView>(
@@ -209,6 +219,28 @@ export default function SimTable({
                   {fmtBb(seat.stack_bb)}bb
                   {allin && <span className="sim-allin"> all-in</span>}
                 </span>
+                {/* Range reveal (V2): live villain pods only. Gated on the
+                    STAGED fold state (`folded` above) — same value the pod
+                    display uses — so the button stays until the fold narrates
+                    (spec low-2), not the instant server-truth flips. Also
+                    requires a persona (no estimate without a pack). Hidden at
+                    hand_over: the felt reveals real cards, an estimate is noise. */}
+                {seat.persona_type && !folded && !hand.hand_over && (
+                  <button
+                    type="button"
+                    className={
+                      "sim-vrange-btn" +
+                      (openRangeSeat === seat.seat_index ? " sim-vrange-btn-on" : "")
+                    }
+                    onClick={() => onToggleRange(seat.seat_index)}
+                    aria-pressed={openRangeSeat === seat.seat_index}
+                    aria-label={`${
+                      openRangeSeat === seat.seat_index ? "Hide" : "Show"
+                    } estimated range for ${seat.position}`}
+                  >
+                    range
+                  </button>
+                )}
               </div>
             );
           })}

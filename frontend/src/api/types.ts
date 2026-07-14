@@ -317,3 +317,22 @@ export interface PreflopChartView {
   grid: Record<string, Record<string, number>> | null; // hand -> {action: freq}, ≈ baseline
   exploit_note: ExploitNoteView | null;
 }
+
+// Simulate villain-range (V2) — the live estimated hand-range for a non-hero,
+// non-folded villain seat, as a WEIGHTED 13×13 chart. Mirror of
+// backend/app/schemas/simulate.py:VillainRangeView. `available` is a 200-body
+// concern (never a fetch error): false — with a null weights map — for the
+// hero's own seat, a seat folded per SERVER truth, a finished hand, or a seat
+// with no persona. Only a missing/ended session 404s. `weights` is a sparse
+// hand-class -> weight map (zero-weight classes omitted); `exact` is true
+// preflop (deterministic pack posterior) and false postflop (≈ estimate — the
+// UI tags those charts "estimated"). Computed from PUBLIC info only — the
+// villain's actual hole cards never cross the wire (no-peek invariant).
+export interface VillainRangeView {
+  available: boolean;
+  seat_index: number;
+  persona_label: string | null;
+  street: string | null;
+  exact: boolean;
+  weights: Record<string, number> | null; // hand class -> weight; zero-weight omitted
+}

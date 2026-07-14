@@ -33,7 +33,7 @@ from app.domain.scenarios import (
 from app.domain.spot import ActionType, NodeContext, Position, Street
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import HandState, apply, start_hand
-from app.domain.table.grade_map import map_decision_point
+from app.domain.table.grade_map import _find_limp_entry, map_decision_point
 from app.services.sim_session import apply_hero_action, street_report
 
 HERO_SEAT = 0
@@ -74,6 +74,10 @@ def _between(a: Position, b: Position) -> list[Position]:
     return _SEAT_ORDER[_SEAT_ORDER.index(a) + 1 : _SEAT_ORDER.index(b)]
 
 
+def _after(pos: Position) -> list[Position]:
+    return _SEAT_ORDER[_SEAT_ORDER.index(pos) + 1 :]
+
+
 def _folded_to(hero_pos: Position, seed: int = 7) -> HandState:
     state = _state(hero_pos, seed)
     return _play(state, [_fold(p) for p in _before(hero_pos) if p not in _BLINDS])
@@ -84,6 +88,46 @@ def _facing_open(hero_pos: Position, opener: Position, size: float, seed: int = 
     moves = [_fold(p) for p in _before(opener) if p not in _BLINDS]
     moves.append((opener, Decision(action=ActionType.RAISE, size_bb=size)))
     moves += [_fold(p) for p in _between(opener, hero_pos)]
+    return _play(state, moves)
+
+
+def _facing_3bet(
+    hero_pos: Position, threebettor: Position, open_size: float, tbet_size: float,
+    seed: int = 7,
+) -> HandState:
+    """Hero opens, folds to the 3-bettor, everyone behind folds, back to hero."""
+    state = _state(hero_pos, seed)
+    moves = [_fold(p) for p in _before(hero_pos) if p not in _BLINDS]
+    moves.append((hero_pos, Decision(action=ActionType.RAISE, size_bb=open_size)))
+    moves += [_fold(p) for p in _between(hero_pos, threebettor)]
+    moves.append((threebettor, Decision(action=ActionType.RAISE, size_bb=tbet_size)))
+    moves += [_fold(p) for p in _after(threebettor)]
+    return _play(state, moves)
+
+
+def _facing_4bet(
+    hero_pos: Position, opener: Position, osize: float, tbet: float, fbet: float,
+    seed: int = 7,
+) -> HandState:
+    """Villain opens, hero 3-bets, folds around, the SAME villain 4-bets."""
+    state = _state(hero_pos, seed)
+    moves = [_fold(p) for p in _before(opener) if p not in _BLINDS]
+    moves.append((opener, Decision(action=ActionType.RAISE, size_bb=osize)))
+    moves += [_fold(p) for p in _between(opener, hero_pos)]
+    moves.append((hero_pos, Decision(action=ActionType.RAISE, size_bb=tbet)))
+    moves += [_fold(p) for p in _after(hero_pos)]
+    moves.append((opener, Decision(action=ActionType.RAISE, size_bb=fbet)))
+    return _play(state, moves)
+
+
+def _limped_to(hero_pos: Position, limpers: list[Position], seed: int = 7) -> HandState:
+    """Unraised pot: `limpers` call 1bb at their slots, everyone else folds."""
+    state = _state(hero_pos, seed)
+    moves = [
+        (p, Decision(action=ActionType.CALL)) if p in limpers else _fold(p)
+        for p in _before(hero_pos)
+        if p not in _BLINDS
+    ]
     return _play(state, moves)
 
 
@@ -151,6 +195,81 @@ def test_vs_rfi_and_blind_defense_map_to_builder_spot_verbatim(hero_pos, opener,
     assert spot.facing is opener
 
 
+# C0 — vs_3bet / vs_4bet / vs_limpers builder-parity (every content pair).
+
+
+@pytest.mark.parametrize(
+    ("hero_pos", "threebettor"),
+    [
+        (Position.UTG, Position.BTN),
+        (Position.CO, Position.BTN),
+        (Position.CO, Position.SB),
+        (Position.BTN, Position.BB),
+        (Position.BTN, Position.SB),
+    ],
+)
+def test_vs_3bet_maps_to_builder_spot_verbatim(hero_pos, threebettor):
+    osize = _OPEN_SIZE[hero_pos]
+    state = _facing_3bet(hero_pos, threebettor, osize, round(3 * osize, 2))
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    entry = _find_entry(NodeContext.VS_3BET, hero_pos, threebettor)
+    assert entry is not None
+    expected = build_spot(
+        entry, random.Random(0), eff_bb=100.0,
+        hole_cards=state.seats[HERO_SEAT].hole_cards,
+    )
+    assert spot == expected
+    assert spot.facing is threebettor
+
+
+@pytest.mark.parametrize(
+    ("hero_pos", "opener"),
+    [
+        (Position.CO, Position.UTG),
+        (Position.BTN, Position.CO),
+        (Position.BB, Position.BTN),
+    ],
+)
+def test_vs_4bet_maps_to_builder_spot_verbatim(hero_pos, opener):
+    osize = _OPEN_SIZE[opener]
+    tbet = round(3 * osize, 2)
+    fbet = round(2.3 * tbet, 2)
+    state = _facing_4bet(hero_pos, opener, osize, tbet, fbet)
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    entry = _find_entry(NodeContext.VS_4BET, hero_pos, opener)
+    assert entry is not None
+    expected = build_spot(
+        entry, random.Random(0), eff_bb=100.0,
+        hole_cards=state.seats[HERO_SEAT].hole_cards,
+    )
+    assert spot == expected
+    assert spot.facing is opener
+
+
+@pytest.mark.parametrize(
+    ("hero_pos", "limpers"),
+    [
+        (Position.CO, [Position.UTG]),  # builder-canonical limp seat
+        (Position.BTN, [Position.HJ]),  # non-canonical seat: count semantics
+        (Position.BTN, [Position.UTG, Position.LJ]),  # two limpers
+    ],
+)
+def test_vs_limpers_maps_to_builder_spot_verbatim(hero_pos, limpers):
+    state = _limped_to(hero_pos, limpers)
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    entry = _find_limp_entry(hero_pos, len(limpers))
+    assert entry is not None
+    expected = build_spot(
+        entry, random.Random(0), eff_bb=100.0,
+        hole_cards=state.seats[HERO_SEAT].hole_cards,
+    )
+    assert spot == expected
+    assert spot.limper_count == len(limpers)
+
+
 # ----------------------------------------------------- property: flop c-bet
 
 
@@ -204,20 +323,101 @@ def test_multiway_flop_returns_none():
     assert map_decision_point(state, HERO_SEAT) is None
 
 
-def test_limped_pot_returns_none():
+def test_limped_pot_off_count_returns_none():
+    # C0 SUPERSESSION of the old test_limped_pot_returns_none: single-limper
+    # pots to CO/BTN now map (vs_limpers content). Off-pack COUNTS still
+    # return None — three limpers to the BTN has no entry.
+    state = _limped_to(Position.BTN, [Position.UTG, Position.LJ, Position.HJ])
+    assert state.to_act_seat == HERO_SEAT
+    assert map_decision_point(state, HERO_SEAT) is None
+    # CO facing TWO limpers: only a 1-limper CO entry exists.
+    state = _limped_to(Position.CO, [Position.UTG, Position.LJ])
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_limp_raise_pot_returns_none():
+    # A limp followed by a raise is neither vs_limpers nor vs_rfi content.
     state = _state(Position.BTN)
     state = _play(
         state,
         [
-            _fold(Position.UTG),
+            (Position.UTG, Decision(action=ActionType.CALL)),  # limp
             _fold(Position.UTG1),
             _fold(Position.UTG2),
-            (Position.LJ, Decision(action=ActionType.CALL)),  # limp
-            _fold(Position.HJ),
+            _fold(Position.LJ),
+            (Position.HJ, Decision(action=ActionType.RAISE, size_bb=4.0)),
             _fold(Position.CO),
         ],
     )
     assert state.to_act_seat == HERO_SEAT
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_sb_complete_returns_none():
+    # SB completing is not a canonical limp (_LIMP_SEATS is non-blind only).
+    state = _state(Position.BB)
+    moves = [_fold(p) for p in _before(Position.SB) if p not in _BLINDS]
+    moves.append((Position.SB, Decision(action=ActionType.CALL)))
+    state = _play(state, moves)
+    assert state.to_act_seat == HERO_SEAT
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_min_raise_war_vs_3bet_maps_within_band():
+    # Bots min-raise every street of the raise war (play.py la.min_bb): a
+    # 2.0bb hero open min-3-bet to 3.0bb must still map (band, not equality).
+    state = _facing_3bet(Position.CO, Position.BTN, 2.0, 3.0)
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert NodeContext.VS_3BET in spot.node_context
+    assert spot.facing is Position.BTN
+
+
+def test_oversize_3bet_returns_none():
+    # 12bb over a 2.5bb CO open exceeds the canonical 3x band (7.5bb).
+    state = _facing_3bet(Position.CO, Position.BTN, 2.5, 12.0)
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_oversize_hero_open_in_3bet_pot_returns_none():
+    # Hero's own open must sit in [2.0..canonical] too.
+    state = _facing_3bet(Position.CO, Position.BTN, 4.0, 9.0)
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_off_pack_vs_3bet_pairing_returns_none():
+    # UTG opens, CO 3-bets: canonical shape but no UTG-vs-CO entry exists.
+    assert _find_entry(NodeContext.VS_3BET, Position.UTG, Position.CO) is None
+    state = _facing_3bet(Position.UTG, Position.CO, 3.0, 9.0)
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_cold_4bet_returns_none():
+    # UTG opens, hero CO 3-bets, BTN cold 4-bets: the 4-bettor is not the
+    # opener, so the vs_4bet CO-vs-UTG entry must NOT be fabricated onto it.
+    state = _state(Position.CO)
+    state = _play(
+        state,
+        [
+            (Position.UTG, Decision(action=ActionType.RAISE, size_bb=3.0)),
+            _fold(Position.UTG1),
+            _fold(Position.UTG2),
+            _fold(Position.LJ),
+            _fold(Position.HJ),
+            (Position.CO, Decision(action=ActionType.RAISE, size_bb=9.0)),
+            (Position.BTN, Decision(action=ActionType.RAISE, size_bb=27.0)),
+            _fold(Position.SB),
+            _fold(Position.BB),
+            _fold(Position.UTG),
+        ],
+    )
+    assert state.to_act_seat == HERO_SEAT
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_oversize_4bet_returns_none():
+    # 30bb over a canonical 7.5bb 3-bet exceeds the 2.3x band (17.25bb).
+    state = _facing_4bet(Position.BTN, Position.CO, 2.5, 7.5, 30.0)
     assert map_decision_point(state, HERO_SEAT) is None
 
 

@@ -3494,3 +3494,287 @@ kbd {
     }
   }
 }
+
+/* ── Simulate preflop range chart (C2) ──────────────────────────────────────
+   A sim-owned COPY of Practice's Solver-Line plate (SimRangeChart.tsx), sitting
+   in the main column under the action bar on the hero's preflop turn. It wears
+   the SAME `.gridwrap/.gridtoggle/.grid/.cell/.gridlegend` chrome READ-ONLY (no
+   shared-class edits — Practice's RangeGrid stays pixel-identical); everything
+   below is scoped under `.sim-chart` or a `.sim-chart-*` class of its own.
+   Tokens-only, AA both themes, focus ring inherited from the global
+   :focus-visible on the .gridtoggle button. */
+.sim-chart {
+  margin-top: var(--space-4); /* clears the action bar above */
+}
+
+/* Fetch/empty/error lines inside the panel body. The loading line reads as the
+   panel's own voice (serif-adjacent ink); "no chart yet" + "unavailable" step
+   back to muted so they land as calm information, never an error banner. */
+.sim-chart-status {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-1);
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.sim-chart-status-quiet {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Exploit note — the LIVE villain's persona-keyed read line, sitting between
+   the baseline grid and the legend. Visually distinct from the generic squares:
+   an inset plate on --surface with a gilt left rule (the room's one metal), the
+   villain tag struck in gold small-caps, the rationale in body ink. The whole
+   line reads as "the read for THIS opponent," set apart from the baseline mix
+   above it. --primary on --surface clears 5.0:1 (day) / 7.6:1 (night). */
+.sim-chart-exploit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border-left: var(--space-1) solid color-mix(in srgb, var(--primary) 70%, transparent);
+}
+.sim-chart-exploit-villain {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+}
+.sim-chart-exploit-rationale {
+  font-size: var(--text-md);
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* ── Simulate villain-range (V2) ─────────────────────────────────────────────
+   A live, weighted 13×13 heat chart of one villain's ESTIMATED hand-range,
+   plus the small "range" reveal token on live villain pods. This is a NEW
+   sim-owned renderer — it shares NO markup with RangeGrid / SimRangeChart (the
+   `.grid/.cell/...` action-segment classes stay untouched); everything here is
+   scoped under `.sim-vrange`/`.sim-vrange-*`. Tokens-only, AA both themes.
+
+   The heat speaks one metal voice (brass over ivory stock), deliberately unlike
+   RangeGrid's three action hues: this chart answers "how likely is this class",
+   not "what does it do". Weight → fill OPACITY, but weight is never conveyed by
+   opacity ALONE: nonzero cells floor at a visible intensity and the class label
+   is drawn full-contrast on NONZERO cells (near-black --act-on on the
+   ivory-to-brass ground, ≥4.5:1 at every nonzero weight, theme-independent).
+   Zero-weight classes recede to bare mat with a deliberately MUTED label
+   (45% mix — legible-but-quiet by design, not an AA claim). */
+
+/* Reveal token on a live villain pod. A struck brass chip on the felt (the
+   room's one metal, same family as .sim-chips), ≥24px target, ink legible on
+   the always-dark felt in both themes. Pressed = filled gold. Focus ring is the
+   global :focus-visible brass outline (≥3:1 on felt — tokens.css annotates it). */
+.sim-vrange-btn {
+  margin-top: 2px;
+  min-height: 24px;
+  padding: 2px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--felt-chip-bg);
+  /* Ink rides the felt-text (near-white) with a gold tint rather than the
+     theme primary: Day's dark-bronze primary fell to ~2.6:1 over the felt's
+     lighter gradient regions (design-review med-1). Verified >=4.5:1 over the
+     brightest felt region, both themes. */
+  color: color-mix(in srgb, var(--felt-text) 82%, var(--gold-bright));
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sim-vrange-btn {
+    transition:
+      background var(--dur-1) var(--ease-1),
+      color var(--dur-1) var(--ease-1),
+      border-color var(--dur-1) var(--ease-1);
+  }
+}
+.sim-vrange-btn:hover {
+  border-color: var(--primary);
+  color: var(--gold-bright);
+}
+.sim-vrange-btn-on,
+.sim-vrange-btn[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: linear-gradient(180deg, var(--gold-bright), var(--primary) 75%);
+  color: var(--primary-text);
+}
+
+/* Panel — the plate the heat chart sits on, under the felt. Mirrors the
+   .sim-chart plate idiom (surface card, gilt hairline) without reusing its
+   classes. */
+.sim-vrange {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sim-vrange {
+    animation: sim-vrange-in var(--dur-2) var(--ease-1) both;
+  }
+  @keyframes sim-vrange-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+.sim-vrange-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.sim-vrange-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+/* Position label — the anchor, struck in display serif + gold like a plate
+   heading. --primary on --surface: 5.0:1 day / 7.6:1 night. */
+.sim-vrange-pos {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--primary);
+}
+.sim-vrange-persona {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.sim-vrange-kicker {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.sim-vrange-head-aside {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+/* "estimated" tag — postflop approximation flag (exact=false). A quiet warn-tone
+   pill, never an alarm; warn ink on warn-bg clears AA in both themes. */
+.sim-vrange-approx {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sim-vrange-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sim-vrange-close {
+    transition:
+      color var(--dur-1) var(--ease-1),
+      border-color var(--dur-1) var(--ease-1);
+  }
+}
+.sim-vrange-close:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+/* Status lines (loading / empty / error) — same voice as .sim-chart-status. */
+.sim-vrange-status {
+  margin: 0;
+  padding: var(--space-2) var(--space-1);
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.sim-vrange-status-quiet {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* The 13×13 mat. Ivory chart stock in both themes (theme-independent tokens),
+   hairline gaps engraved into it. role="table"; rows are display:contents so
+   they leave the grid box tree (same technique RangeGrid uses, re-implemented
+   here — no shared class). */
+.sim-vrange-grid {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 1px;
+  padding: 1px;
+  background: color-mix(in srgb, var(--act-on) 30%, var(--sim-vrange-mat));
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.sim-vrange-row {
+  display: contents;
+}
+.sim-vrange-cell {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--sim-vrange-mat); /* bare ivory = zero-weight (not in range) */
+}
+/* Heat wash — a brass fill whose OPACITY is the per-cell weight (--w, set
+   inline, 0..1). Drawn under the label so the label stays crisp. Only present
+   on nonzero cells. */
+.sim-vrange-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--sim-vrange-heat);
+  opacity: var(--w, 0);
+}
+/* Class glyph — engraved near-black instrument lettering, full-contrast on
+   NONZERO cells (--act-on clears ≥4.5:1 at every nonzero weight; the redundant
+   non-color cue that makes the heat honest). Zero-weight cells step the label
+   back to a muted 45% mix so bare mat reads as "not in range" without shouting
+   the class — deliberately quiet, not an AA claim (refuter low-2). */
+.sim-vrange-label {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: color-mix(in srgb, var(--act-on) 45%, var(--sim-vrange-mat));
+  pointer-events: none;
+}
+.sim-vrange-cell-on .sim-vrange-label {
+  color: var(--act-on);
+}
