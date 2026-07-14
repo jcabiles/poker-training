@@ -1,4 +1,5 @@
 import type { SeatView } from "../../api/types";
+import { fmtBb } from "./simGrade";
 
 // Simulate S9 ledger — the club's rail sheet. A ruled P&L book: one row per
 // seat (position · persona · running net_bb), figures set in mono tabular
@@ -10,7 +11,7 @@ import type { SeatView } from "../../api/types";
 
 function fmtNet(net: number): string {
   const sign = net > 0 ? "+" : net < 0 ? "−" : "";
-  return `${sign}${Math.abs(net)}`;
+  return `${sign}${fmtBb(Math.abs(net))}`;
 }
 
 function personaLabel(persona: string | null): string {

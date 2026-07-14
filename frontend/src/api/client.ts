@@ -15,6 +15,7 @@ import type {
   SessionView,
   Spot,
   StatsSummary,
+  StreetReportView,
 } from "./types";
 
 const BASE = "/api/v1"; // proxied to FastAPI :8008 in dev
@@ -129,4 +130,11 @@ export async function postNextHand(sessionId: string): Promise<SessionView> {
 export async function leaveSession(sessionId: string): Promise<void> {
   const r = await fetch(`${BASE}/simulate/session/${sessionId}/leave`, { method: "POST" });
   if (!r.ok) throw new Error(`${r.url} -> ${r.status}`);
+}
+
+// S10 — all-time per-street grading report (across every session). Session
+// -independent, so no session_id: the panel fetches it on mount and refetches
+// when a hand completes. Always returns all four street rows.
+export async function getStreetReport(): Promise<StreetReportView> {
+  return json(await fetch(`${BASE}/simulate/report/streets`));
 }

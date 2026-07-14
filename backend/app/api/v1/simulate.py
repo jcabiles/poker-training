@@ -6,6 +6,7 @@ POST /simulate/session/{id}/action   -> hero acts; bots advance to the next
                                          hero decision (or hand end).
 POST /simulate/session/{id}/hand     -> deal the next hand (carry-over stacks).
 POST /simulate/session/{id}/leave    -> end the session (no longer restorable).
+GET  /simulate/report/streets        -> all-time per-street grading report (S10).
 
 All state lives in the DB (`app.services.sim_session`); this module only
 translates HTTP <-> service calls. No auth: `owner_id=""`. See
@@ -19,7 +20,7 @@ from sqlmodel import Session
 
 from app.db.session import get_session
 from app.domain.action import Decision
-from app.schemas.simulate import SessionView
+from app.schemas.simulate import SessionView, StreetReportView
 from app.services import sim_session
 from app.services.sim_session import SessionNotFound
 
@@ -48,7 +49,7 @@ async def post_hero_action(
     session_id: str, decision: Decision, db: Session = Depends(get_session)
 ) -> SessionView:
     try:
-        return sim_session.apply_hero_action(db, session_id, decision, owner_id=_OWNER_ID)
+        return await sim_session.apply_hero_action(db, session_id, decision, owner_id=_OWNER_ID)
     except SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="session not found") from exc
     except ValueError as exc:
@@ -66,3 +67,8 @@ async def next_hand(session_id: str, db: Session = Depends(get_session)) -> Sess
 @router.post("/session/{session_id}/leave", status_code=204)
 async def leave(session_id: str, db: Session = Depends(get_session)) -> None:
     sim_session.leave_session(db, session_id, owner_id=_OWNER_ID)
+
+
+@router.get("/report/streets", response_model=StreetReportView)
+async def street_report(db: Session = Depends(get_session)) -> StreetReportView:
+    return sim_session.street_report(db, owner_id=_OWNER_ID)

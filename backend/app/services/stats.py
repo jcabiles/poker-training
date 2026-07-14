@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from app.db.models import DrillAttempt, SRSItemRow
 from app.domain.leaks import LeakCategory
@@ -35,8 +35,17 @@ def _name(cat: int) -> str:
         return str(cat)
 
 
+# Practice-only filter (S10): sim-tagged rows (source='simulate') must never
+# reach Practice dashboards. Historical rows predate the `source` column and
+# read back as SQL NULL (nullable-with-default migration, 0010) rather than
+# 'practice' — NULL must be treated as 'practice' here, not excluded.
+_PRACTICE_SOURCE = or_(DrillAttempt.source == "practice", DrillAttempt.source.is_(None))
+
+
 def leak_stats(session: Session) -> list[dict]:
-    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
+    rows = list(
+        session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "", _PRACTICE_SOURCE))
+    )
     by: dict[int, list[DrillAttempt]] = defaultdict(list)
     for r in rows:
         if r.leak_category is not None:
@@ -83,7 +92,9 @@ def summary(session: Session, today: date | None = None) -> dict:
     # local calendar days so the due count and streak agree with what the
     # user sees "today" in their own timezone.
     today = today or date.today()
-    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
+    rows = list(
+        session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "", _PRACTICE_SOURCE))
+    )
     ordered = sorted(rows, key=lambda r: r.created_at)
 
     days = {_local_date(r.created_at) for r in rows}
@@ -138,7 +149,9 @@ def calendar(session: Session, weeks: int = 8, today: date | None = None) -> lis
     start = today - timedelta(weeks=weeks - 1)
     start -= timedelta(days=start.weekday())  # back up to that week's Monday
 
-    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
+    rows = list(
+        session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "", _PRACTICE_SOURCE))
+    )
     by_day: dict[date, list[DrillAttempt]] = defaultdict(list)
     for r in rows:
         by_day[_local_date(r.created_at)].append(r)
@@ -160,7 +173,9 @@ def calendar(session: Session, weeks: int = 8, today: date | None = None) -> lis
 
 def recap(session: Session) -> dict:
     """Most recent calendar day (local) that has any attempts."""
-    rows = list(session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "")))
+    rows = list(
+        session.exec(select(DrillAttempt).where(DrillAttempt.owner_id == "", _PRACTICE_SOURCE))
+    )
     if not rows:
         return {
             "day": None,
@@ -209,6 +224,7 @@ def hand_error_weights(session: Session) -> dict[str, float]:
             select(DrillAttempt)
             .where(DrillAttempt.owner_id == "")
             .where(DrillAttempt.leak_category.in_(_RFI_CATEGORIES))
+            .where(_PRACTICE_SOURCE)
         )
     )
 

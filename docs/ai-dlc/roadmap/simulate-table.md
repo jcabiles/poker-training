@@ -224,7 +224,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 
 - [x] **S9b — Table size + crowding fix.** *(done 2026-07-12, wave 4.5 — user-reported: felt starved at ~640px on 1440px screens, board cards overlapped HJ/CO pods. Simulate route alone widens to `--content-width-wide` 1360px via `.app:has(.simulate)`; sim ring caps 5×card-h with a 4× re-cap inside the existing `@media (max-height:920px)` density gate (refuter caught the specificity beating the gate); SimTable slotStyle top-half y-radius 38→41 (bottom stays 38 — hero pod otherwise clipped `.stage overflow:hidden`); sim-layout single-column gate raised 900→1100px so ≤1100px drops the rail sheet below the felt instead of starving the ring. Playwright bounding-box sweep: zero overlaps + zero stage-clipping at 1440×900/1280×800/1024×768; Practice/Quiz shells verified untouched at 1080px. Spec/contracts/tickets: `simulate-table-size.md`.)* *(Track E, W4.5 — between S9 and S10)*
 
-- [ ] **S10 — Grading wired in: live badge + end-of-hand recap + tagged attempts.** ICE 10·7·4. *(Track E, W5 — needs S9; consumes whatever graders exist)*
+- [x] **S10 — Grading wired in: live badge + end-of-hand recap + tagged attempts.** *(done 2026-07-12, wave 5: `grade_map.map_decision_point` — preflop RFI/vs-RFI/blind-defense via the SAME `scenarios.build_spot` Practice uses + HU flop c-bet mirroring `build_cbet_spot`; open-size band [2.0..canonical] per W1-refuter adjudication (bots min-raise — strict gate made facing-a-raise ungradeable); None ⇒ honest "no baseline yet", NO drill_attempt. Async `apply_hero_action` grades the pre-`apply()` state via the drill provider singleton, writes ride the single commit (illegal action ⇒ zero rows). `sim_decision` (migration 0010) + `DrillAttempt.source='simulate'` (marker sig `sim:ctx:pos`, never `spot_signature()`); stats.py NULL-tolerant source filter on all 5 Practice reads. FE: hero-pod side-flag badge (clip-rescued per final design review), SimRecap w/ live-tier accumulation (reload degrades to numbers-only — 0011 tracked in NEXT), SimStreetReport all-time panel + fold-path refetch fix (final-gate refuter high-1). 10 `--sim-tier-*` tokens. 472 backend tests; refuter PASS-w-issues all folded; design-review ship-with-nits, nit fixed + re-verified.)* ICE 10·7·4. *(Track E, W5)*
       **Problem:** the key value — Practice-grade verdicts inside the game — isn't wired.
       **Outcome-link:** primary metric becomes measurable in-sim.
       **Solution:** map each hero decision to a `Spot`, grade via the existing provider stack
@@ -249,7 +249,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       verdicts; no SRS; no charts/winrate graphs/positional breakdowns (NEXT: session
       analytics).
 
-- [ ] **S11 — Pacing + table feel polish.** ICE 6·8·6. *(Track E, W6 — last)*
+- [x] **S11 — Pacing + table feel polish.** *(done 2026-07-12, wave 6: one `stagedIndex` drives log narration AND felt seat reveals (revealAt map — felt never leads the log, design-review frame-verified); SimSpeedPicker normal 0.5-1.5s random / fast ×0.4 / instant, localStorage, radio-group a11y; hero-fold skips playback → next hand; prefers-reduced-motion ⇒ instant. T5 polish: Night folded persona/stack 3.82→4.73:1 AA (sim-scoped rule, shared base untouched), fmtBb kills float smears at all bb sites, caption voice unified. Final design review: ship-with-nits — badge clip fixed (side-flag), mobile + nav-desync pre-existing/tracked.)* ICE 6·8·6. *(Track E, W6)*
       **Problem:** instant 8-bot action is unreadable; folded hands waste time.
       **Outcome-link:** "feels like a real game" — the premise.
       **Solution:** randomized bot delays (~0.5–1.5s) with normal/fast/instant setting;
@@ -315,6 +315,11 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   perf; disclaimer wording; interplay with hidden-persona mode (a reveal button is a
   training wheel that mode would gate); does always-available reveal soften the
   read-development goal.
+- **Reload-durable recap reasoning (migration 0011).** *(W1 combined-refuter med-1,
+  2026-07-12.)* `SimDecision` stores no verdict/reasoning text — the recap's "why" tiers
+  exist only in-memory for the live request; a session reload rebuilds the recap with
+  freq/EV/correctness intact but tiers=None for every row. If reload-durable reasoning
+  becomes a real ask, add `verdict`/`reasoning` columns via migration 0011.
 - **Simulate mobile responsiveness.** *(design-review 2026-07-11; deferred by the
   desktop-primary decision — desktop + tablet 768px ship premium/clean.)* *Evidence:* at
   ≤~600px the 9-seat felt collapses into overlap (measured 30 overlapping seat pairs at 375px;
