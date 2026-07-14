@@ -478,6 +478,21 @@ export default function SimulateView() {
               </>
             )}
 
+            {/* Hand-over surfaces gate on playback: the recap and settlement
+                slip appear only once the bot playback finishes (revealHandEnd),
+                so nothing leads the log. */}
+            {hand.hand_over && revealHandEnd && (
+              <>
+                <SimShowdown
+                  showdown={hand.showdown}
+                  seats={hand.seats}
+                  onNextHand={nextHand}
+                  dealing={busy}
+                />
+                <SimRecap recap={mergedRecap} />
+              </>
+            )}
+
             {!hand.is_hero_turn && !hand.hand_over && (
               <p className="sim-waiting" role="status">
                 Waiting on the table…

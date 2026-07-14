@@ -6,6 +6,7 @@ import type {
   LeakStat,
   Mode,
   NextDrillResponse,
+  PreflopChartView,
   QuizAnswer,
   QuizItem,
   QuizKind,

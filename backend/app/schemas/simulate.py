@@ -99,3 +99,26 @@ class SimulateHandView(BaseModel):
 class SessionView(BaseModel):
     session_id: str
     hand: SimulateHandView
+
+
+class ExploitNoteView(BaseModel):
+    """Persona-keyed exploit line for the chart's LIVE villain (preflop chart).
+
+    villain_label is the actual opponent seat's persona_type — resolved from
+    the mapped Spot's facing position, never guessed (spec med-1)."""
+
+    villain_label: str
+    rationale: str
+
+
+class PreflopChartView(BaseModel):
+    """Point-of-need baseline range chart for the hero's current preflop
+    decision (simulate-preflop-chart C1). available=false (no grid) when it is
+    not the hero's preflop turn, the hand is over, or the spot is unmappable —
+    never a fabricated chart. Availability is a 200-body concern; 404 stays
+    reserved for a missing/ended session."""
+
+    available: bool
+    node_label: str | None = None
+    grid: dict[str, dict[str, float]] | None = None  # hand -> {action: freq}, ≈ baseline
+    exploit_note: ExploitNoteView | None = None  # None when no authored pair exists

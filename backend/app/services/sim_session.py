@@ -29,11 +29,12 @@ from sqlmodel import Session, select
 
 from app.db.models import DrillAttempt, SimDecision, SimHand, SimSeat, SimSession
 from app.domain.action import Decision
+from app.domain.archetypes import VillainType
 from app.domain.content.models import PersonaPack
 from app.domain.content.notation import hole_cards_to_class
 from app.domain.evaluation import Coverage, EvaluationResult, FeedbackTiers
 from app.domain.personas import load_persona_packs
-from app.domain.spot import Hero
+from app.domain.spot import Hero, NodeContext, Spot, Street
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
     HandState,
