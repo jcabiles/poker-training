@@ -3095,6 +3095,56 @@ kbd {
   outline-offset: 2px;
 }
 
+/* Watch toggle — a single pill governing whether a hero fold plays the villains
+   out to showdown (pressed) or instantly skips to the next hand (unpressed).
+   Mirrors ONE Speed chip's shape/size (a chip nested in a pill container);
+   pressed wears the same gilt as a selected Speed chip. Bottom-aligned so its
+   pill lines up with the Speed pill, which sits under its SPEED caption. Own
+   classes — no shared .sim-speed edits. */
+.sim-watch {
+  align-self: flex-end;
+  display: inline-flex;
+  padding: var(--space-1);
+  margin: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+.sim-watch-face {
+  display: inline-flex;
+  align-items: center;
+  /* ≥24px target, same as a Speed chip. */
+  min-height: var(--space-6);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  /* A <button> resets line-height to `normal` (~1.2); the Speed chip's <span>
+     inherits the body's 1.5. Pin 1.5 here so the face box (and thus the pill)
+     matches a Speed chip to the pixel — top AND bottom edges align. */
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  transition: color var(--dur-1) var(--ease-1), background var(--dur-1) var(--ease-1);
+}
+.sim-watch:hover .sim-watch-face {
+  color: var(--text);
+}
+/* Pressed = gilt chip — primary-text on primary clears AA in both themes (4.9:1
+   day, 7.6:1 night), same token pair the selected Speed chip uses. Redundant
+   with aria-pressed. */
+.sim-watch[aria-pressed="true"] .sim-watch-face {
+  color: var(--primary-text);
+  background: var(--primary);
+}
+/* Focus ring on the pill itself (≥3px, ≥3:1 primary vs both surfaces). */
+.sim-watch:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Event-log entrance: each newly-revealed call-sheet line breathes in (opacity
    + a short slide from the leading edge, logical so it flips under RTL). The
    list itself is unchanged from S9 — only the freshly-staged <li> animates,

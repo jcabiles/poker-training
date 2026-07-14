@@ -16,6 +16,7 @@ import SimRangeChart from "./simulate/SimRangeChart";
 import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
 import SimSpeedPicker, { type SimSpeed } from "./simulate/SimSpeedPicker";
+import SimWatchToggle from "./simulate/SimWatchToggle";
 import SimStreetReport from "./simulate/SimStreetReport";
 import SimTable from "./simulate/SimTable";
 import SimVillainRange from "./simulate/SimVillainRange";
@@ -33,6 +34,7 @@ import SimVillainRange from "./simulate/SimVillainRange";
 
 const STORAGE_KEY = "simulate.session_id";
 const SPEED_KEY = "simulate.speed";
+const WATCH_KEY = "simulate.watch";
 
 // The client's json<T>() throws Error("<url> -> <status>") on non-2xx, so a
 // lost/ended session surfaces as a message ending "-> 404".
@@ -63,6 +65,17 @@ function readSpeed(): SimSpeed {
     /* private-mode storage — fall through to default */
   }
   return "normal";
+}
+
+// Watch-folded-hands setting (client-only, localStorage). ON (default) plays the
+// villains out to showdown after a hero fold; OFF skips straight to the next
+// hand. Absent/garbage storage ⇒ default ON.
+function readWatch(): boolean {
+  try {
+    return window.localStorage.getItem(WATCH_KEY) !== "off";
+  } catch {
+    return true;
+  }
 }
 
 function prefersReducedMotion(): boolean {
@@ -99,6 +112,21 @@ export default function SimulateView() {
     setSpeed(next);
     try {
       window.localStorage.setItem(SPEED_KEY, next);
+    } catch {
+      /* private-mode storage — setting still applies this session */
+    }
+  }, []);
+
+  // Watch-folded-hands toggle. Held in a ref too because `decide` reads it at
+  // fold-CLICK time (a mid-playout flip must not retroactively change the hand
+  // in flight — it takes effect on the NEXT fold).
+  const [watch, setWatch] = useState<boolean>(readWatch);
+  const watchRef = useRef<boolean>(watch);
+  const changeWatch = useCallback((next: boolean) => {
+    watchRef.current = next;
+    setWatch(next);
+    try {
+      window.localStorage.setItem(WATCH_KEY, next ? "on" : "off");
     } catch {
       /* private-mode storage — setting still applies this session */
     }
@@ -396,11 +424,15 @@ export default function SimulateView() {
 
   const decide = useCallback(
     (action: ActionType, sizeBb?: number | null) => {
-      // Hero-fold shortcut: the hero has no more decisions this hand, so there
-      // is nothing to pace for them — skip the bot playback entirely and deal
-      // the next hand in the same turn. Cancel any residual timer first so a
-      // fold mid-playback of a prior batch can't leave a stray reveal running.
-      if (action === "fold") {
+      // Hero-fold skip (Watch OFF only): the hero has no more decisions this
+      // hand, so with watching disabled there is nothing to pace — skip the bot
+      // playback entirely and deal the next hand in the same turn. Cancel any
+      // residual timer first so a fold mid-playback of a prior batch can't leave
+      // a stray reveal running. Read from the ref so a mid-playout toggle only
+      // affects the NEXT fold. With Watch ON we fall through to the normal path
+      // below, which adopts the fold response so the villains narrate to
+      // showdown (+ recap) exactly like a hand played out.
+      if (action === "fold" && !watchRef.current) {
         clearTimer();
         void run(async (id) => {
           // The fold response ends the hand but is never adopted (we jump
@@ -561,6 +593,7 @@ export default function SimulateView() {
         <h1 className="sim-heading">Simulate</h1>
         {view && (
           <div className="sim-topbar-controls">
+            <SimWatchToggle watch={watch} onChange={changeWatch} />
             <SimSpeedPicker speed={speed} onChange={changeSpeed} />
             <button
               type="button"
