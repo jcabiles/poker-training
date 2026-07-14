@@ -11,7 +11,6 @@ import type { ActionType, GradeView, SessionView } from "../api/types";
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
 import SimLedger from "./simulate/SimLedger";
-import SimRangeChart from "./simulate/SimRangeChart";
 import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
 import SimSpeedPicker, { type SimSpeed } from "./simulate/SimSpeedPicker";
@@ -464,21 +463,19 @@ export default function SimulateView() {
               />
             )}
 
-            {/* Point-of-need baseline range chart (C2). Preflop hero turns only,
-                and never during bot playback (pacing). The identity key must
-                change PER DECISION POINT, not per hand: two hero preflop turns
-                in one hand (open → villain 3-bets → hero faces it) would
-                otherwise share a key and keep the FIRST decision's chart on
-                screen for the second (chart refuter high-1). pot_bb strictly
-                grows between consecutive preflop hero decisions, so it is the
-                per-decision discriminator; is_hero_turn added nothing (always
-                true when mounted). */}
-            {hand.is_hero_turn && hand.street === "preflop" && !playing && view && (
-              <SimRangeChart
-                sessionId={view.session_id}
-                identityKey={`${view.session_id}#${hand.hand_no}#${hand.pot_bb}`}
-                heroCards={hand.hero.hole_cards}
-              />
+            {/* Hand-over surfaces gate on playback: the recap and settlement
+                slip appear only once the bot playback finishes (revealHandEnd),
+                so nothing leads the log. */}
+            {hand.hand_over && revealHandEnd && (
+              <>
+                <SimShowdown
+                  showdown={hand.showdown}
+                  seats={hand.seats}
+                  onNextHand={nextHand}
+                  dealing={busy}
+                />
+                <SimRecap recap={mergedRecap} />
+              </>
             )}
 
             {/* Hand-over surfaces gate on playback: the recap and settlement

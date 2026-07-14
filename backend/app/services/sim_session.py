@@ -32,9 +32,7 @@ from app.domain.action import Decision
 from app.domain.archetypes import VillainType
 from app.domain.content.models import PersonaPack
 from app.domain.content.notation import hole_cards_to_class
-from app.domain.content.registry import lookup
 from app.domain.evaluation import Coverage, EvaluationResult, FeedbackTiers
-from app.domain.grading import range_grid
 from app.domain.personas import load_persona_packs
 from app.domain.spot import Hero, NodeContext, Spot, Street
 from app.domain.table.deck import deal_hand
@@ -50,9 +48,7 @@ from app.domain.table.grade_map import map_decision_point
 from app.domain.table.play import ActionEvent, advance_to_hero, assign_lineup
 from app.schemas.simulate import (
     EventView,
-    ExploitNoteView,
     GradeView,
-    PreflopChartView,
     SeatView,
     SessionView,
     ShowdownSeatView,
@@ -471,87 +467,6 @@ def street_report(db: Session, owner_id: str = "") -> StreetReportView:
     return StreetReportView(
         rows=[StreetReportRow(street=s, **by_street[s]) for s in _STREET_ORDER],
         total_decisions=sum(a["graded"] + a["no_baseline"] for a in by_street.values()),
-    )
-
-
-def _content_index() -> dict:
-    """The ONE content index singleton Practice's drill grid is built from —
-    reusing it (not a second build_index) guarantees the chart grid is
-    byte-identical to the Practice drill grid for the same Spot. Lazy import
-    for the same circularity reason as _grading_provider."""
-    from app.api.v1.drill import _INDEX
-
-    return _INDEX
-
-
-def _node_label(spot: Spot) -> str:
-    ctx = spot.node_context[0]
-    pos = spot.hero.position.value
-    if ctx is NodeContext.RFI:
-        return f"{pos} open (RFI)"
-    if ctx is NodeContext.VS_LIMPERS:
-        n = spot.limper_count or 0
-        return f"{pos} vs {n} limper{'' if n == 1 else 's'}"
-    facing = spot.facing.value if spot.facing is not None else "?"
-    if ctx is NodeContext.VS_3BET:
-        return f"{pos} vs {facing} 3-bet"
-    if ctx is NodeContext.VS_4BET:
-        return f"{pos} vs {facing} 4-bet"
-    return f"{pos} vs {facing} open"  # VS_RFI / BLIND_DEFENSE
-
-
-def _exploit_note(
-    spot: Spot, state: HandState, seats: list[SimSeat]
-) -> ExploitNoteView | None:
-    """The authored exploit rationale for (mapped node, LIVE villain persona).
-
-    Villain resolution (spec med-1): the mapped Spot carries villain_type=None;
-    the villain is the seat sitting at the Spot's `facing` position in the LIVE
-    hand — its persona_type keys the registry lookup. Spots without a facing
-    position (RFI, vs_limpers — content keys limpers by count, not seat) carry
-    no single resolvable villain seat ⇒ no note; ditto any missing authored
-    pair. The note is omitted, never guessed."""
-    if spot.facing is None:
-        return None
-    villain_seat = next(s.seat for s in state.seats if s.position is spot.facing)
-    persona = seats[villain_seat].persona_type
-    if persona is None:
-        return None
-    entry = lookup(_content_index(), spot, villain_type=VillainType(persona))
-    if entry is None or entry.rationale is None:
-        return None
-    return ExploitNoteView(villain_label=persona, rationale=entry.rationale)
-
-
-def preflop_chart(db: Session, session_id: str, owner_id: str = "") -> PreflopChartView:
-    """Read-only: the baseline chart for the hero's CURRENT preflop decision.
-
-    available=false when it is not the hero's preflop turn, the hand is over,
-    or the decision point is unmappable — chart availability ≡ gradeability
-    (same map_decision_point gate), never a fabricated grid."""
-    session = _get_session(db, session_id, owner_id)
-    if session is None:
-        raise SessionNotFound(session_id)
-    hand = _current_hand(db, session)
-    if hand is None or hand.state_json is None:
-        return PreflopChartView(available=False)
-    state = HandState.model_validate_json(hand.state_json)
-    if (
-        state.hand_over
-        or state.street is not Street.PREFLOP
-        or state.to_act_seat != HERO_SEAT
-    ):
-        return PreflopChartView(available=False)
-    spot = map_decision_point(state, HERO_SEAT)
-    if spot is None:
-        return PreflopChartView(available=False)
-    # Exactly api/v1/drill.py's preflop-grid pattern, on the same singletons.
-    grid = range_grid(lookup(_content_index(), spot))
-    return PreflopChartView(
-        available=True,
-        node_label=_node_label(spot),
-        grid=grid,
-        exploit_note=_exploit_note(spot, state, _load_seats(db, session_id)),
     )
 
 

@@ -139,13 +139,3 @@ export async function leaveSession(sessionId: string): Promise<void> {
 export async function getStreetReport(): Promise<StreetReportView> {
   return json(await fetch(`${BASE}/simulate/report/streets`));
 }
-
-// Preflop chart (C1/C2) — the baseline range chart for the hero's CURRENT
-// preflop decision on this session. Server-side state only (no spot params):
-// the endpoint reads the live decision point. `available=false` (with a null
-// grid) is a normal 200 body for a non-hero-preflop / unmappable spot — only a
-// missing/ended session 404s. The panel fetches this on first expand and
-// refetches per new hero preflop turn while expanded.
-export async function getPreflopChart(sessionId: string): Promise<PreflopChartView> {
-  return json(await fetch(`${BASE}/simulate/${sessionId}/preflop-chart`));
-}
