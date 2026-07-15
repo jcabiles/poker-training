@@ -338,3 +338,20 @@ export interface VillainRangeView {
   exact: boolean;
   weights: Record<string, number> | null; // hand class -> weight; zero-weight omitted
 }
+
+// On-demand villain-card reveal after a hero fold (R1). Mirror of
+// backend/app/schemas/simulate.py:RevealView. The client holds NO villain hole
+// cards until it fetches this; `available` is a 200-body concern (false — empty
+// seats — when the reveal capability is off, the hand isn't complete, or the
+// hero didn't fold, in which case a genuine showdown auto-reveals instead).
+// Only a missing/ended session 404s. scope 'last-in' = seats still live at hand
+// end; 'all' = every non-hero seat dealt in. Hero is never included.
+export interface RevealedSeatView {
+  seat_index: number;
+  hole_cards: [string, string];
+}
+export interface RevealView {
+  available: boolean;
+  scope: string; // "last-in" | "all"
+  seats: RevealedSeatView[];
+}

@@ -8,6 +8,12 @@ import Card from "../Card";
 // hidden hole cards leak here. When the hand ends without a showdown (everyone
 // folded to one seat), `showdown` is empty and we show the fold-out line
 // instead. Position labels come from the seat roster.
+//
+// R1: when the HERO folded, the villains played out face-down (so the hero can
+// guess ranges). Two buttons let the hero reveal them on demand — "Reveal
+// Last-In" (seats still live at hand end) and "Reveal All" (every dealt seat).
+// The reveal flips cards on the FELT (SimTable), not here; these buttons only
+// trigger the fetch and reflect which scope is active.
 
 function fmtDelta(delta: number): string {
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
@@ -19,11 +25,21 @@ export default function SimShowdown({
   seats,
   onNextHand,
   dealing,
+  heroFolded,
+  revealScope,
+  onReveal,
 }: {
   showdown: ShowdownSeatView[];
   seats: SeatView[];
   onNextHand: () => void;
   dealing: boolean;
+  // R1: true only when the hero folded this hand — the sole case where villains
+  // stayed face-down and there is anything to reveal. Otherwise the buttons are
+  // hidden (a genuine showdown already auto-revealed).
+  heroFolded: boolean;
+  // Which reveal scope is currently active (drives the pressed state), or null.
+  revealScope: "last-in" | "all" | null;
+  onReveal: (scope: "last-in" | "all") => void;
 }) {
   const posBySeat = new Map<number, string>(seats.map((s) => [s.seat_index, s.position]));
 
@@ -53,8 +69,27 @@ export default function SimShowdown({
         </ul>
       ) : (
         <p className="sim-showdown-fold">
-          The pot was taken down before showdown — no cards revealed.
+          {heroFolded
+            ? "No showdown — you folded. Reveal the villains below."
+            : "The pot was taken down before showdown — no cards revealed."}
         </p>
+      )}
+      {heroFolded && (
+        <div className="sim-reveal-actions" role="group" aria-label="Reveal villain hands">
+          {(["last-in", "all"] as const).map((scope) => (
+            <button
+              key={scope}
+              type="button"
+              className={
+                "btn sim-reveal-btn" + (revealScope === scope ? " sim-reveal-btn-on" : "")
+              }
+              onClick={() => onReveal(scope)}
+              aria-pressed={revealScope === scope}
+            >
+              {scope === "last-in" ? "Reveal last-in" : "Reveal all"}
+            </button>
+          ))}
+        </div>
       )}
       <button
         type="button"

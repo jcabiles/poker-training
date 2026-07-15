@@ -20,7 +20,14 @@ from app.domain.personas import load_persona_packs
 from app.domain.spot import ActionType, Street
 from app.domain.table import play
 from app.domain.table.deck import deal_hand
-from app.domain.table.engine import HandState, SeatDelta, Settlement, apply, start_hand
+from app.domain.table.engine import (
+    HandState,
+    PlayerStatus,
+    SeatDelta,
+    Settlement,
+    apply,
+    start_hand,
+)
 from app.domain.table.engine import legal_actions as engine_legal_actions
 from app.services import sim_session
 from app.services.sim_session import (
@@ -29,6 +36,7 @@ from app.services.sim_session import (
     deal_next_hand,
     leave_session,
     restore_session,
+    reveal,
 )
 
 
@@ -315,3 +323,122 @@ def test_last_action_per_street_folded_override_and_post_excluded():
         legal = next(a for a in acts if a.action is ActionType.BET)
         state = apply(state, Decision(action=ActionType.BET, size_bb=legal.min_bb))
         assert la(state, state.seats[seat]) == "bet"
+
+
+# ------------------------------------------------------- R1: reveal hands
+# Bots act via a non-seeded fresh RNG (sim_session._fresh_rng), so a hero-fold-
+# then-villain-showdown line can't be reproduced deterministically through play.
+# Per the R1 spec's test-determinism note, craft a completed HandState directly.
+
+
+def _terminal_state(hero: str = "fold", in_seats=(1, 2), allin_seats=()) -> HandState:
+    """A completed river HandState. Every seat FOLDED except: the hero (per
+    `hero`: 'fold' | 'in'), the `in_seats` (left IN), and `allin_seats` (ALLIN).
+    Non-folded seats carry investment so settle() forms a real (showdown) pot."""
+    st = start_hand(deal_hand(random.Random(7)), 0, [100.0] * 9)
+    st.street = Street.RIVER
+    st.board = list(st.full_board)
+    st.to_act_seat = None
+    st.hand_over = True
+    for s in st.seats:
+        s.status = PlayerStatus.FOLDED
+        s.invested_street_bb = 0.0
+        s.invested_total_bb = 0.0
+    st.seats[0].status = PlayerStatus.FOLDED if hero == "fold" else PlayerStatus.IN
+    if hero == "in":
+        st.seats[0].invested_total_bb = 5.0
+    for i in in_seats:
+        st.seats[i].status = PlayerStatus.IN
+        st.seats[i].invested_total_bb = 5.0
+    for i in allin_seats:
+        st.seats[i].status = PlayerStatus.ALLIN
+        st.seats[i].invested_total_bb = 5.0
+    return st
+
+
+def _write_terminal(db, session_id: str, state: HandState):
+    """Overwrite the session's current hand with a crafted completed state."""
+    session = sim_session._get_session(db, session_id, "")
+    hand = sim_session._current_hand(db, session)
+    hand.state_json = state.model_dump_json()
+    hand.status = "complete"
+    db.add(hand)
+    db.commit()
+
+
+def test_hero_fold_villain_showdown_stays_facedown_no_leak(db):
+    # Hero folded; villains 1 & 2 ran a genuine showdown among themselves.
+    state = _terminal_state(hero="fold", in_seats=(1, 2))
+    view = create_session(db)
+    _write_terminal(db, view.session_id, state)
+    restored = restore_session(db, view.session_id)
+    # Face-down: no auto-reveal for a hero-folded hand.
+    assert restored.hand.showdown == []
+    # Privacy sweep: NO non-hero hole card appears anywhere on the wire.
+    wire = restored.model_dump_json()
+    for i in (1, 2):
+        for card in state.seats[i].hole_cards:
+            assert card not in wire, f"seat {i} card {card} leaked to the wire"
+    # Hero's own cards still ship (allowed).
+    assert restored.hand.hero.hole_cards == state.seats[0].hole_cards
+
+
+def test_hero_in_showdown_still_autoreveals(db):
+    # Regression: a genuine hero-in showdown auto-reveals exactly as before.
+    state = _terminal_state(hero="in", in_seats=(2,))
+    view = create_session(db)
+    _write_terminal(db, view.session_id, state)
+    restored = restore_session(db, view.session_id)
+    seats = {sd.seat_index for sd in restored.hand.showdown}
+    assert seats == {0, 2}  # hero + the villain compared
+
+
+def test_reveal_last_in_returns_only_live_seats(db):
+    # Hero folded; seats 1,2 IN and seat 3 ALLIN at end; 4-8 folded.
+    state = _terminal_state(hero="fold", in_seats=(1, 2), allin_seats=(3,))
+    view = create_session(db)
+    _write_terminal(db, view.session_id, state)
+    result = reveal(db, view.session_id, "last-in")
+    assert result.available
+    assert {s.seat_index for s in result.seats} == {1, 2, 3}
+    assert all(len(s.hole_cards) == 2 for s in result.seats)
+
+
+def test_reveal_all_returns_every_nonhero_seat(db):
+    state = _terminal_state(hero="fold", in_seats=(1, 2), allin_seats=(3,))
+    view = create_session(db)
+    _write_terminal(db, view.session_id, state)
+    result = reveal(db, view.session_id, "all")
+    assert result.available
+    assert {s.seat_index for s in result.seats} == set(range(1, 9))  # hero excluded
+
+
+def test_reveal_unavailable_when_hero_not_folded(db):
+    state = _terminal_state(hero="in", in_seats=(2,))
+    view = create_session(db)
+    _write_terminal(db, view.session_id, state)
+    for scope in ("last-in", "all"):
+        result = reveal(db, view.session_id, scope)
+        assert not result.available and result.seats == []
+
+
+def test_reveal_unavailable_on_live_hand_and_unknown_scope(db):
+    view = create_session(db)  # hand 1 is in_progress, not complete
+    assert not reveal(db, view.session_id, "last-in").available
+    # Unknown scope is a 200-body availability concern, never an error.
+    state = _terminal_state(hero="fold", in_seats=(1, 2))
+    _write_terminal(db, view.session_id, state)
+    assert not reveal(db, view.session_id, "sideways").available
+
+
+def test_reveal_unavailable_when_capability_off(db, monkeypatch):
+    state = _terminal_state(hero="fold", in_seats=(1, 2))
+    view = create_session(db)
+    _write_terminal(db, view.session_id, state)
+    monkeypatch.setattr(sim_session, "REVEAL_ENABLED", False)
+    assert not reveal(db, view.session_id, "all").available
+
+
+def test_reveal_missing_session_raises(db):
+    with pytest.raises(SessionNotFound):
+        reveal(db, "no-such-session", "all")

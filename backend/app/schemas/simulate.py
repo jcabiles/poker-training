@@ -126,6 +126,34 @@ class PreflopChartView(BaseModel):
     exploit_note: ExploitNoteView | None = None  # None when no authored pair exists
 
 
+class RevealedSeatView(BaseModel):
+    """One villain's hole cards, revealed on demand after a hero fold (R1).
+
+    Distinct from ShowdownSeatView: no delta_bb (reveal is a card lookup, not a
+    settlement). The ONLY other wire shape that carries villain hole cards."""
+
+    seat_index: int
+    hole_cards: tuple[str, str]
+
+
+class RevealView(BaseModel):
+    """On-demand reveal of the just-completed hand's villain cards (R1).
+
+    Sourced server-side from SimHand.state_json; hero is never included (hero
+    folded, and hero cards already ship on Hero). available=false (empty seats)
+    when the reveal capability is off, the hand isn't complete, or the hero did
+    not fold this hand (a genuine showdown auto-reveals instead) — never a
+    fabricated reveal. Availability is a 200-body concern; 404 stays reserved
+    for a missing/ended session.
+
+    scope: 'last-in' = non-hero seats still IN/ALLIN at hand end;
+    'all' = every non-hero seat dealt into the hand."""
+
+    available: bool
+    scope: str
+    seats: list[RevealedSeatView] = []
+
+
 class VillainRangeView(BaseModel):
     """Live per-villain range estimate (villain-range V2). available=false
     (no weights) for the hero's own seat, a folded seat (staged-fold gating

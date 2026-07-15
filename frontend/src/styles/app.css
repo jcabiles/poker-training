@@ -2762,12 +2762,15 @@ kbd {
   color: var(--gold-bright);
 }
 
-/* Showdown reveal ON the felt — the villain's revealed hole cards at their pod,
-   rendered at the same tilt idiom as held cards but half-scale (they share the
-   pod footprint with the seat label). */
+/* Showdown / R1 reveal ON the felt — the villain's revealed hole cards at their
+   pod. Sized to the SAME 0.45 footprint as the face-down backs (.tseat-cards)
+   so a revealed pod occupies exactly the space a live pod's card-backs already
+   hold collision-free around the whole ring — R1 "Reveal all" flips folded pods
+   that previously showed no cards, and a larger 0.6 footprint pushed those into
+   diagonal-neighbour stack labels at ≥1100px (design-review med-1). */
 .sim-reveal .card {
-  width: calc(var(--card-w) * 0.6);
-  height: calc(var(--card-h) * 0.6);
+  width: calc(var(--card-w) * 0.45);
+  height: calc(var(--card-h) * 0.45);
 }
 
 /* Action console — the hero's decision bar reuses .decisionbar/.decision-btn
@@ -2987,6 +2990,28 @@ kbd {
 }
 .sim-deal-btn {
   width: 100%;
+}
+/* R1 reveal-after-fold: the two "reveal villain hands" buttons, sat above the
+   deal control on a hero-folded hand. Two equal-share ghost buttons; the active
+   scope reads as pressed (gilded) so the hero knows which set is on the felt. */
+.sim-reveal-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.sim-reveal-btn {
+  flex: 1 1 0;
+  font-size: var(--text-sm);
+  /* Lift the ghost outline to --muted so the resting border clears WCAG 1.4.11
+     3:1 against the panel surface in BOTH themes — the base --border fell to
+     1.63:1 in Night, leaving the button shape faint (design-review low-2). */
+  border-color: var(--muted);
+}
+.sim-reveal-btn-on,
+.sim-reveal-btn[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
 }
 
 /* Narrow gate — collapse to a single column; the side table drops below the

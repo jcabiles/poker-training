@@ -260,6 +260,207 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       **Appetite:** ~1 small epic. **No-gos:** no sound; no avatars/art beyond badges; no
       animation library without ask-first.
 
+---
+
+## NOW — Epic 2: Realism, Range Coverage & Coaching Depth (added 2026-07-14)
+
+> Second epic on the shipped Simulate table. Same north-star (become a winning $2/$3
+> player — deepen the *transfer layer*). Six user asks (2026-07-14 interview) →
+> research-backed slices. **Interview decisions (locked):** bet sizes are **live $2/$3
+> stakes-calibrated, persona-flavored, fixed** · Reveal = **two buttons** (last-in villains /
+> all incl. folded) · hero sizing = **context-specific option pairs per node** (not one global
+> rule) · postflop "ranges" = an **openable call/fold/raise chart for the current spot**
+> (postflop analog of the preflop chart #36) · **three separate `/research` passes** (ranges,
+> bet sizes, postflop ranges) · coaching gap = **spot-specificity + why-it's-wrong depth**
+> (trend view stays lower priority).
+>
+> **Sequencing (user-approved):** R1 → R2 → R3 → R4 → R5 → R6, with the three research spikes
+> (RES-A/B/C) front-loaded and running in parallel since each seeds a later slice. Research
+> spikes are `/research` + `/deep-research` tasks whose OUTPUT is content-pack data + a
+> decision doc — no app code. Each build slice consumes its spike's findings.
+>
+> **Cross-cutting hazards to inject into every Epic-2 slice brief:**
+> - **Hero-only wire privacy (S9 invariant):** the client never has villain hole cards
+>   pre-showdown. R1's Reveal needs a *server* endpoint returning the finished hand's cards.
+> - **Hero-fold playout path** (PR #38 `domain/table/play.py` + FE staging): fold-path FE state
+>   bugs recurred **three times** in waves 3-6 — always test the hero-fold branch first.
+> - **Predetermined-sizing shape:** hero + bots use a fixed `LegalAction`/`Decision` sizing
+>   today. R2/R3 change what those sizes ARE and add a hero *choice*; keep the frequency-
+>   sampled anti-sizing-tell no-go (strength→size must stay non-deterministic for bots).
+> - **`spot_signature()` preflop byte-lock:** R4 adds positions — new RFI rows must not mutate
+>   existing signatures (append/extend content, don't renumber the preflop signature dims).
+> - **Heuristic-only no-go:** all range/sizing/coaching content stays heuristic + research-
+>   grounded (no solver tables); EVs stay labeled *approximate*.
+
+### Research spikes (front-loaded, parallel — output = data + decision doc, no app code)
+
+- [ ] **RES-A — Preflop range research: RFI-by-position + all node contexts, live $2/$3.**
+      **Problem:** `content/preflop/rfi.json` (+ vs_rfi/vs_3bet/vs_4bet/blind_defense) covers
+      UTG, LJ, HJ, CO, BTN, SB — the early seats between UTG and LJ (commonly **UTG+1/UTG+2**)
+      have no ranges, and coverage of every node context for those seats is absent.
+      **Outcome-link:** hero can't be graded / can't range-guess in spots the content doesn't
+      cover. **Solution:** `/deep-research` live $2/$3 (≈100BB) opening + response ranges by
+      seat; if literature is sparse, land the **CO→UTG monotonic-tightening heuristic** the
+      user named, documented and defensible. Deliver a positions×node-context coverage matrix +
+      proposed range strings. **Pass/fail:** a decision doc under `docs/ai-dlc/research/`
+      lists, for each missing seat × node context, either a sourced range or an explicit
+      heuristic-derived range with rationale; no app code touched. **Appetite:** ~1 research
+      spike. **No-gos:** no content-file edits here (that's R4); no solver ranges.
+
+- [ ] **RES-B — Bet-sizing research: realistic fixed $2/$3 sizes, persona-flavored.**
+      **Problem:** bot/hero bet sizes are unrealistic (user-reported). **Outcome-link:** every
+      graded decision happens at a realistic price. **Solution:** `/deep-research` live $2/$3
+      standard sizings per node (open, 3-bet, 4-bet, c-bet, turn/river barrel, check-raise,
+      facing-bet raises) AND how they skew by player type (maniac overbet, nit small/standard,
+      TAG textbook). Confirm/refute the user's "sizes differ by level" intuition — resolved as
+      **stakes-calibrated** ($2/$3), persona-flavored. Deliver a size table keyed by
+      node × persona. **Pass/fail:** decision doc gives a defensible fixed size for every
+      node × persona with sources or explicit heuristic; flags any node where hero should get
+      TWO options (feeds R3). **Appetite:** ~1 research spike. **No-gos:** no code; sizes stay
+      FIXED (no bet-size sliders); no per-hand randomization beyond the existing sampling.
+
+- [ ] **RES-C — Postflop range research: call/fold/raise ranges by street & spot.**
+      **Problem:** postflop has heuristic graders (S6/S7) but no openable *range* view — hero
+      can't see "what should call/fold/raise here." **Outcome-link:** point-of-need postflop
+      strategy = the deepest transfer gap. **Solution:** `/deep-research` postflop
+      continuation/response ranges for the common Simulate node families (c-bet/vs-c-bet,
+      turn barrel/vs, river value-bluff/vs) at live $2/$3, HU and multiway-aware; where solver
+      literature is thin, a documented merit-bucket → action-frequency heuristic. Deliver a
+      spot → {call/fold/raise range or category-frequency} spec. **Pass/fail:** decision doc
+      covers each shipped postflop grader's node family with a range/frequency spec + honest
+      "approximate" labeling and a stated representation (combo strings vs category weights);
+      no app code. **Appetite:** ~1 large research spike. **No-gos:** no solver tables; no code;
+      approximate labels mandatory.
+
+### Build slices
+
+- [x] **R1 — Reveal Hands: face-down playout + two reveal buttons.** *(done 2026-07-15,
+      feat/reveal-hands-r1: face-down gate in `_view()` gated strictly on hero
+      `PlayerStatus.FOLDED` at hand_over — a villain-only showdown after a hero fold no
+      longer auto-reveals; `settle()` untouched so a genuine hero-in showdown is byte-stable.
+      New `GET /simulate/{id}/reveal/{scope}` (scope last-in|all) sourced from
+      `SimHand.state_json` — NO migration; last-in = non-hero IN/ALLIN seats, all = every
+      non-hero dealt seat, hero always excluded. Capability seam = module constant
+      `REVEAL_ENABLED` (global; a future hidden-persona mode flips it off). Watch-ON only (the
+      face-down watch-and-guess loop only exists there). FE: two ghost buttons in SimShowdown
+      beside "Deal next hand" (heroFolded-gated), reveal FLIPS THE FELT via SimTable
+      `revealedBySeat`, state reset on the same hand-transition boundary as the range panel.
+      8 new backend tests built from a crafted terminal HandState (bots use non-seeded RNG →
+      can't reproduce hero-fold-then-villain-showdown by play); privacy sweep asserts zero
+      non-hero cards on the wire for a hero-folded hand. refuter PASS (test-determinism +
+      "mirror" wording + felt-flip decision folded in); design-review ship-with-nits — all 3
+      folded: reveal-all felt collision fixed by matching cards to the 0.45 face-down
+      footprint, Night ghost-border lifted to --muted for WCAG 1.4.11 3:1, empty-showdown copy
+      softened when heroFolded. 532 backend tests + verify.sh + FE typecheck/build green.)*
+      ICE 8·9·8.
+      **Problem:** after hero folds (PR #38) the still-live villains play out **face-up**,
+      destroying the range-guessing exercise the user learns from. **Outcome-link:** hero
+      practices reading ranges as streets unfold — the core learning loop.
+      **Solution:** villain hands stay **face-down** through any no-showdown resolution (fold
+      wins included); the played-out action still advances so hero can watch and guess.
+      Add **two buttons** beside "Deal Next Hand": **"Reveal Last-In"** (villains still live
+      when the hand ended) and **"Reveal All"** (every villain dealt in, incl. early folders).
+      Reveal fetches cards from a **new server endpoint** for the just-completed hand (client
+      has no hole cards pre-reveal — S9 privacy invariant); showdown still auto-reveals as
+      today. **Pass/fail:** fold as UTG → villains play out face-down; "Reveal Last-In" shows
+      only end-of-hand live villains; "Reveal All" shows every dealt villain; a genuine
+      showdown still auto-reveals; no villain hole card reaches the client until a reveal/
+      showdown (privacy test — mirror S9's zero-leak sweep); hero-fold FE staging still lockstep
+      (test that path first); `verify.sh` + typecheck/build green; design-review both themes.
+      **Appetite:** ~1 small epic. **No-gos:** no auto-reveal on fold; no persona/read tagging
+      (that's the NEXT hidden-persona bet); no change to showdown behavior. **Reveal must route
+      through a server-side capability seam** (endpoint + a togglable flag), NOT an always-on
+      client toggle — so the NEXT hidden-persona mode can withhold it later without a rewrite.
+
+- [ ] **R2 — Realistic persona-flavored fixed bet sizes** *(consumes RES-B)*. ICE 8·7·5.
+      **Problem:** unrealistic sizings make every price wrong. **Outcome-link:** decisions
+      graded at real prices. **Solution:** replace predetermined bot/hero sizings with the
+      RES-B size table — fixed, keyed by node, flavored per persona (levers in the persona
+      packs, mechanics in code, per the S4 lever/code split). **Pass/fail:** bot open/3-bet/
+      c-bet/barrel sizes match the researched table per persona (test asserts persona A sizes ≠
+      persona B where research says so); sizes stay frequency-sampled where multiple are
+      authored (no deterministic strength→size tell); chip-conservation + engine tests still
+      green; `verify.sh` green. **Appetite:** ~1 epic. **No-gos:** no sliders; no rake/ante;
+      hero *choice* is R3, not here — R2 keeps hero on a single predetermined size.
+
+- [ ] **R3 — Hero bet-sizing feature: two context-specific options** *(consumes RES-B, after R2)*.
+      ICE 8·7·5.
+      **Problem:** hero can't choose a size — a real skill the trainer omits. **Outcome-link:**
+      sizing decisions become gradeable. **Solution:** when hero bets/raises, surface **two
+      size options chosen per node** (RES-B flags which two — e.g. vs a 3-bet: standard re-raise
+      OR shove; c-bet: 1/3 OR 2/3), not one global rule. Grade the size choice against the
+      node's baseline (extends S10 grade_map / grade coverage). **Pass/fail:** hero facing each
+      supported node sees the two researched options; choosing gets a freq+EV verdict (approx);
+      an unmapped node falls back to the single predetermined size + "no baseline yet"; illegal
+      sizes rejected; `verify.sh` + build green; design-review the new action UI both themes.
+      **Appetite:** ~1 epic. **No-gos:** no free-form slider; no more than two options; no
+      solver EVs.
+
+- [ ] **R4 — Preflop coverage: fill UTG+1/UTG+2 + all node contexts** *(consumes RES-A)*.
+      ICE 8·8·6.
+      **Problem:** early seats between UTG and LJ have no ranges → hero un-gradeable / no chart
+      there. **Outcome-link:** ≥90% preflop-decision coverage (the north-star coverage metric).
+      **Solution:** add the missing seats to `content/preflop/*.json` (rfi/vs_rfi/vs_3bet/
+      vs_4bet/blind_defense) from RES-A; extend persona per-position ranges, the S10 grade_map,
+      and the preflop chart (#36) to render them. Confirm the table engine's seat model exposes
+      those positions (open question for /ai-dlc). **Pass/fail:** a hand where hero is UTG+1/
+      UTG+2 gets a baseline verdict + a populated preflop chart (not "no chart yet"); existing
+      preflop `spot_signature()` values byte-unchanged (golden test); persona VPIP/PFR bands
+      still hold for the new seats; `verify.sh` + build green.
+      **Blocker to resolve in RES-A / spec, before build:** confirm the table engine's seat
+      model can cleanly expose UTG+1/UTG+2 — if positions are a fixed enum that doesn't, R4 is a
+      bigger structural slice than ~1 epic and must be re-appetited (don't silently absorb it).
+      **Appetite:** ~1 epic (contingent on the seat-model check). **No-gos:** no signature-dim
+      renumbering; no postflop (R5); no persona-adjusted squares on the chart (baseline +
+      exploit note only, per the shipped-chart no-go).
+
+- [ ] **R5 — Postflop range chart: openable call/fold/raise ranges for the current spot**
+      *(consumes RES-C)*. ICE 9·6·4.
+      **Problem:** no point-of-need postflop range view. **Outcome-link:** the deepest transfer
+      gap — postflop strategy at the moment of decision. **Solution:** an openable panel (the
+      preflop chart's interaction pattern) showing the call/fold/raise range (or category-
+      frequency, approx-labeled) for hero's **current** postflop spot, backed by RES-C content;
+      widen postflop grading coverage to match. Point-of-need only (current spot) so it stays
+      inside the no-browsable-lessons no-go. **Pass/fail:** on a supported flop/turn/river spot,
+      the chart opens and shows a call/fold/raise breakdown with approximate labeling; an
+      unmapped spot shows "no chart for this spot yet" (never fabricated); grading of that spot
+      matches the chart's stance (consistency test); `verify.sh` + build green; design-review
+      both themes. **Reconciliation rule (tie-breaker):** RES-C's researched range/frequency
+      spec is the **single source of truth** — where it disagrees with the existing S6/S7
+      postflop heuristic graders, R5 re-points the grader at the RES-C content (graders and
+      chart read the same spec); a spot RES-C can't cover stays "no baseline yet" on BOTH — never
+      loosen one side to fake agreement. **Appetite:** ~1 large epic. **No-gos:** no solver
+      tables; no browsable library; approximate labels mandatory; multiway handled or honestly
+      "no baseline yet".
+
+- [ ] **R6 — Coaching: leak-by-spot analytics view** *(after R2/R4/R5)*. ICE 9·6·5.
+      **Problem:** feedback isn't spot-specific — the user can't find leaks by spot / position /
+      street (gap #1 the user named). **Outcome-link:** the primary metric becomes *actionable*,
+      not just measurable. **Solution:** a **leak-by-spot analytics view** — one aggregate
+      read-model over `sim_decision` (EV-loss / mistake-rate grouped by street × position ×
+      node family), surfacing hero's worst spots ("you over-fold BB vs steals"). Extends the S10
+      per-street report; reuses its NULL-tolerant source filter. **Pass/fail:** the view ranks
+      hero's spots by leak severity with real `sim_decision` data (excludes no-baseline rows
+      from rates, shows them as a coverage count); numbers reconcile with the S10 per-street
+      report; `verify.sh` + build green; design-review both themes. **Appetite:** ~1 epic.
+      **No-gos:** no exploit-/persona-aware verdicts (ask-first if folding in the NEXT exploit
+      layer); no trend/progress graphs (user ranked trend lower — stays NEXT); no SRS writes;
+      no new `sim_decision` columns (read-model only — schema unchanged).
+
+- [ ] **R7 — Coaching: why-it's-wrong recap depth** *(after R6; consumes RES-A/B/C rationales)*.
+      ICE 8·6·5.
+      **Problem:** verdicts say good/bad but don't teach the concept or the fix (gap #2 the user
+      named). **Outcome-link:** mistakes become learnable, not just flagged. **Solution:**
+      richer per-decision "why" in the recap — concept + concrete fix, drawn from the RES-A/B/C
+      rationales **already authored as structured content** (RES specs must emit rationale text
+      in a programmatically consumable shape — an explicit input contract for this slice, not a
+      late discovery). **Pass/fail:** a mistake/blunder recap gives a spot-specific reason + a
+      fix, not a generic verdict; the "why" is generated **live per request only** (no reload-
+      durable text) so no schema change is needed; `verify.sh` + build green; design-review both
+      themes. **Appetite:** ~1 epic. **No-gos:** **no migration 0011 / no `verdict`/`reasoning`
+      columns on `sim_decision`** — reload-durable reasoning stays the deferred NEXT bet
+      (ask-first if it becomes a real ask); no exploit-aware "why"; no SRS.
+
 ## NEXT — validated problems / opportunities (not yet spec'd)
 
 - **Exploit-aware grading layer.** *(gate-mandated follow-on)* *Evidence:* personas are
@@ -271,6 +472,8 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 - **Turn/river teaching surface in Practice.** *Evidence:* teacher-roadmap mandate — a street
   ships *with* teaching; S6/S7 add graders + tiered feedback but no drill modes/concept cards.
   *Candidate slices:* turn/river drill modes; concept cards for barrel/bluff-catch families.
+  *(Partly realized by Epic-2 **R5** — the openable postflop range chart — inside Simulate;
+  the Practice drill-mode + concept-card surface remains NEXT.)*
 - **SRS integration for Simulate spots.** *Evidence:* sim blunders are exactly the reps worth
   scheduling; held out of v1 to protect the queue from off-depth/multiway noise.
   *Open questions:* which sim spots are signature-clean enough to seed; depth filter.
@@ -279,6 +482,8 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   replay with verdicts.
 - **Hidden-persona mode + read tagging.** *Evidence:* gate decision — visible badges v1,
   read-development later. *Open questions:* does tagging need showdown-history support.
+  *(Epic-2 **R1**'s reveal buttons are a training wheel this mode would eventually gate —
+  keep R1's reveal server-side + on-demand so hidden-persona mode can withhold it later.)*
 - **Session analytics view (per-street decision quality).** *(promoted from Later
   2026-07-12 — explicit user vision: "track my decisions at each street, then show me
   analytics on whether I made good/bad/acceptable decisions at each street.")* *Evidence:*
@@ -288,6 +493,8 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   per-session filtering; leak-category drill-down. *Open questions:* how much does the S10
   minimal report already answer (review after ~2 weeks of real use); charting approach
   (tokens-only CSS bars vs a library — library needs ask-first).
+  *(Epic-2 **R6** promotes the spot-specific + leak-by-spot half of this into NOW — the
+  trend/progress-graph half stays here, ranked lower by the user 2026-07-14.)*
 - ~~Collapsible hero preflop range chart~~ **DONE 2026-07-12 → PR #36** *(built autonomously under the user's proceed-with-everything instruction: grade_map extended to vs_3bet/vs_4bet/vs_limpers (C0 — also widens S10 grading), GET /simulate/{id}/preflop-chart (grid byte-identical to Practice via the same _INDEX + range_grid; exploit note resolved facing→sim_seat persona, vs_limpers honestly note-less), SimRangeChart collapsed-default panel (fetch-on-expand, pot_bb-keyed per-decision refetch — refuter caught a same-hand stale-chart high), design-review SHIP zero issues; 504 tests green.)* *(user request 2026-07-12;
   gate decision: baseline chart + exploit note — NOT persona-adjusted squares, which would
   collide with the heuristic-only no-go and belongs to a Later bet after exploit-aware

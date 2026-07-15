@@ -12,6 +12,8 @@ GET  /simulate/{id}/preflop-chart    -> baseline range chart for the hero's
 GET  /simulate/{id}/villain-range/{seat} -> live estimated hand-range for a
                                          non-hero, non-folded villain seat
                                          (villain-range V2).
+GET  /simulate/{id}/reveal/{scope}   -> on-demand villain-card reveal after a
+                                         hero fold; scope last-in|all (R1).
 
 All state lives in the DB (`app.services.sim_session`); this module only
 translates HTTP <-> service calls. No auth: `owner_id=""`. See
@@ -25,7 +27,13 @@ from sqlmodel import Session
 
 from app.db.session import get_session
 from app.domain.action import Decision
-from app.schemas.simulate import PreflopChartView, SessionView, StreetReportView, VillainRangeView
+from app.schemas.simulate import (
+    PreflopChartView,
+    RevealView,
+    SessionView,
+    StreetReportView,
+    VillainRangeView,
+)
 from app.services import sim_session
 from app.services.sim_session import SessionNotFound
 
@@ -87,6 +95,19 @@ async def preflop_chart(
     # 200-body concern; 404 stays SessionNotFound-only.
     try:
         return sim_session.preflop_chart(db, session_id, owner_id=_OWNER_ID)
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="session not found") from exc
+
+
+@router.get("/{session_id}/reveal/{scope}", response_model=RevealView)
+async def reveal(
+    session_id: str, scope: str, db: Session = Depends(get_session)
+) -> RevealView:
+    # R1: reveal the just-completed hand's villain cards after a hero fold.
+    # Availability (capability off / unknown scope / hand not complete / hero
+    # didn't fold) is a 200-body concern; 404 stays SessionNotFound-only.
+    try:
+        return sim_session.reveal(db, session_id, scope, owner_id=_OWNER_ID)
     except SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="session not found") from exc
 

@@ -13,6 +13,7 @@ import type {
   QuizResult,
   RecapResponse,
   ReviewPlanResponse,
+  RevealView,
   SessionView,
   Spot,
   StatsSummary,
@@ -166,4 +167,15 @@ export async function getVillainRange(
 ): Promise<VillainRangeView> {
   const q = throughAction != null ? `?through_action=${throughAction}` : "";
   return json(await fetch(`${BASE}/simulate/${sessionId}/villain-range/${seatIndex}${q}`));
+}
+
+// R1: reveal the just-completed hand's villain cards after a hero fold. scope
+// "last-in" = seats still live at hand end; "all" = every non-hero seat dealt
+// in. `available` false (empty seats) when the capability is off / the hand
+// isn't complete / the hero didn't fold — only a missing/ended session 404s.
+export async function getReveal(
+  sessionId: string,
+  scope: "last-in" | "all",
+): Promise<RevealView> {
+  return json(await fetch(`${BASE}/simulate/${sessionId}/reveal/${scope}`));
 }

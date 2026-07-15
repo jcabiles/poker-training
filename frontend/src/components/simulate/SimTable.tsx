@@ -10,7 +10,8 @@ import { fmtBb, fmtEvLoss, tierOf } from "./simGrade";
 // PokerTable does not carry — persona badge, chips-in-front, live status, and
 // showdown reveals. PokerTable.tsx itself stays untouched (Practice/Quiz still
 // use it). Privacy: a non-hero seat's hole cards are rendered ONLY when that
-// seat is in `showdown` — folded/live villains stay face-down.
+// seat is in `showdown` or the hero explicitly revealed it after folding (R1,
+// `revealedBySeat`) — otherwise folded/live villains stay face-down.
 
 // Canonical 9-max seating order (clockwise) — same ring PokerTable uses.
 const RING = ["UTG", "UTG1", "UTG2", "LJ", "HJ", "CO", "BTN", "SB", "BB"];
@@ -53,6 +54,7 @@ export default function SimTable({
   lastGrade,
   openRangeSeat,
   onToggleRange,
+  revealedBySeat,
 }: {
   hand: SimulateHandView;
   // How many of the current events batch have been narrated (shared with the
@@ -77,6 +79,11 @@ export default function SimTable({
   // vanish before the fold is narrated (spec low-2).
   openRangeSeat: number | null;
   onToggleRange: (seatIndex: number) => void;
+  // R1: seat_index → hole cards the hero chose to reveal after folding (via the
+  // reveal buttons). Empty until a reveal is requested. These flip the felt
+  // face-up exactly like a genuine showdown, but sourced on-demand — the client
+  // holds no villain cards until the reveal endpoint returns them.
+  revealedBySeat: Map<number, readonly [string, string]>;
 }) {
   const { seats, board, pot_bb, hero, to_act_seat, button_seat } = hand;
   const showdownBySeat = new Map<number, ShowdownSeatView>(
@@ -134,6 +141,13 @@ export default function SimTable({
             const allin = revealed && seat.status === "allin";
             const isToAct = to_act_seat != null && seat.seat_index === to_act_seat;
             const reveal = showdownBySeat.get(seat.seat_index);
+            // Cards to show face-up: a genuine showdown (settlement) OR an
+            // on-demand R1 reveal after a hero fold. R1 reveals can include
+            // FOLDED seats ("Reveal All"), so a revealed card overrides the
+            // face-down/hidden default even when the seat folded.
+            const revealedCards: readonly [string, string] | undefined = reveal
+              ? reveal.hole_cards
+              : revealedBySeat.get(seat.seat_index);
             const style = slotStyle(i, ordered.length);
 
             // Chips-in-front: this street's commitment, shown as a small puck in
@@ -208,9 +222,9 @@ export default function SimTable({
               >
                 {lastAction}
                 {chips}
-                {reveal ? (
+                {revealedCards ? (
                   <span className="cards sim-reveal" aria-label={`${seat.position} shows`}>
-                    {reveal.hole_cards.map((c, j) => (
+                    {revealedCards.map((c, j) => (
                       <Card key={j} card={c} />
                     ))}
                   </span>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  getReveal,
   getSession,
   getVillainRange,
   leaveSession,
@@ -8,7 +9,13 @@ import {
   postNextHand,
   postSimulateSession,
 } from "../api/client";
-import type { ActionType, GradeView, SessionView, VillainRangeView } from "../api/types";
+import type {
+  ActionType,
+  GradeView,
+  RevealedSeatView,
+  SessionView,
+  VillainRangeView,
+} from "../api/types";
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
 import SimLedger from "./simulate/SimLedger";
@@ -196,6 +203,12 @@ export default function SimulateView() {
   const [rangeLoading, setRangeLoading] = useState(false);
   const [rangeErrored, setRangeErrored] = useState(false);
 
+  // R1 reveal-after-fold: which reveal button is active (null = none clicked
+  // yet) and the villain cards the server returned. Reset on every hand
+  // transition (in adopt) so a reveal never bleeds onto the next hand.
+  const [revealScope, setRevealScope] = useState<"last-in" | "all" | null>(null);
+  const [revealedSeats, setRevealedSeats] = useState<RevealedSeatView[]>([]);
+
   const clearTimer = useCallback(() => {
     if (timerRef.current != null) {
       window.clearTimeout(timerRef.current);
@@ -311,6 +324,11 @@ export default function SimulateView() {
       // a NON-folding villain silently carried across the hand boundary —
       // villain-range refuter med-1).
       setOpenRangeSeat(null);
+      // R1: a new hand clears any reveal from the previous hand (fold-path FE
+      // state bled 3× historically — reset it on the same boundary as the range
+      // panel so revealed cards can't carry onto the next dealt hand).
+      setRevealScope(null);
+      setRevealedSeats([]);
     } else {
       narratedBaseRef.current = narratedBaseRef.current + prevEventCountRef.current + 1;
     }
@@ -509,6 +527,35 @@ export default function SimulateView() {
   // click, not the bot playback, so it may show immediately.
   const revealHandEnd = !playing;
 
+  // ── R1 reveal-after-fold ────────────────────────────────────────────────────
+  // Did the hero fold this hand? Only then are the villains withheld (face-down)
+  // and the reveal buttons meaningful; a hero-in showdown auto-reveals instead.
+  const heroFolded = hand?.hand_over
+    ? hand.seats.some((s) => s.is_hero && s.status === "folded")
+    : false;
+  // Fetch the requested reveal set and flip those seats on the felt. Availability
+  // is a 200 body — an unavailable reveal (capability off / not a hero fold) just
+  // leaves the felt face-down. Only a dead session errors; swallow it (reveal is
+  // an optional affordance, never blocks play).
+  const onReveal = useCallback(async (scope: "last-in" | "all") => {
+    const id = sessionIdRef.current;
+    if (!id) return;
+    try {
+      const res = await getReveal(id, scope);
+      if (res.available) {
+        setRevealScope(scope);
+        setRevealedSeats(res.seats);
+      }
+    } catch {
+      /* non-fatal: reveal is optional */
+    }
+  }, []);
+  // seat_index → revealed hole cards, consumed by SimTable to flip the felt.
+  const revealedBySeat = useMemo(
+    () => new Map(revealedSeats.map((s) => [s.seat_index, s.hole_cards] as const)),
+    [revealedSeats],
+  );
+
   // ── Villain-range panel: open/close + lockstep fetch (V2) ───────────────────
   // The narrated count that gates the estimate. While playback runs, it's the
   // per-hand cumulative count of narrated actions the log has revealed so far
@@ -623,6 +670,7 @@ export default function SimulateView() {
               lastGrade={heroBadge}
               openRangeSeat={openRangeSeat}
               onToggleRange={toggleRange}
+              revealedBySeat={revealedBySeat}
             />
 
             {/* Villain-range panel (V2) — one open villain at a time, keyed by
@@ -675,6 +723,9 @@ export default function SimulateView() {
                   seats={hand.seats}
                   onNextHand={nextHand}
                   dealing={busy}
+                  heroFolded={heroFolded}
+                  revealScope={revealScope}
+                  onReveal={onReveal}
                 />
                 <SimRecap recap={mergedRecap} />
               </>

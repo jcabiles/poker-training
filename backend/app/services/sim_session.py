@@ -59,6 +59,8 @@ from app.schemas.simulate import (
     ExploitNoteView,
     GradeView,
     PreflopChartView,
+    RevealedSeatView,
+    RevealView,
     SeatView,
     SessionView,
     ShowdownSeatView,
@@ -71,6 +73,12 @@ from app.schemas.simulate import (
 HERO_SEAT = 0
 _STARTING_STACK_BB = 100.0
 _REBUY_FLOOR_BB = 1.0
+
+# R1 capability seam: gates the on-demand villain reveal after a hero fold. A
+# future hidden-persona mode can flip this off to withhold reveals without a
+# rewrite. Global (not per-session) by design — v1 has no per-session hiding.
+REVEAL_ENABLED = True
+_REVEAL_SCOPES = ("last-in", "all")
 
 
 class SessionNotFound(Exception):
@@ -296,7 +304,11 @@ def _view(
     hero_state = state.seats[HERO_SEAT]
     is_hero_turn = not state.hand_over and state.to_act_seat == HERO_SEAT
     showdown: list[ShowdownSeatView] = []
-    if state.hand_over:
+    # R1: when the hero folded this hand, villains stay FACE-DOWN — no auto-reveal,
+    # even if the villains ran a genuine showdown among themselves. The hero reveals
+    # them on demand via the reveal endpoint. A hero-in showdown (hero IN/ALLIN)
+    # auto-reveals exactly as before; `settle()` is untouched.
+    if state.hand_over and hero_state.status is not PlayerStatus.FOLDED:
         settlement = settle(state)
         showdown = [
             ShowdownSeatView(
@@ -682,6 +694,51 @@ def villain_range(
         exact=estimate.exact,
         weights=weights,
     )
+
+
+def reveal(
+    db: Session,
+    session_id: str,
+    scope: str,
+    owner_id: str = "",
+) -> RevealView:
+    """On-demand reveal of the just-completed hand's villain cards after a hero
+    fold (R1). Sourced from the completed hand's `state_json` (all 9 seats' hole
+    cards); the hero is always excluded (hero folded, hero cards already ship on
+    `Hero`). Reveal buttons fire BEFORE `deal_next_hand` advances `hand_no`, so
+    the session's current hand IS the just-completed one.
+
+    available=false (200 body, no seats) when: the reveal capability is off, the
+    scope is unknown, no completed hand exists, or the hero did NOT fold this
+    hand (a genuine showdown auto-reveals via `_view`, so there is nothing to
+    reveal here). 404 stays reserved for SessionNotFound.
+
+    scope 'last-in' = non-hero seats still IN/ALLIN at hand end (the lone winner
+    on a fold-out, or the villain-vs-villain showdown participants);
+    'all' = every non-hero seat dealt into the hand.
+    """
+    session = _get_session(db, session_id, owner_id)
+    if session is None:
+        raise SessionNotFound(session_id)
+    if not REVEAL_ENABLED or scope not in _REVEAL_SCOPES:
+        return RevealView(available=False, scope=scope)
+    hand = _current_hand(db, session)
+    if hand is None or hand.state_json is None or hand.status != "complete":
+        return RevealView(available=False, scope=scope)
+    state = HandState.model_validate_json(hand.state_json)
+    if state.seats[HERO_SEAT].status is not PlayerStatus.FOLDED:
+        # Hero reached showdown / won — auto-reveal already handled it.
+        return RevealView(available=False, scope=scope)
+    seats = [
+        RevealedSeatView(seat_index=i, hole_cards=eng.hole_cards)
+        for i, eng in enumerate(state.seats)
+        if i != HERO_SEAT
+        and (
+            scope == "all"
+            or eng.status in (PlayerStatus.IN, PlayerStatus.ALLIN)
+        )
+    ]
+    return RevealView(available=True, scope=scope, seats=seats)
 
 
 def deal_next_hand(db: Session, session_id: str, owner_id: str = "") -> SessionView:
