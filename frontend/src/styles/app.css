@@ -3557,6 +3557,23 @@ kbd {
   margin-top: var(--space-4); /* clears the action bar above */
 }
 
+/* Compact simulate chart (scoped — Practice's RangeGrid stays pixel-identical):
+   the point-of-need baseline is a reference thumbnail, not the room's focus, so
+   the square grid is capped at half the column width (≈¼ the on-screen area).
+   The hand-class label is sized to the CELL via a container query so it fills
+   the box no matter how small the grid renders — each cell is a size container
+   and the label rides ~48% of the cell's short side (3-char classes like "AKs"
+   fill the width; overrides the frozen --text-2xs ONLY inside .sim-chart). */
+.sim-chart .grid {
+  max-width: 50%;
+}
+.sim-chart .cell {
+  container-type: size;
+}
+.sim-chart .cell-label {
+  font-size: 48cqmin;
+}
+
 /* Fetch/empty/error lines inside the panel body. The loading line reads as the
    panel's own voice (serif-adjacent ink); "no chart yet" + "unavailable" step
    back to muted so they land as calm information, never an error banner. */
