@@ -212,6 +212,8 @@ export interface SeatView {
   stack_bb: number; // carry-over current stack
   status: "in" | "folded" | "allin"; // PlayerStatus StrEnum — lowercase on the wire
   invested_street_bb: number; // this street's commitment (chips-in-front)
+  last_action: string | null; // verb of last VOLUNTARY action this street (felt label);
+  // "fold" persists for folded seats; null = hasn't acted this street. Blinds excluded.
   net_bb: number; // stack_bb - buyins_bb (ledger P&L)
 }
 

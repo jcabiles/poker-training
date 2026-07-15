@@ -263,3 +263,55 @@ def test_bot_decision_parity_with_harness():
             checked += 1
             state = apply(state, got)
     assert checked > 50  # enough decisions across preflop + postflop streets
+
+
+def test_last_action_per_street_folded_override_and_post_excluded():
+    """`_last_action` (felt label): current-street verb only, folded persists,
+    blind POSTs excluded, clears when the street advances. Spec:
+    docs/ai-dlc/specs/simulate-seat-action-labels.md."""
+    la = sim_session._last_action
+    dealt = deal_hand(random.Random(7))
+    state = start_hand(dealt, button_seat=0, stacks_bb=[100.0] * 9)
+
+    # Preflop, before any voluntary action: SB/BB have POSTed blinds, but POST is
+    # excluded, so every seat's label is None.
+    for eng in state.seats:
+        assert la(state, eng) is None
+
+    # Drive preflop: first legal raiser opens, BB (seat 2) calls, everyone else
+    # folds → reaches the flop heads-up (raiser vs BB).
+    raiser_seat = None
+    while not state.hand_over and state.street is Street.PREFLOP:
+        seat = state.to_act_seat
+        acts = engine_legal_actions(state)
+        kinds = {a.action for a in acts}
+        if raiser_seat is None and ActionType.RAISE in kinds:
+            legal = next(a for a in acts if a.action is ActionType.RAISE)
+            state = apply(state, Decision(action=ActionType.RAISE, size_bb=legal.min_bb))
+            raiser_seat = seat
+        elif seat == 2 and ActionType.CALL in kinds:
+            state = apply(state, Decision(action=ActionType.CALL))
+        else:
+            state = apply(state, Decision(action=ActionType.FOLD))
+
+    assert state.street is Street.FLOP
+    assert raiser_seat is not None
+
+    # Per-street clear: the preflop raise does NOT bleed onto the flop.
+    assert la(state, state.seats[raiser_seat]) is None
+    assert la(state, state.seats[2]) is None  # BB called preflop; cleared on flop
+    # Folded override: a seat that folded PREFLOP still reads "fold" on the flop.
+    folded = next(s for s in state.seats if s.status.value == "folded")
+    assert la(state, folded) == "fold"
+
+    # A current-street action shows its verb immediately.
+    seat = state.to_act_seat
+    acts = engine_legal_actions(state)
+    kinds = {a.action for a in acts}
+    if ActionType.CHECK in kinds:
+        state = apply(state, Decision(action=ActionType.CHECK))
+        assert la(state, state.seats[seat]) == "check"
+    else:
+        legal = next(a for a in acts if a.action is ActionType.BET)
+        state = apply(state, Decision(action=ActionType.BET, size_bb=legal.min_bb))
+        assert la(state, state.seats[seat]) == "bet"

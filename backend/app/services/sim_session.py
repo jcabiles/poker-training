@@ -36,10 +36,11 @@ from app.domain.content.registry import lookup
 from app.domain.evaluation import Coverage, EvaluationResult, FeedbackTiers
 from app.domain.grading import range_grid
 from app.domain.personas import load_persona_packs
-from app.domain.spot import Hero, NodeContext, PlayerStatus, Spot, Street
+from app.domain.spot import ActionType, Hero, NodeContext, PlayerStatus, Spot, Street
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
     HandState,
+    SeatState,
     Settlement,
     apply,
     legal_actions,
@@ -239,6 +240,26 @@ def _sim_decision_row(
     )
 
 
+def _last_action(state: HandState, eng: SeatState) -> str | None:
+    """The verb of a seat's last VOLUNTARY action on the CURRENT street, for the
+    felt label (S-action-labels). Per-street: clears when the street advances,
+    like the chips-in-front puck. A folded seat reads "fold" persistently (a fold
+    is a hand-level state — its fold entry may sit on an earlier street). Forced
+    blind POSTs are not a voluntary action and are skipped (the amount already
+    shows in the chips puck). None ⇒ hasn't acted this street ⇒ no label.
+    """
+    if eng.status is PlayerStatus.FOLDED:
+        return "fold"
+    for h in reversed(state.action_history):
+        if (
+            h.position == eng.position
+            and h.street == state.street
+            and h.action is not ActionType.POST
+        ):
+            return h.action.value
+    return None
+
+
 def _view(
     session: SimSession,
     hand: SimHand,
@@ -268,6 +289,7 @@ def _view(
                 stack_bb=row.stack_bb if complete else eng.stack_bb,
                 status=eng.status.value,
                 invested_street_bb=eng.invested_street_bb,
+                last_action=_last_action(state, eng),
                 net_bb=round(row.stack_bb - row.buyins_bb, 2),
             )
         )
