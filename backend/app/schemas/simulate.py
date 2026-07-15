@@ -22,6 +22,8 @@ class SeatView(BaseModel):
     stack_bb: float
     status: str  # in / folded / allin
     invested_street_bb: float  # this street's commitment (chips-in-front display)
+    last_action: str | None  # verb of last VOLUNTARY action this street (felt label);
+    # "fold" persists for folded seats; None ⇒ hasn't acted this street. Blinds excluded.
     net_bb: float  # stack_bb - buyins_bb (ledger)
 
 

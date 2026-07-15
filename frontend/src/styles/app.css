@@ -2718,6 +2718,30 @@ kbd {
   opacity: 0.35;
 }
 
+/* Last-action verb — the seat's most recent VOLUNTARY action this street, struck
+   above the cards and above the chips puck (order:-2 clears .sim-chips's -1, so
+   it's topmost in the pod column). A quiet uppercase call-sheet stencil in the
+   felt's legible ink (--felt-text is AA on both themes by construction); folded
+   seats step back to match .sim-persona's dim. Per-street: the backend clears it
+   on street advance, and the FE gates it on the lockstep `revealed` flag. */
+.sim-last-action {
+  order: -2;
+  /* --text-xs (11px), not the 9px grid-cell floor — a call-sheet label read at
+     felt distance across a 9-max ring; the taller ring gives it the room. */
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--felt-text);
+  white-space: nowrap;
+}
+/* Folded steps back but stays clear of AA: 80% felt-text mix ⇒ ~5.1:1 on the
+   lighter Night felt (the 72% .sim-persona value sat at 4.73:1 — lifted here so
+   the smallest+dimmest state isn't hugging the floor). */
+.tseat-folded .sim-last-action {
+  color: color-mix(in srgb, var(--felt-text) 80%, var(--felt));
+}
+
 /* Live seat cue — the seat whose turn it is gets a soft gold outline ring, so
    the eye lands on the actor even before reading. Redundant with the felt's
    "your turn" text on the hero pod; villains never linger (bots act instantly)
@@ -2993,11 +3017,11 @@ kbd {
    base .tablering's 3.9→3.4 step so short rooms (1440×900, 1024×768) keep
    the felt + hero console in view without scroll. */
 .simulate .tablering {
-  max-height: calc(var(--card-h) * 5);
+  max-height: calc(var(--card-h) * 6.5);
 }
 @media (max-height: 920px) {
   .simulate .tablering {
-    max-height: calc(var(--card-h) * 4);
+    max-height: calc(var(--card-h) * 5);
   }
 }
 

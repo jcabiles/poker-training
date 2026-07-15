@@ -30,6 +30,12 @@ function slotStyle(i: number, n: number): CSSProperties {
   return { left: `${x}%`, top: `${y}%` };
 }
 
+// Last action verbs arrive lowercase on the wire (fold/check/call/bet/raise);
+// Title-case the single word for the felt label above each seat's cards.
+function actionLabel(action: string): string {
+  return action.charAt(0).toUpperCase() + action.slice(1);
+}
+
 // Persona archetypes arrive as SCREAMING_SNAKE VillainType values; render them
 // as short Title Case labels for the seat badge.
 function personaLabel(persona: string): string {
@@ -140,6 +146,18 @@ export default function SimTable({
                 </span>
               ) : null;
 
+            // Last-action verb, sat above the cards (and the chips puck). Gated on
+            // the SAME lockstep `revealed` flag as chips/fold state, so the felt
+            // never shows a verb before the event log narrates it. Per-street:
+            // the backend clears it when the street advances (null ⇒ no label).
+            // "Fold" persists for folded seats (backend override).
+            const lastAction =
+              revealed && seat.last_action ? (
+                <span className="sim-last-action" title="last action">
+                  {actionLabel(seat.last_action)}
+                </span>
+              ) : null;
+
             if (seat.is_hero) {
               return (
                 <div
@@ -149,6 +167,7 @@ export default function SimTable({
                   key={seat.seat_index}
                   style={style}
                 >
+                  {lastAction}
                   {chips}
                   <div className={"hero-ring" + (isToAct ? " sim-ring-live" : "")}>
                     <div className="cards">
@@ -187,6 +206,7 @@ export default function SimTable({
                 key={seat.seat_index}
                 style={style}
               >
+                {lastAction}
                 {chips}
                 {reveal ? (
                   <span className="cards sim-reveal" aria-label={`${seat.position} shows`}>
