@@ -432,18 +432,44 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       green; `verify.sh` green. **Appetite:** ~1 epic. **No-gos:** no sliders; no rake/ante;
       hero *choice* is R3, not here — R2 keeps hero on a single predetermined size.
 
-- [ ] **R3 — Hero bet-sizing feature: two context-specific options** *(consumes RES-B, after R2)*.
-      ICE 8·7·5.
+- [ ] **R3 — Hero bet-sizing feature: two size options — FLOP C-BET ONLY** *(consumes RES-B, after R2)*.
+      ICE 8·7·5. *(Scope narrowed 2026-07-16 at Gate-2: W1 refuter proved the preflop grader
+      `grading.py::grade()` matches by `ActionType` only and CANNOT distinguish a standard 4-bet
+      from a shove — both grade byte-identically. So vs-3bet/vs-4bet size grading needs new
+      size-matching built INTO the Practice-shared preflop grader, deferred to **R3b**. Flop
+      c-bet has no such issue — `grade_cbet` already scores by size — so R3 ships that one node
+      cleanly.)*
       **Problem:** hero can't choose a size — a real skill the trainer omits. **Outcome-link:**
-      sizing decisions become gradeable. **Solution:** when hero bets/raises, surface **two
-      size options chosen per node** (RES-B flags which two — e.g. vs a 3-bet: standard re-raise
-      OR shove; c-bet: 1/3 OR 2/3), not one global rule. Grade the size choice against the
-      node's baseline (extends S10 grade_map / grade coverage). **Pass/fail:** hero facing each
-      supported node sees the two researched options; choosing gets a freq+EV verdict (approx);
-      an unmapped node falls back to the single predetermined size + "no baseline yet"; illegal
-      sizes rejected; `verify.sh` + build green; design-review the new action UI both themes.
-      **Appetite:** ~1 epic. **No-gos:** no free-form slider; no more than two options; no
-      solver EVs.
+      sizing decisions become gradeable. **Solution:** on the flop c-bet, surface **two size
+      options (0.33 / 0.75 pot as a fixed pair)** in `_hero_legal_actions`; the existing
+      `grade_cbet` grades the choice (freq+EV, approx); FE already renders two BETs (B/V keys).
+      **Pass/fail:** hero c-betting the flop sees both sizes; choosing gets a freq+EV verdict;
+      wet/mono boards still show two DISTINCT sizes (not the `HERO_NODE_SIZE`==0.75 collapse the
+      refuter caught); illegal sizes rejected; `verify.sh` + build green; design-review both themes.
+      **Appetite:** ~1 small epic. **No-gos:** no free-form slider; no more than two options; no
+      solver EVs; no preflop/turn/river size grading here (R3b). Spec: `specs/r3-hero-bet-sizing.md`.
+
+- [ ] **R3b — Hero bet-sizing: preflop + turn/river size grading** *(consumes RES-B, after R3 + R5)*.
+      ICE 7·6·4.
+      **Problem:** R3 shipped only flop-c-bet sizing; the juicy sizing skills — 4-bet-vs-shove,
+      barrel sizing, check-raise sizing — remain ungraded. **Outcome-link:** the full RES-B
+      two-option node set becomes gradeable. **Solution:** (1) build size-matching into the
+      preflop grader `grading.py::grade()` (a `_match()` like `postflop.py:555` — pick the chosen
+      `ActionEval` by nearest `size_bb`, emit distinct evals per authored raise size) + a
+      documented heuristic for the alternate size's approximate EV, WITH a Practice-safety
+      regression test (grade() is shared with Practice drills); (2) surface the remaining RES-B
+      two-option nodes — **vs-3bet** (4-bet 2.4× / shove), **vs-4bet** (call / shove), **turn
+      barrel** (0.5 / 0.75), **river value** (0.5 / pot), **flop check-raise** (2.5× / 3.5×),
+      **facing-bet raise** (2.5× / 3×) — the postflop ones riding R5's turn/river coverage;
+      (3) FE `decisions.ts` gains a **RAISE-aware two-size branch** (the current one handles only
+      two BETs; two RAISEs collide on key `R`) — must not regress Practice's single-RAISE flows.
+      **Pass/fail:** each supported node grades the size choice freq+EV; standard-vs-shove no
+      longer grade identically (direction test); Practice single-RAISE flows unchanged; illegal
+      sizes rejected; `verify.sh` + build green; design-review both themes. **Appetite:** ~1 epic.
+      **No-gos:** no slider; no >2 options; no solver EVs; **accepted limitation** — persisted
+      `chosen_action` stores a bare `"raise"` so history can't distinguish 4-bet from shove after
+      the fact (a `chosen_size_bb` column would be migration 0012, ask-first if it becomes a real
+      need).
 
 - [ ] **R4 — Preflop coverage: fill UTG+1/UTG+2 + all node contexts** *(consumes RES-A)*.
       ICE 8·8·6.
@@ -523,6 +549,33 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   *Candidate slices:* turn/river drill modes; concept cards for barrel/bluff-catch families.
   *(Partly realized by Epic-2 **R5** — the openable postflop range chart — inside Simulate;
   the Practice drill-mode + concept-card surface remains NEXT.)*
+- **Sizing + postflop coverage beyond the "c-bet-and-called" line.** *(user ask 2026-07-16:
+  "will there ever be a way to understand optimal strategy/sizing for the other scenarios
+  beyond flop c-bet?")* *Evidence:* the heuristic graders cover only ~7 node families
+  (flop c-bet/vs-c-bet/vs-check-raise, turn barrel/vs, river barrel/vs), ALL on the single line
+  "opener c-bet the flop and got called." Every other live shape — **donk/lead bets, delayed
+  c-bet, probe bets, hero-as-check-raiser, 3-bet/4-bet pots, limped pots, short-SPR jams,
+  overbets** — has no grader and shows "no baseline yet" forever (RES-C §12's non-spot list).
+  R3b + R5 push the frontier (preflop 4-bet-vs-shove sizing; turn/river barrels) but do NOT
+  lift this ceiling. *Candidate slices:* per-node-family heuristic graders for donk / 3-bet-pot /
+  delayed-c-bet / check-raiser, each with content-pack thresholds + a grade_map mapper + an
+  R5-style chart; more sizing nodes into R3b's framework. *Open questions:* authoring volume
+  (each family is a mini-slice); how many families before diminishing returns at $2/$3; does the
+  heuristic stay defensible that deep, or does this become the trigger to revisit the
+  solver-baseline no-go. **Hard ceiling:** truly optimal-for-every-spot sizing/strategy needs
+  the **solver-grade baseline** (LATER bet below) — heuristics get "simplified-but-winning,"
+  never GTO-exact; EVs stay labeled approximate throughout.
+  **Two concrete gate-coverage followups surfaced by W1 (2026-07-16, R5 combined-refuter):**
+  (a) `map_flop_cbet` still uses an EXACT per-seat open gate while the turn/river mappers were
+  widened to the `[2.0, 3.0]` band — so on a standard 3.0 open the turn barrel maps but the
+  flop c-bet on the same line stays "no baseline yet." Align `map_flop_cbet`'s open gate to the
+  same band for street-consistency (small, but shifts existing flop-cbet coverage → re-verify
+  the S10 grade_map tests). (b) `map_vs_turn_bet`/`map_vs_river_bet` almost never fire
+  organically: bots bet `round(frac*pot, 2)` (`personas_postflop.py:350`) but the mapper's
+  `_is_canonical_bet` demands the 1-dp bucket within 1e-6 — so hero-as-BB turn/river charts are
+  near-empty in live play. Fix = either snap bot postflop bets to the 1-dp bucket, or widen the
+  mapper's bet gate to nearest-bucket tolerance (risks mis-labeling a 0.5-pot bet as a 0.33
+  node — needs care). Both are coverage (safe "no baseline yet"), not correctness.
 - **SRS integration for Simulate spots.** *Evidence:* sim blunders are exactly the reps worth
   scheduling; held out of v1 to protect the queue from off-depth/multiway noise.
   *Open questions:* which sim spots are signature-clean enough to seed; depth filter.

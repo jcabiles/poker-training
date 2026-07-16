@@ -17,6 +17,28 @@
     },
     {
       "node_context": "vs_3bet",
+      "position": "UTG1",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "KK+, AKs", "frequency": 1.0 },
+        { "action": "call", "combos": "QQ, JJ, AKo, AQs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 22.0,
+      "rationale": "You opened from an early seat with the tightest range at the table, so a BTN 3-bet has you dominated by the value half of most ranges: 4-bet only the hands that beat a calling 4-bet (KK+, AKs) and flat QQ/JJ/AKo/AQs to keep the pot controlled from out of position; everything below folds because live players under-3-bet-bluff, so their 3-bets are rarely light (doc 01 §6)."
+    },
+    {
+      "node_context": "vs_3bet",
+      "position": "UTG2",
+      "facing": "BTN",
+      "actions": [
+        { "action": "raise", "combos": "KK+, AKs", "frequency": 1.0 },
+        { "action": "call", "combos": "QQ, JJ, AKo, AQs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 22.0,
+      "rationale": "You opened from an early seat with the tightest range at the table, so a BTN 3-bet has you dominated by the value half of most ranges: 4-bet only the hands that beat a calling 4-bet (KK+, AKs) and flat QQ/JJ/AKo/AQs to keep the pot controlled from out of position; everything below folds because live players under-3-bet-bluff, so their 3-bets are rarely light (doc 01 §6)."
+    },
+    {
+      "node_context": "vs_3bet",
       "position": "CO",
       "facing": "BTN",
       "actions": [

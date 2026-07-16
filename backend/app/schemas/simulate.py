@@ -126,6 +126,32 @@ class PreflopChartView(BaseModel):
     exploit_note: ExploitNoteView | None = None  # None when no authored pair exists
 
 
+class PostflopChartAction(BaseModel):
+    """One action of the grader's postflop mix (the grader's OWN ActionEval,
+    re-shaped for the wire — never re-derived frequencies)."""
+
+    action: str  # check / bet / fold / call / raise
+    size_bb: float | None = None  # bet/raise sizing bucket; None for check/fold/call
+    frequency: float  # 0-1, ≈ baseline
+    ev_bb: float  # ≈ approximate (heuristic provider)
+
+
+class PostflopChartView(BaseModel):
+    """Point-of-need action-mix chart for the hero's current POSTFLOP decision
+    (R5). Renders the grading provider's own per_action output — chart==grader
+    by construction. available=false (no actions) when it is not the hero's
+    postflop turn, the hand is over, or the spot is unmappable ("no baseline
+    yet" — never fabricated). Availability is a 200-body concern; 404 stays
+    reserved for a missing/ended session. Distinct from PreflopChartView: an
+    action mix, not a 169-combo grid."""
+
+    available: bool
+    node_label: str | None = None
+    hand_category: str | None = None  # strong / weak_made / draw / air (river: draw→air)
+    actions: list[PostflopChartAction] = []
+    approx: bool = True  # heuristic EVs — always labeled approximate
+
+
 class RevealedSeatView(BaseModel):
     """One villain's hole cards, revealed on demand after a hero fold (R1).
 

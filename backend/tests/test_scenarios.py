@@ -2,10 +2,12 @@ import asyncio
 import random
 
 from app.domain.content.models import ActionRange, Entry
+from app.domain.grading import range_grid
 from app.domain.providers import get_provider
 from app.domain.scenarios import (
     RFI_POSITIONS,
     _entries,
+    _find_entry,
     build_spot,
     sample_rfi_spot,
     sample_spot,
@@ -19,6 +21,32 @@ def test_sample_rfi_is_valid():
     assert NodeContext.RFI in spot.node_context
     assert spot.hero.hole_cards[0] != spot.hero.hole_cards[1]
     assert any(a.action == ActionType.RAISE for a in spot.legal_actions)
+
+
+def _rfi_raise_hands(position: Position) -> set[str]:
+    entry = _find_entry(NodeContext.RFI, position, None)
+    grid = range_grid(entry)
+    return {hand for hand, mix in grid.items() if mix.get(ActionType.RAISE.value) == 1.0}
+
+
+def test_rfi_nesting_utg_through_lj_is_monotonic():
+    """R4 golden: UTG ⊆ UTG1 ⊆ UTG2 ⊆ LJ RFI-raise ranges (RES-A §4.2)."""
+    utg = _rfi_raise_hands(Position.UTG)
+    utg1 = _rfi_raise_hands(Position.UTG1)
+    utg2 = _rfi_raise_hands(Position.UTG2)
+    lj = _rfi_raise_hands(Position.LJ)
+    assert utg <= utg1 <= utg2 <= lj
+    # strictly widening at each step (no seat collapses to an equal-or-tighter set)
+    assert len(utg) < len(utg1) < len(utg2) < len(lj)
+
+
+def test_utg1_utg2_non_spots_stay_unmapped():
+    """RES-A §7: vs_4bet / blind_defense / vs_limpers are non-spots for
+    UTG1/UTG2 -- no content entry exists so `_find_entry` returns None."""
+    for pos in (Position.UTG1, Position.UTG2):
+        assert _find_entry(NodeContext.VS_4BET, pos, Position.BTN) is None
+        assert _find_entry(NodeContext.BLIND_DEFENSE, pos, Position.BTN) is None
+        assert _find_entry(NodeContext.VS_LIMPERS, pos, None) is None
 
 
 def test_sample_is_deterministic_with_seed():

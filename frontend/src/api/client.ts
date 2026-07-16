@@ -6,6 +6,7 @@ import type {
   LeakStat,
   Mode,
   NextDrillResponse,
+  PostflopChartView,
   PreflopChartView,
   QuizAnswer,
   QuizItem,
@@ -150,6 +151,15 @@ export async function getStreetReport(): Promise<StreetReportView> {
 // refetches per new hero preflop turn while expanded.
 export async function getPreflopChart(sessionId: string): Promise<PreflopChartView> {
   return json(await fetch(`${BASE}/simulate/${sessionId}/preflop-chart`));
+}
+
+// Postflop chart (R5) — the grader's action mix for the hero's CURRENT
+// postflop decision on this session. Server-side state only (no spot params).
+// `available=false` (empty actions) is a normal 200 body for a non-postflop /
+// unmappable spot ("no baseline yet") — only a missing/ended session 404s.
+// Read-only on the server: fetching never writes a sim_decision.
+export async function getPostflopChart(sessionId: string): Promise<PostflopChartView> {
+  return json(await fetch(`${BASE}/simulate/${sessionId}/postflop-chart`));
 }
 
 // Villain-range (V2) — the live estimated hand-range for one villain seat on

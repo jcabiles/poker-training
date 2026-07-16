@@ -13,6 +13,20 @@
     },
     {
       "node_context": "RFI",
+      "position": "UTG1",
+      "actions": [{ "action": "raise", "combos": "66+, A7s+, A5s, KTs+, QTs+, JTs, T9s, AJo+", "frequency": 1.0 }],
+      "sizing_bb": 3.0,
+      "rationale": "One seat later than UTG with 6-7 players still to act, UTG+1 loosens only slightly off the tightest EP range: it adds 66 (marginally better set-mining odds with one fewer player behind), the suited broadways KTs/QTs, and the suited connectors down to T9s, whose straight/flush potential now clears the equity-realization bar that UTG's fuller field denied them. It stays strictly EP — no offsuit KQ, no small pairs below 66 — because a raise from here still runs into 6-7 potential wake-ups and gets dominated too often when called."
+    },
+    {
+      "node_context": "RFI",
+      "position": "UTG2",
+      "actions": [{ "action": "raise", "combos": "66+, A7s+, A5s, KTs+, QTs+, JTs, T9s, 98s, AJo+, KQo", "frequency": 1.0 }],
+      "sizing_bb": 3.0,
+      "rationale": "The EP-to-MP transition seat: with 5-6 players left, UTG+2 adds 98s (extending the suited-connector floor one more notch) and KQo, the first offsuit broadway to enter, because now few enough players remain that KQo's top-pair value and blockers outweigh its domination risk. It still holds the EP pair floor at 66 (small pairs' implied odds stay thin here) and the A7s+/A5s suited-ace convention, leaving LJ its A6s step so LJ remains the widest of the early seats."
+    },
+    {
+      "node_context": "RFI",
       "position": "LJ",
       "actions": [{ "action": "raise", "combos": "66+, A5s+, KTs+, QTs+, JTs, T9s, 98s, AJo+, KQo", "frequency": 1.0 }],
       "sizing_bb": 3.0,

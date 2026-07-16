@@ -57,7 +57,7 @@ _D_OBJ_TABLE: dict[tuple[Position, str], float] | None = None
 
 
 def _rfi_entries() -> dict[Position, Entry]:
-    """The 6 RFI seats' content Entries, keyed via the registry index.
+    """The 8 RFI seats' content Entries, keyed via the registry index.
 
     RFI entries have facing=None, limper_count=0, villain_type=None (see
     content/preflop/rfi.json + registry.py's `_key`/`lookup`).
@@ -106,7 +106,7 @@ def flip_score(position: Position, hand: str) -> float:
 
 
 def _edge_table() -> dict[tuple[Position, str], float]:
-    """Precompute E(P,H) for the full 6x169 grid (cached; independent of rng
+    """Precompute E(P,H) for the full 8x169 grid (cached; independent of rng
     and personal_weights, so it's built once per process).
 
     E(P,H): kernel-decayed LOCAL DENSITY of disagreement around H in the
@@ -157,7 +157,7 @@ def edge_score(position: Position, hand: str) -> float:
 
 
 def objective_difficulty(position: Position, hand: str) -> float:
-    """D_obj(P,H) = wF*F(P,H) + wE*E(P,H), cached over the 6x169 grid."""
+    """D_obj(P,H) = wF*F(P,H) + wE*E(P,H), cached over the 8x169 grid."""
     global _D_OBJ_TABLE
     if _D_OBJ_TABLE is None:
         edge = _edge_table()
@@ -196,7 +196,7 @@ def sample_challenge_spot(
     eff_bb: float = 100.0,
 ) -> Spot:
     """Sample a preflop RFI Spot with `(position, hand)` drawn jointly ~ W(P,H)
-    over the 6x169 grid, then deal a random concrete combo of `hand` and build
+    over the 8x169 grid, then deal a random concrete combo of `hand` and build
     the Spot via the existing RFI builder (so the shape matches every other
     RFI sampler — grid, legal_actions, pot, node_context, etc.).
 

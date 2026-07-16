@@ -321,6 +321,29 @@ export interface PreflopChartView {
   exploit_note: ExploitNoteView | null;
 }
 
+// Simulate postflop chart (R5) — the grader's OWN action mix for the hero's
+// CURRENT postflop decision (chart==grader by construction: same provider
+// singleton, same mapped Spot). Mirror of backend/app/schemas/simulate.py:
+// PostflopChartView. `available` is a 200-body concern (never a fetch error):
+// false — with empty actions — when it isn't the hero's postflop turn, the hand
+// is over, or the spot is unmappable ("no baseline yet"). Distinct from
+// PreflopChartView: an action mix, not a 169-combo grid. EVs are heuristic —
+// always labeled approximate.
+export interface PostflopChartAction {
+  action: string; // check / bet / fold / call / raise
+  size_bb: number | null; // bet/raise sizing bucket; null for check/fold/call
+  frequency: number; // 0-1, ≈ baseline
+  ev_bb: number; // ≈ approximate
+}
+
+export interface PostflopChartView {
+  available: boolean;
+  node_label: string | null;
+  hand_category: string | null; // strong / weak_made / draw / air (river: draw→air)
+  actions: PostflopChartAction[];
+  approx: boolean;
+}
+
 // Simulate villain-range (V2) — the live estimated hand-range for a non-hero,
 // non-folded villain seat, as a WEIGHTED 13×13 chart. Mirror of
 // backend/app/schemas/simulate.py:VillainRangeView. `available` is a 200-body

@@ -9,6 +9,7 @@ import asyncio
 import random
 
 import pytest
+import test_grade_map  # _cbet_state helper reference (flop c-bet HandState builder)
 import test_personas_postflop as harness  # per-decision parity reference
 from sqlmodel import Session, create_engine, select
 
@@ -18,7 +19,7 @@ from app.domain.action import Decision
 from app.domain.archetypes import VillainType
 from app.domain.personas import load_persona_packs
 from app.domain.scenarios import _find_entry
-from app.domain.spot import ActionType, NodeContext, Street
+from app.domain.spot import ActionType, NodeContext, Position, Street
 from app.domain.table import play
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
@@ -30,6 +31,7 @@ from app.domain.table.engine import (
     start_hand,
 )
 from app.domain.table.engine import legal_actions as engine_legal_actions
+from app.domain.table.grade_map import map_decision_point
 from app.services import sim_session
 from app.services.sim_session import (
     SessionNotFound,
@@ -298,6 +300,114 @@ def test_hero_open_size_is_content_sizing_not_min_raise():
     assert raise_la.size_bb == expected
     assert raise_la.size_bb != raise_la.min_bb  # realistic, not the min-raise
     assert raise_la.min_bb <= raise_la.size_bb <= raise_la.max_bb  # legal
+
+
+# --------------------------------------- R3: flop c-bet two bet sizes
+
+
+def _flop_cbet_bets(state) -> list:
+    legal = sim_session._hero_legal_actions(state)
+    return [la for la in legal if la.action is ActionType.BET]
+
+
+def test_flop_cbet_offers_two_distinct_bet_sizes():
+    state = test_grade_map._cbet_state(Position.BTN)
+    bets = _flop_cbet_bets(state)
+    assert len(bets) == 2
+    pot_bb = sum(s.invested_total_bb for s in state.seats)
+    assert bets[0].min_bb == round(0.33 * pot_bb, 1)
+    assert bets[1].min_bb == round(0.75 * pot_bb, 1)
+    assert bets[0].min_bb != bets[1].min_bb
+
+
+def test_flop_cbet_wet_and_mono_boards_stay_distinct():
+    # Regression (refuter HIGH): sizing off `HERO_NODE_SIZE[node]` alone would
+    # collapse small==big on these textures (both node baselines are 0.75/0.33
+    # single fractions) — the fixed 0.33/0.75 PAIR must stay distinct regardless.
+    from app.domain.texture import classify
+
+    wet = ["Jh", "Th", "9d"]  # two-tone, connected -> wet, not monotone
+    mono = ["Kh", "7h", "2h"]  # monotone
+    assert classify(wet).wetness == "wet" and classify(wet).suitedness != "monotone"
+    assert classify(mono).suitedness == "monotone"
+    for board in (wet, mono):
+        state = test_grade_map._cbet_state(Position.BTN)
+        state.board = board
+        state.full_board = board + state.full_board[3:]
+        bets = _flop_cbet_bets(state)
+        assert len(bets) == 2, f"expected two BET legs for board {board}"
+        assert bets[0].min_bb != bets[1].min_bb, f"sizes collapsed for board {board}"
+
+
+def test_flop_cbet_displayed_sizes_match_graded_spot_sizes():
+    # Parity (refuter LOW): the LIVE legal_actions sizes the FE shows must
+    # equal the sizes the graded Spot (map_flop_cbet) carries, same 1dp round.
+    state = test_grade_map._cbet_state(Position.BTN)
+    displayed = _flop_cbet_bets(state)
+    spot = map_decision_point(state, sim_session.HERO_SEAT)
+    assert spot is not None
+    graded = [la for la in spot.legal_actions if la.action is ActionType.BET]
+    assert [la.min_bb for la in displayed] == [la.min_bb for la in graded]
+
+
+def test_flop_cbet_non_cbet_node_keeps_single_bet_size():
+    # A non-c-bet postflop BET (turn barrel, or a flop donk/lead where hero is
+    # NOT the aggressor) is untouched — single size, as before R3.
+    state = test_grade_map._cbet_state(Position.BTN)
+    assert state.street is Street.FLOP and state.to_act_seat == sim_session.HERO_SEAT
+
+    legal = engine_legal_actions(state)
+    assert sim_session._is_flop_cbet_node(state, legal)  # sanity: flop IS the c-bet node
+
+    # Flip the aggressor flag to simulate a donk/lead node on the SAME flop
+    # shape (hero not the aggressor) — postflop_node_key must return "flat".
+    from app.domain.table.sizing import postflop_node_key
+
+    node = postflop_node_key(state.board, legal, is_aggressor=False)
+    assert node == "flat"
+
+    # Advance past the flop c-bet to the turn: BTN barrels, BB calls.
+    bet_leg = next(a for a in legal if a.action is ActionType.BET)
+    state = apply(state, Decision(action=ActionType.BET, size_bb=bet_leg.min_bb))
+    state = apply(state, Decision(action=ActionType.CALL))
+    assert state.street is Street.TURN
+    guard = 0
+    while state.to_act_seat != sim_session.HERO_SEAT and not state.hand_over:
+        guard += 1
+        assert guard < 10
+        acts = engine_legal_actions(state)
+        kinds = {a.action for a in acts}
+        move = ActionType.CHECK if ActionType.CHECK in kinds else ActionType.FOLD
+        state = apply(state, Decision(action=move))
+    assert not state.hand_over and state.street is Street.TURN
+    turn_legal = sim_session._hero_legal_actions(state)
+    turn_bets = [la for la in turn_legal if la.action is ActionType.BET]
+    assert len(turn_bets) <= 1  # turn_barrel keeps the single-size R2 behavior
+
+
+def test_flop_cbet_size_choice_grades_freq_ev_not_boolean(db):
+    # Deterministic: craft the session's live hand into the canonical flop
+    # c-bet shape directly (scripted, not random-play-until-we-get-lucky).
+    view = create_session(db)
+    state = test_grade_map._cbet_state(Position.BTN)
+    session = sim_session._get_session(db, view.session_id, "")
+    hand = sim_session._current_hand(db, session)
+    hand.state_json = state.model_dump_json()
+    hand.status = "in_progress"
+    db.add(hand)
+    db.commit()
+
+    bets = _flop_cbet_bets(state)
+    assert len(bets) == 2 and bets[0].min_bb != bets[1].min_bb
+    after = apply_hero_action(
+        db, view.session_id, Decision(action=ActionType.BET, size_bb=bets[0].min_bb)
+    )
+    grade = after.hand.last_grade
+    assert grade is not None
+    # freq+EV verdict, never a boolean: correctness is a tier label (or None
+    # for no-baseline) and ev_loss_bb is always a float.
+    assert grade.correctness in (None, "optimal", "acceptable", "mistake", "blunder")
+    assert isinstance(grade.ev_loss_bb, float)
 
 
 def test_last_action_per_street_folded_override_and_post_excluded():
