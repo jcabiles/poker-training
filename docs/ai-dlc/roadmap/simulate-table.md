@@ -294,7 +294,18 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 
 ### Research spikes (front-loaded, parallel — output = data + decision doc, no app code)
 
-- [ ] **RES-A — Preflop range research: RFI-by-position + all node contexts, live $2/$3.**
+- [x] **RES-A — Preflop range research: RFI-by-position + all node contexts, live $2/$3.**
+      *(done 2026-07-15, `docs/ai-dlc/research/RES-A-preflop-ranges.md`: 7 UTG1/UTG2 entries —
+      RFI ×2, vs_RFI ×3, vs_3bet ×2 — all heuristic-derived via the CO→UTG monotonic-tightening
+      interpolation, nesting-verified programmatically (UTG⊆UTG1⊆UTG2⊆LJ, combo-label counts
+      23⊂27⊂29⊂30), shape-corroborated by 9-max solver grids. **Blocker resolved:** engine already
+      models UTG1/UTG2 as first-class (`spot.py` enum + `_OPEN_SIZE`=3.0 + rotation/action-order/
+      grading maps) — R4's only gap is content data + adding both to `RFI_POSITIONS`. `spot_signature()`
+      hashes `position.value` raw ⇒ new rows mint non-colliding hashes, purely additive. **Corrected
+      prior research:** doc 05 §3.2's UTG1/UTG2 strings don't nest (its UTG2 opened wider than authored
+      LJ) — superseded. vs_4bet/blind_defense/vs_limpers for UTG1/UTG2 documented as non-spots (not
+      chased). §10 gives R4 copy-verbatim entries. Open R4 call: single `vs BTN` 3-bet facing vs
+      authoring SB/BB/CO facings (breadth, not strategy — shape identical). No app/content code touched.)*
       **Problem:** `content/preflop/rfi.json` (+ vs_rfi/vs_3bet/vs_4bet/blind_defense) covers
       UTG, LJ, HJ, CO, BTN, SB — the early seats between UTG and LJ (commonly **UTG+1/UTG+2**)
       have no ranges, and coverage of every node context for those seats is absent.
@@ -307,7 +318,20 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       heuristic-derived range with rationale; no app code touched. **Appetite:** ~1 research
       spike. **No-gos:** no content-file edits here (that's R4); no solver ranges.
 
-- [ ] **RES-B — Bet-sizing research: realistic fixed $2/$3 sizes, persona-flavored.**
+- [x] **RES-B — Bet-sizing research: realistic fixed $2/$3 sizes, persona-flavored.**
+      *(done 2026-07-15, `docs/ai-dlc/research/RES-B-bet-sizing.md`: 60 node×persona cells (preflop 24 +
+      postflop 36), each sourced or heuristic-with-reasoning. **Key finding — existing persona sizing
+      levers are ALREADY correct/defensible for $2/$3** (preflop `sizing` blocks + postflop bucket
+      distributions both confirmed, not rewritten); the user-reported "unrealistic sizes" traces to (a)
+      the node-agnostic FLAT postflop distribution and (b) missing turn/river sampling nodes — NOT wrong
+      numbers. So R2's real work = wiring confirmed levers through the predetermined bot/hero path, not
+      authoring values. "Sizes differ by level" resolved: stakes-calibrated ($2/$3) confirmed, per-hand
+      strength→size dial refuted (anti-tell). **Schema flag for R2:** confirm `PersonaPack.postflop.sizing`
+      accepts the maniac's `1.5` overbet key (verified present in `maniac.json`) — loosen if enum-locked.
+      §5.3 node-agnostic limitation = R2 decision (Option A flat, no schema change, recommended; Option B
+      `sizing_by_node` override = deferred). **7 R3 two-option nodes** flagged: c-bet (1/3·3/4), turn
+      barrel (1/2·3/4), river value (1/2·pot), vs-3bet (4-bet·shove), check-raise (2.5x·3.5x), facing-bet
+      raise (2.5x·3x), + vs-4bet call/jam; open excluded. Anti-sizing-tell verified respected. No code.)*
       **Problem:** bot/hero bet sizes are unrealistic (user-reported). **Outcome-link:** every
       graded decision happens at a realistic price. **Solution:** `/deep-research` live $2/$3
       standard sizings per node (open, 3-bet, 4-bet, c-bet, turn/river barrel, check-raise,
@@ -319,7 +343,22 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       TWO options (feeds R3). **Appetite:** ~1 research spike. **No-gos:** no code; sizes stay
       FIXED (no bet-size sliders); no per-hand randomization beyond the existing sampling.
 
-- [ ] **RES-C — Postflop range research: call/fold/raise ranges by street & spot.**
+- [x] **RES-C — Postflop range research: call/fold/raise ranges by street & spot.**
+      *(done 2026-07-15, `docs/ai-dlc/research/RES-C-postflop-ranges.md`: **representation = category
+      weights, NOT combo strings** (postflop range is board-conditioned ⇒ a combo string would be a
+      per-board solver table = no-go). Taxonomy frozen verbatim to `postflop.py::_hand_category()`:
+      `strong`/`weak_made`/`draw`/`air` (incl. the river busted-draw→air demotion + the deliberate
+      top-pair=weak_made-not-strong quirk). All 7 shipped grader node families specced HU + multiway
+      (cbet 200, vs_cbet 201, vs_check_raise 202, turn_barrel 203, vs_turn_bet 204, river_barrel 205,
+      vs_river_bet 206) as approximate category×texture/turn-class/river-class/price frequency tables,
+      sourced doc-02/06 + live GTOW/ThinkGTO/PokerNews. Every multiway row is the direction S8's
+      `_apply_multiway` already moves (0.6/1.15/1.3, positive-merit-only, applied last) — no second MW
+      model. **"No baseline yet" list (§12):** donk/lead, delayed-cbet/probe/overbet, hero-as-check-raiser,
+      3-bet/4-bet & limped pots, short-SPR jams, blocker/kicker resolution, post-check-raise 4-bet-on-paired
+      raise leg, and any turn/river spot `grade_map` can't yet build (mapper covers preflop + HU flop c-bet
+      today — R5 decides whether to widen). **Reconciliation recommendation:** keep the merit pipeline
+      authoritative and have R5's chart render the grader's own `per_action` for the current spot ⇒
+      chart==grader by construction; this spec becomes the merit-constant tuning target. No code.)*
       **Problem:** postflop has heuristic graders (S6/S7) but no openable *range* view — hero
       can't see "what should call/fold/raise here." **Outcome-link:** point-of-need postflop
       strategy = the deepest transfer gap. **Solution:** `/deep-research` postflop

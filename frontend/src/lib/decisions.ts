@@ -34,13 +34,15 @@ export function legalDecisions(spot: Spot): DecisionOption[] {
       };
     }
     const name = la.action.charAt(0).toUpperCase() + la.action.slice(1);
+    // R2: prefer the server's realistic suggested size for bet/raise; call has none.
+    const suggested = la.size_bb ?? la.min_bb;
     const sized =
-      (la.action === "raise" || la.action === "bet" || la.action === "call") && la.min_bb
-        ? ` ${la.min_bb}bb`
+      (la.action === "raise" || la.action === "bet" || la.action === "call") && suggested
+        ? ` ${suggested}bb`
         : "";
     return {
       action: la.action,
-      size_bb: la.min_bb,
+      size_bb: suggested,
       key: BASE_KEY[la.action] ?? "?",
       label: name + sized,
       primary: la.action === "raise" || la.action === "bet",

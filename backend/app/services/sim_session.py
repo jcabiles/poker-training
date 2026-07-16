@@ -36,7 +36,16 @@ from app.domain.content.registry import lookup
 from app.domain.evaluation import Coverage, EvaluationResult, FeedbackTiers
 from app.domain.grading import range_grid
 from app.domain.personas import load_persona_packs
-from app.domain.spot import ActionType, Hero, NodeContext, PlayerStatus, Spot, Street
+from app.domain.scenarios import _find_entry
+from app.domain.spot import (
+    ActionType,
+    Hero,
+    LegalAction,
+    NodeContext,
+    PlayerStatus,
+    Spot,
+    Street,
+)
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
     HandState,
@@ -53,6 +62,12 @@ from app.domain.table.range_estimate import (
     PublicAction,
     PublicActionHistory,
     estimate_range,
+)
+from app.domain.table.sizing import (
+    HERO_NODE_SIZE,
+    last_aggressor_position,
+    postflop_node_key,
+    pot_fraction_to_bb,
 )
 from app.schemas.simulate import (
     EventView,
@@ -268,6 +283,61 @@ def _last_action(state: HandState, eng: SeatState) -> str | None:
     return None
 
 
+def _hero_preflop_size_bb(state) -> float | None:
+    """Hero's realistic predetermined preflop raise size = the content
+    `sizing_bb` for hero's current spot (the SAME baseline grading uses).
+    Returns None for any spot the mapper/content can't cover ⇒ FE falls back to
+    the engine min-raise."""
+    spot = map_decision_point(state, HERO_SEAT)
+    if spot is None or not spot.node_context:
+        return None
+    raises = [
+        h
+        for h in state.action_history
+        if h.street is Street.PREFLOP and h.action is ActionType.RAISE
+    ]
+    facing = raises[-1].position if raises else None
+    entry = _find_entry(spot.node_context[0], spot.hero.position, facing)
+    return entry.sizing_bb if entry else None
+
+
+def _hero_postflop_size_bb(state, la, legal) -> float | None:
+    """Hero's single predetermined postflop size = the RES-B node baseline
+    (HERO_NODE_SIZE) for the current node, as a pot-fraction → bb. None for a
+    node without a baseline (donk/lead) ⇒ FE falls back to min-raise."""
+    hero_pos = state.seats[HERO_SEAT].position
+    is_aggr = last_aggressor_position(state.action_history) == hero_pos
+    frac = HERO_NODE_SIZE.get(postflop_node_key(state.board, legal, is_aggressor=is_aggr))
+    if frac is None:
+        return None
+    call = next((x for x in legal if x.action is ActionType.CALL), None)
+    to_call = (call.min_bb or 0.0) if call is not None else 0.0
+    pot_bb = sum(s.invested_total_bb for s in state.seats)
+    return pot_fraction_to_bb(
+        frac, pot_bb, action=la.action, current_bet_to=state.current_bet_bb, to_call=to_call
+    )
+
+
+def _hero_legal_actions(state) -> list[LegalAction]:
+    """Legal actions for hero's turn, with a realistic `size_bb` suggestion set
+    on each BET/RAISE (R2). Clamped legal; None (unmapped) ⇒ FE uses min_bb."""
+    legal = legal_actions(state)
+    out: list[LegalAction] = []
+    for la in legal:
+        if la.action in (ActionType.BET, ActionType.RAISE):
+            raw = (
+                _hero_preflop_size_bb(state)
+                if state.street is Street.PREFLOP
+                else _hero_postflop_size_bb(state, la, legal)
+            )
+            if raw is not None and la.min_bb is not None and la.max_bb is not None:
+                size = round(min(max(raw, la.min_bb), la.max_bb), 2)
+                out.append(la.model_copy(update={"size_bb": size}))
+                continue
+        out.append(la)
+    return out
+
+
 def _view(
     session: SimSession,
     hand: SimHand,
@@ -334,7 +404,7 @@ def _view(
             ),
             to_act_seat=state.to_act_seat,
             is_hero_turn=is_hero_turn,
-            legal_actions=legal_actions(state) if is_hero_turn else [],
+            legal_actions=_hero_legal_actions(state) if is_hero_turn else [],
             events=[
                 EventView(
                     seat_index=e.seat,

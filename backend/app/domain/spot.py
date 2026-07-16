@@ -118,6 +118,9 @@ class LegalAction(BaseModel):
     action: ActionType
     min_bb: float | None = None
     max_bb: float | None = None
+    # R2: optional realistic suggested size (bb) for a BET/RAISE. None = no
+    # suggestion (FE falls back to min_bb). Not hashed by spot_signature().
+    size_bb: float | None = None
 
 
 class Hero(BaseModel):

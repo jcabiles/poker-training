@@ -657,7 +657,13 @@ def test_bot_driven_facing_raise_decision_grades(db, monkeypatch):
     monkeypatch.setattr(svc.secrets, "randbits", lambda _bits: next(deal_seeds))
 
     view = create_session(db)
-    for _ in range(160):
+    # Cap raised 160 -> 500 (R2): realistic bot sizes shifted the playout
+    # distribution, so the rare clean single-raise-to-hero shape surfaces at
+    # different (hash-seed-dependent) hand offsets — 160 flaked on some seeds.
+    # 500 hands gives a comfortable margin across all PYTHONHASHSEED values
+    # (swept 0..88, zero misses). The band fix itself is proven deterministically
+    # by test_realistic_bot_open_maps_to_vs_rfi; this is the end-to-end belt.
+    for _ in range(500):
         while not view.hand.hand_over:
             kinds = {la.action for la in view.hand.legal_actions}
             if ActionType.CHECK in kinds:
@@ -676,6 +682,19 @@ def test_bot_driven_facing_raise_decision_grades(db, monkeypatch):
             return  # graded facing-a-raise decision reached through real play
         view = deal_next_hand(db, view.session_id)
     raise AssertionError(
-        "no bot-driven VS_RFI/BLIND_DEFENSE decision graded in 40 hands "
+        "no bot-driven VS_RFI/BLIND_DEFENSE decision graded in 500 hands "
         "(open-size band regression?)"
     )
+
+
+def test_realistic_bot_open_maps_to_vs_rfi():
+    # R2: a persona open at the 3.0bb standard (tag/nit/lag open_bb) is now
+    # in-band and gradeable — the deterministic proof of the widened open band
+    # (canonical 2.5 .. 3.0). Complements the flaky end-to-end belt above.
+    state = _facing_open(Position.BTN, Position.CO, 3.0)
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert NodeContext.VS_RFI in spot.node_context
+    assert spot.facing is Position.CO
+    # a genuine oversize (fish/maniac territory) still returns None
+    assert map_decision_point(_facing_open(Position.BTN, Position.CO, 4.0), HERO_SEAT) is None

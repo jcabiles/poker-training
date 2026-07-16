@@ -118,6 +118,27 @@ class PersonaSizing(BaseModel):
     fourbet_mult: float
 
 
+def _validate_bucket_dist(v: dict[str, float]) -> dict[str, float]:
+    """A pot-fraction bucket distribution: float keys > 0, weights > 0, sum ~1.0.
+    Shared by the flat `sizing` field and each inner dist of `sizing_by_node`."""
+    if not v:
+        raise ValueError("sizing must be non-empty")
+    total = 0.0
+    for key, weight in v.items():
+        try:
+            frac = float(key)
+        except ValueError:
+            raise ValueError(f"sizing key {key!r} is not a float pot fraction") from None
+        if frac <= 0.0:
+            raise ValueError(f"sizing fraction {key!r} must be > 0")
+        if weight <= 0.0:
+            raise ValueError(f"sizing weight for {key!r} must be > 0")
+        total += weight
+    if abs(total - 1.0) > 1e-3:
+        raise ValueError(f"sizing weights sum to {total}, expected ~1.0")
+    return v
+
+
 class PersonaPostflop(BaseModel):
     """Postflop lever block (S4) — every persona-differentiating number lives
     here; the shared mechanics live in app/domain/personas_postflop.py."""
@@ -126,27 +147,27 @@ class PersonaPostflop(BaseModel):
     stickiness: float = Field(gt=0.0)  # scales call merit / resistance to folding
     bluff_freq: float = Field(ge=0.0, le=1.0)  # baseline bet/raise rate with air
     sizing: dict[str, float]  # pot-fraction str -> weight; weights sum to ~1
+    # R2: optional per-node override, keyed by postflop node name (e.g.
+    # "cbet_dry") -> its own bucket distribution. Falls back to flat `sizing`
+    # for any node absent here. Node-key strings are NOT pot fractions.
+    sizing_by_node: dict[str, dict[str, float]] | None = None
     spr_commit: float = Field(gt=0.0)  # SPR at/below which strong+ hands commit
     multiway_bluff_damp: float = Field(ge=0.0, le=1.0)  # per extra opponent
 
     @field_validator("sizing")
     @classmethod
     def _sizing_valid(cls, v: dict[str, float]) -> dict[str, float]:
-        if not v:
-            raise ValueError("sizing must be non-empty")
-        total = 0.0
-        for key, weight in v.items():
-            try:
-                frac = float(key)
-            except ValueError:
-                raise ValueError(f"sizing key {key!r} is not a float pot fraction") from None
-            if frac <= 0.0:
-                raise ValueError(f"sizing fraction {key!r} must be > 0")
-            if weight <= 0.0:
-                raise ValueError(f"sizing weight for {key!r} must be > 0")
-            total += weight
-        if abs(total - 1.0) > 1e-3:
-            raise ValueError(f"sizing weights sum to {total}, expected ~1.0")
+        return _validate_bucket_dist(v)
+
+    @field_validator("sizing_by_node")
+    @classmethod
+    def _sizing_by_node_valid(
+        cls, v: dict[str, dict[str, float]] | None
+    ) -> dict[str, dict[str, float]] | None:
+        if v is None:
+            return v
+        for dist in v.values():  # keys are node-name strings, not floats
+            _validate_bucket_dist(dist)
         return v
 
 

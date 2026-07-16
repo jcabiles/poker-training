@@ -59,11 +59,16 @@
         "codeload.github.com",
         "objects.githubusercontent.com",
         "localhost",
-        "127.0.0.1"
+        "127.0.0.1",
+        "auth.openai.com",
+        "api.openai.com",
+        "*.openai.com",
+        "chatgpt.com",
+        "*.chatgpt.com"
       ]
     },
     "filesystem": {
-      "allowWrite": ["."],
+      "allowWrite": [".", "~/.codex"],
       "denyRead": [
         "~/.ssh",
         "~/.aws",

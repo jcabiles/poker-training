@@ -7,6 +7,7 @@ export interface LegalAction {
   action: ActionType;
   min_bb?: number | null;
   max_bb?: number | null;
+  size_bb?: number | null; // R2: realistic suggested size; falls back to min_bb
 }
 
 export interface HistoryAction {

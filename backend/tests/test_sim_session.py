@@ -17,7 +17,8 @@ from app.db.models import SimHand, SimSeat
 from app.domain.action import Decision
 from app.domain.archetypes import VillainType
 from app.domain.personas import load_persona_packs
-from app.domain.spot import ActionType, Street
+from app.domain.scenarios import _find_entry
+from app.domain.spot import ActionType, NodeContext, Street
 from app.domain.table import play
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
@@ -265,12 +266,38 @@ def test_bot_decision_parity_with_harness():
                     seat_state.stack_bb, opponents, random.Random(decision_seed),
                     state.current_bet_bb,
                 )
-            assert got == expected, (
-                f"parity break: hand_seed={hand_seed} guard={guard} seat={seat}"
+            # R2: play.bot_decision now sizes bets from the persona levers /
+            # node-aware distribution, while the harness mirror stays on the
+            # min-raise / flat sizing that anchors the statistical bands — so
+            # the two INTENTIONALLY diverge on bet SIZE. The decision LOGIC
+            # (which action is chosen) must still match exactly; size
+            # correctness is covered by test_bet_sizing.py.
+            assert got.action == expected.action, (
+                f"action parity break: hand_seed={hand_seed} guard={guard} seat={seat}"
             )
             checked += 1
             state = apply(state, got)
     assert checked > 50  # enough decisions across preflop + postflop streets
+
+
+def test_hero_open_size_is_content_sizing_not_min_raise():
+    # R2: hero's predetermined open size = the content rfi `sizing_bb` for its
+    # seat (the baseline grading uses), NOT the engine min-raise.
+    state = None
+    for btn in range(9):  # find the button that makes hero (seat 0) UTG opener
+        s = start_hand(deal_hand(random.Random(7)), button_seat=btn, stacks_bb=[100.0] * 9)
+        if s.to_act_seat == 0 and s.street is Street.PREFLOP:
+            state = s
+            break
+    assert state is not None
+    hero_pos = state.seats[0].position
+    legal = sim_session._hero_legal_actions(state)
+    raise_la = next(la for la in legal if la.action is ActionType.RAISE)
+    entry = _find_entry(NodeContext.RFI, hero_pos, None)
+    expected = round(min(max(entry.sizing_bb, raise_la.min_bb), raise_la.max_bb), 2)
+    assert raise_la.size_bb == expected
+    assert raise_la.size_bb != raise_la.min_bb  # realistic, not the min-raise
+    assert raise_la.min_bb <= raise_la.size_bb <= raise_la.max_bb  # legal
 
 
 def test_last_action_per_street_folded_override_and_post_excluded():

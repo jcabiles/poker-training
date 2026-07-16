@@ -22,6 +22,7 @@ from app.domain.action import Decision
 from app.domain.content.models import PersonaPack
 from app.domain.equity import _RIDX, _eval5
 from app.domain.spot import ActionType, Card, LegalAction
+from app.domain.table.sizing import postflop_node_key, pot_fraction_to_bb
 
 _ACE = 12  # rank index of the ace in equity.RANKS
 _KING = 11
@@ -245,8 +246,16 @@ def sample_postflop_decision(
     rng: random.Random,
     noise: float = 1.0,
     current_bet_to: float = 0.0,
+    is_aggressor: bool = False,
 ) -> Decision:
     """Draw a frequency-mixed postflop decision from the pack's levers.
+
+    R2 sizing: when `sizing_by_node` is authored on the pack AND the caller
+    passes `is_aggressor`, the pot-fraction is drawn from the node-specific
+    distribution (small on dry flops, big on wet turns). The default
+    `is_aggressor=False` keeps every existing caller (the statistical harness,
+    the range estimator) on the flat `sizing` distribution byte-for-byte — so
+    action-frequency bands are unchanged; only the live bot loop opts in.
 
     Facing state is derived from the `legal` shapes (unopened: CHECK+BET;
     matched-with-option: CHECK+RAISE; facing chips: FOLD+CALL[+RAISE]).
@@ -325,14 +334,18 @@ def sample_postflop_decision(
     if action not in (ActionType.BET, ActionType.RAISE):
         return Decision(action=action)
 
-    # Sizing draw — independent of bucket (rule 3).
-    fracs = [(float(k), w) for k, w in pf.sizing.items()]
+    # Sizing draw — independent of bucket (rule 3). R2: node-aware override when
+    # authored + aggressor context supplied; else the flat distribution.
+    dist = pf.sizing
+    if pf.sizing_by_node and is_aggressor:
+        node = postflop_node_key(board, legal, is_aggressor=is_aggressor)
+        dist = pf.sizing_by_node.get(node, pf.sizing)
+    fracs = [(float(k), w) for k, w in dist.items()]
     f = rng.choices([fr for fr, _ in fracs], weights=[w for _, w in fracs], k=1)[0]
-    if action is ActionType.BET:
-        size = f * pot_bb
-    else:
-        to_call = by_kind[ActionType.CALL].min_bb or 0.0 if ActionType.CALL in by_kind else 0.0
-        size = current_bet_to + f * (pot_bb + to_call)  # spec formula, exact
+    to_call = by_kind[ActionType.CALL].min_bb or 0.0 if ActionType.CALL in by_kind else 0.0
+    size = pot_fraction_to_bb(
+        f, pot_bb, action=action, current_bet_to=current_bet_to, to_call=to_call
+    )
     bracket = by_kind[action]
     size = min(max(round(size, 2), bracket.min_bb), bracket.max_bb)
     return Decision(action=action, size_bb=size)

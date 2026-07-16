@@ -48,6 +48,16 @@ from app.domain.table.engine import HandState
 _EPS = 1e-6
 _BLIND_POSITIONS = (Position.SB, Position.BB)
 
+# R2: bots now size realistically (open 3bb+, 3-bet 3.5x, 4-bet 2.4x) instead of
+# the engine min-raise the old bands were tuned for, so the preflop grading bands
+# widen from the min-raise-era caps to the STANDARD live sizes. Genuine oversizes
+# (maniac 5.5x, fish 4bb opens, jam-adjacent) still return None — defense ranges
+# shift materially. Grading a standard 3bb open against the canonical (2.5) entry
+# stays within the ≈-approximate EV labels (same W1 rationale as the 2.0 relax).
+_STD_OPEN_CAP = max(_OPEN_SIZE.values())  # 3.0bb universal standard open
+_THREEBET_MULT_CAP = 3.5  # standard 3-bet = 3.5x the open
+_FOURBET_MULT_CAP = 2.4  # standard 4-bet = 2.4x the 3-bet
+
 
 def _street_actions(state: HandState, street: Street) -> list[HistoryAction]:
     """This street's history minus blind POSTs (posting is not acting)."""
@@ -115,16 +125,15 @@ def _map_vs_open(
     hero = state.seats[hero_seat]
     opener_pos = raises[0].position
     canonical_open = _OPEN_SIZE.get(opener_pos)
-    # Open-size band [min-raise 2.0 .. canonical]: bots always open to the
-    # engine minimum (play.py sizes at la.min_bb = 2.0) while charts are
-    # authored at 2.5/3.0 — a strict equality gate made VS_RFI/BLIND_DEFENSE
-    # ungradeable against real bot play (W1 combined-refuter high-1, relaxation
-    # ACCEPTED: registry lookup keys by node/position, never bet size, so
-    # grading a 2.0 open against the canonical entry is no more approximate
-    # than the ≈ EV labels already are). Larger-than-canonical opens still
-    # return None — defense ranges tighten materially vs oversizes.
+    # Open-size band [min-raise 2.0 .. standard 3.0] (R2): bots now open at the
+    # persona open_bb (tag/nit/lag 3.0), so the cap rises from the per-seat
+    # canonical (2.5/3.0) to the universal 3bb standard. Grading a 3bb open
+    # against the canonical entry is no more approximate than the ≈ EV labels
+    # (registry keys by node/position, never bet size). Oversized persona opens
+    # (station 3.5 / fish 4.0 / maniac 4.5) still return None — defense ranges
+    # tighten materially vs oversizes.
     if canonical_open is None or not (
-        2.0 - _EPS <= state.current_bet_bb <= canonical_open + _EPS
+        2.0 - _EPS <= state.current_bet_bb <= _STD_OPEN_CAP + _EPS
     ):
         return None
     ctx = (
@@ -153,18 +162,19 @@ def _map_vs_3bet(
     if entry is None:
         return None
     osize = _OPEN_SIZE[hero.position]
-    # Hero's own open must sit in the same [min-raise 2.0 .. canonical] band as
-    # VS_RFI (W1 relaxation) — vs an oversized open the villain's 3-bet range
-    # (and hero's defend range) shifts materially, so oversize ⇒ None.
-    if not (2.0 - _EPS <= raises[0].amount_bb <= osize + _EPS):
+    # Hero's own open must sit in the same [min-raise 2.0 .. standard 3.0] band
+    # as VS_RFI (R2) — vs an oversized open the villain's 3-bet range (and
+    # hero's defend range) shifts materially, so oversize ⇒ None.
+    if not (2.0 - _EPS <= raises[0].amount_bb <= _STD_OPEN_CAP + _EPS):
         return None
-    # 3-bet band (engine legality supplies the lower bound — a bot's min-3-bet
-    # already passed apply()): cap at the builder's canonical 3x-the-canonical-
-    # open. Same justification as the open band: the registry keys by
-    # node/position/facing, never bet size; grading a min-3-bet against the
-    # canonical entry stays within the ≈ approximation. Bigger-than-canonical
-    # 3-bets tighten hero's continue range materially ⇒ None.
-    if state.current_bet_bb > 3 * osize + _EPS:
+    # 3-bet band (engine legality supplies the lower bound — a bot's 3-bet
+    # already passed apply()): cap at the standard 3.5x-the-open (R2 bots 3-bet
+    # threebet_mult×open; tag/nit/lag 3.5x). Same justification as the open
+    # band: the registry keys by node/position/facing, never bet size; grading
+    # a standard 3-bet against the canonical entry stays within the ≈
+    # approximation. Bigger 3-bets (maniac 5.5x) tighten hero's continue range
+    # materially ⇒ None.
+    if state.current_bet_bb > _THREEBET_MULT_CAP * osize + _EPS:
         return None
     return _preflop_spot(entry, state, hero_seat)
 
@@ -189,14 +199,14 @@ def _map_vs_4bet(
     if entry is None:
         return None
     osize = _OPEN_SIZE[opener_pos]
-    tbet = 3 * osize  # builder canonical 3-bet: 3x the canonical open
-    fbet = tbet * 2.3  # builder canonical 4-bet: 2.3x the canonical 3-bet
-    # Same tolerant [engine-min .. canonical] band per raise, same rationale as
-    # the open/3-bet bands (bots min-raise every street of the raise war; the
-    # registry never keys on size). Anything ABOVE a canonical size ⇒ None —
-    # jam-adjacent oversizes change hero's continue range materially (true
-    # all-in 4-bets are already rejected by the ALLIN gate above).
-    if not (2.0 - _EPS <= raises[0].amount_bb <= osize + _EPS):
+    tbet = _THREEBET_MULT_CAP * osize  # standard 3-bet: 3.5x the open (R2)
+    fbet = tbet * _FOURBET_MULT_CAP  # standard 4-bet: 2.4x the 3-bet (R2)
+    # Same tolerant [engine-min .. standard] band per raise, same rationale as
+    # the open/3-bet bands (R2 bots size realistically every street of the raise
+    # war; the registry never keys on size). Anything ABOVE the standard size ⇒
+    # None — jam-adjacent oversizes change hero's continue range materially
+    # (true all-in 4-bets are already rejected by the ALLIN gate above).
+    if not (2.0 - _EPS <= raises[0].amount_bb <= _STD_OPEN_CAP + _EPS):
         return None
     if raises[1].amount_bb + _posted(hero.position) > tbet + _EPS:
         return None

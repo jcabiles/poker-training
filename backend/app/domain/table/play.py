@@ -25,6 +25,11 @@ from app.domain.personas import sample_preflop_action
 from app.domain.personas_postflop import sample_postflop_decision
 from app.domain.spot import ActionType, PlayerStatus, Position, Street
 from app.domain.table.engine import HandState, apply, legal_actions
+from app.domain.table.sizing import (
+    last_aggressor_position,
+    preflop_node,
+    preflop_raise_to,
+)
 
 # Fixed table composition: 8 bots shuffled across the non-hero seats.
 LINEUP: tuple[VillainType, ...] = (
@@ -83,7 +88,9 @@ def _preflop_facing(state: HandState) -> str:
     return "vs_4bet"  # n >= 3 (4bet, 5bet_shove, ...)
 
 
-def _preflop_decision(pack, position, facing, hole, legal, rng) -> Decision:
+def _preflop_decision(
+    pack, position, facing, hole, legal, rng, current_bet_to, limpers
+) -> Decision:
     act = sample_preflop_action(pack, position, facing, hole, rng)
     kinds = {la.action for la in legal}
     if act.action not in kinds:
@@ -100,17 +107,35 @@ def _preflop_decision(pack, position, facing, hole, legal, rng) -> Decision:
         act_action = act.action
     if act_action in (ActionType.BET, ActionType.RAISE):
         la = next(x for x in legal if x.action == act_action)
-        size = la.min_bb if la.min_bb is not None else la.max_bb
-        return Decision(action=act_action, size_bb=round(size, 2))
+        # R2: size from the persona preflop levers (open_bb / threebet_mult /
+        # fourbet_mult), not the engine min-raise. Clamped legal by the helper.
+        size = preflop_raise_to(
+            pack.sizing,
+            preflop_node(facing),
+            last_raise_to=current_bet_to,
+            limpers=limpers,
+            min_bb=la.min_bb,
+            max_bb=la.max_bb,
+        )
+        return Decision(action=act_action, size_bb=size)
     return Decision(action=act_action)
 
 
 def _postflop_decision(
-    pack, hole, board, legal, pot_bb, stack_bb, opponents, rng, current_bet_to
+    pack, hole, board, legal, pot_bb, stack_bb, opponents, rng, current_bet_to, is_aggressor
 ) -> Decision:
     kinds = {la.action for la in legal}
     d = sample_postflop_decision(
-        pack, hole, board, legal, pot_bb, stack_bb, opponents, rng, current_bet_to=current_bet_to
+        pack,
+        hole,
+        board,
+        legal,
+        pot_bb,
+        stack_bb,
+        opponents,
+        rng,
+        current_bet_to=current_bet_to,
+        is_aggressor=is_aggressor,
     )
     if d.action not in kinds:
         # Defensive: never happens if the sampler honors `legal`, but keep
@@ -140,11 +165,26 @@ def bot_decision(
     seat_state = state.seats[seat]
     if state.street is Street.PREFLOP:
         facing = _preflop_facing(state)
+        limpers = sum(
+            1
+            for h in state.action_history
+            if h.street is Street.PREFLOP and h.action is ActionType.CALL
+        )
         return _preflop_decision(
-            pack, seat_state.position, facing, seat_state.hole_cards, legal, rng
+            pack,
+            seat_state.position,
+            facing,
+            seat_state.hole_cards,
+            legal,
+            rng,
+            state.current_bet_bb,
+            limpers,
         )
     pot_bb = sum(s.invested_total_bb for s in state.seats)
     opponents = _live_opponents(state, seat)
+    # R2: this seat sizes as the aggressor (c-bet/barrel) iff it made the most
+    # recent bet/raise; otherwise its bet is a donk/lead → flat sizing.
+    is_aggressor = last_aggressor_position(state.action_history) == seat_state.position
     return _postflop_decision(
         pack,
         seat_state.hole_cards,
@@ -155,6 +195,7 @@ def bot_decision(
         opponents,
         rng,
         state.current_bet_bb,
+        is_aggressor,
     )
 
 
