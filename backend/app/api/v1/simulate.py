@@ -9,6 +9,8 @@ POST /simulate/session/{id}/leave    -> end the session (no longer restorable).
 GET  /simulate/report/streets        -> all-time per-street grading report (S10).
 GET  /simulate/{id}/preflop-chart    -> baseline range chart for the hero's
                                          current preflop decision (chart slice C1).
+GET  /simulate/{id}/postflop-chart   -> the grader's action mix for the hero's
+                                         current postflop decision (R5).
 GET  /simulate/{id}/villain-range/{seat} -> live estimated hand-range for a
                                          non-hero, non-folded villain seat
                                          (villain-range V2).
@@ -28,6 +30,7 @@ from sqlmodel import Session
 from app.db.session import get_session
 from app.domain.action import Decision
 from app.schemas.simulate import (
+    PostflopChartView,
     PreflopChartView,
     RevealView,
     SessionView,
@@ -95,6 +98,19 @@ async def preflop_chart(
     # 200-body concern; 404 stays SessionNotFound-only.
     try:
         return sim_session.preflop_chart(db, session_id, owner_id=_OWNER_ID)
+    except SessionNotFound as exc:
+        raise HTTPException(status_code=404, detail="session not found") from exc
+
+
+@router.get("/{session_id}/postflop-chart", response_model=PostflopChartView)
+async def postflop_chart(
+    session_id: str, db: Session = Depends(get_session)
+) -> PostflopChartView:
+    # R5: the grader's action mix for the hero's current postflop decision.
+    # Availability (not-hero-turn / preflop / unmappable / hand over) is a
+    # 200-body concern; 404 stays SessionNotFound-only. Read-only: zero writes.
+    try:
+        return await sim_session.postflop_chart(db, session_id, owner_id=_OWNER_ID)
     except SessionNotFound as exc:
         raise HTTPException(status_code=404, detail="session not found") from exc
 

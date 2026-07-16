@@ -471,15 +471,51 @@ def test_turn_street_returns_none():
 
 
 def test_off_pack_rfi_position_returns_none():
-    # Folded to UTG1: canonical RFI shape, but no UTG1 content entry exists.
+    # BB is never first-in unopened (it has already posted) -- RFI is
+    # structurally n/a for BB and no content entry exists (RES-A §7 footnote 7).
+    # BB can't be exercised via _folded_to (folding everyone incl. SB is a walk,
+    # not a decision point), so assert directly against the registry lookup
+    # `map_decision_point` itself calls (grade_map_preflop.py:90).
+    assert _find_entry(NodeContext.RFI, Position.BB, None) is None
+
+
+def test_utg1_rfi_now_maps_to_a_spot():
+    # R4: UTG1 RFI content now exists, so folded-to-UTG1 maps to a real Spot
+    # (was the canonical "off-pack -> None" example before R4).
     state = _folded_to(Position.UTG1)
-    assert map_decision_point(state, HERO_SEAT) is None
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.hero.position == Position.UTG1
 
 
 def test_off_pack_vs_rfi_pairing_returns_none():
     # HJ facing an LJ open (canonical size): no vs_RFI HJ-vs-LJ entry exists.
     assert _find_entry(NodeContext.VS_RFI, Position.HJ, Position.LJ) is None
     state = _facing_open(Position.HJ, Position.LJ, _OPEN_SIZE[Position.LJ])
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_limp_raise_line_returns_none_via_full_mapper():
+    # Content-independent structural None-witness (W1 combined-refuter med): a
+    # limp-then-raise pot mixes calls + raises, which every preflop family
+    # rejects -- map_preflop returns None for the SHAPE, not for missing content.
+    # Survives R4's RFI_POSITIONS growth (unlike the retired off-pack-RFI witness,
+    # which went vacuous once every foldable seat gained content).
+    state = _state(Position.CO)
+    state = _play(
+        state,
+        [
+            (Position.UTG, Decision(action=ActionType.CALL)),  # limp
+            (Position.UTG1, Decision(action=ActionType.FOLD)),
+            (Position.UTG2, Decision(action=ActionType.FOLD)),
+            (Position.LJ, Decision(action=ActionType.RAISE, size_bb=3.0)),
+            (Position.HJ, Decision(action=ActionType.FOLD)),
+        ],
+    )
+    assert state.to_act_seat == HERO_SEAT
+    assert state.street is Street.PREFLOP
+    # calls + raises together = cold-call / limp-raise line -> None (no content
+    # family describes those pots), proven end-to-end through map_decision_point.
     assert map_decision_point(state, HERO_SEAT) is None
 
 

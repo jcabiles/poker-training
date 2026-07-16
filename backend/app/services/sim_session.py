@@ -36,6 +36,7 @@ from app.domain.content.registry import lookup
 from app.domain.evaluation import Coverage, EvaluationResult, FeedbackTiers
 from app.domain.grading import range_grid
 from app.domain.personas import load_persona_packs
+from app.domain.postflop import _hand_category, _river_cat_effective
 from app.domain.scenarios import _find_entry
 from app.domain.spot import (
     ActionType,
@@ -73,6 +74,8 @@ from app.schemas.simulate import (
     EventView,
     ExploitNoteView,
     GradeView,
+    PostflopChartAction,
+    PostflopChartView,
     PreflopChartView,
     RevealedSeatView,
     RevealView,
@@ -318,12 +321,44 @@ def _hero_postflop_size_bb(state, la, legal) -> float | None:
     )
 
 
+def _is_flop_cbet_node(state, legal: list[LegalAction]) -> bool:
+    """True when hero's BET here is the flop c-bet (aggressor betting the flop
+    for the first time) — the ONE node R3 offers two sizes for."""
+    hero_pos = state.seats[HERO_SEAT].position
+    is_aggr = last_aggressor_position(state.action_history) == hero_pos
+    node = postflop_node_key(state.board, legal, is_aggressor=is_aggr)
+    return state.street is Street.FLOP and node.startswith("cbet_")
+
+
+def _hero_cbet_legal_actions(la: LegalAction, state) -> list[LegalAction]:
+    """Two FIXED-pair BET options (0.33/0.75 pot, 1dp) for the flop c-bet —
+    NOT `HERO_NODE_SIZE[node]`, which collapses small==big on wet/mono boards
+    (`cbet_wet`==0.75). Mirrors `map_flop_cbet`'s unconditional small/big split
+    (`grade_map_postflop.py`) so the displayed size equals the graded size."""
+    pot_bb = sum(s.invested_total_bb for s in state.seats)
+    small = round(0.33 * pot_bb, 1)
+    big = round(0.75 * pot_bb, 1)
+    lo = la.min_bb if la.min_bb is not None else small
+    hi = la.max_bb if la.max_bb is not None else big
+    return [
+        la.model_copy(update={"min_bb": min(max(small, lo), hi), "size_bb": None}),
+        la.model_copy(update={"min_bb": min(max(big, lo), hi), "size_bb": None}),
+    ]
+
+
 def _hero_legal_actions(state) -> list[LegalAction]:
     """Legal actions for hero's turn, with a realistic `size_bb` suggestion set
-    on each BET/RAISE (R2). Clamped legal; None (unmapped) ⇒ FE uses min_bb."""
+    on each BET/RAISE (R2). Clamped legal; None (unmapped) ⇒ FE uses min_bb.
+
+    R3: the flop c-bet is special-cased to TWO BET `LegalAction`s (fixed
+    0.33/0.75 pot pair) instead of one — see `_hero_cbet_legal_actions`.
+    """
     legal = legal_actions(state)
     out: list[LegalAction] = []
     for la in legal:
+        if la.action is ActionType.BET and _is_flop_cbet_node(state, legal):
+            out.extend(_hero_cbet_legal_actions(la, state))
+            continue
         if la.action in (ActionType.BET, ActionType.RAISE):
             raw = (
                 _hero_preflop_size_bb(state)
@@ -662,6 +697,77 @@ def preflop_chart(db: Session, session_id: str, owner_id: str = "") -> PreflopCh
         node_label=_node_label(spot),
         grid=grid,
         exploit_note=_exploit_note(spot, state, _load_seats(db, session_id)),
+    )
+
+
+_POSTFLOP_STREETS = (Street.FLOP, Street.TURN, Street.RIVER)
+
+
+def _postflop_node_label(spot: Spot) -> str:
+    ctx = spot.node_context[0]
+    pos = spot.hero.position.value
+    facing = spot.facing.value if spot.facing is not None else "?"
+    if ctx is NodeContext.CBET:
+        return f"{pos} flop c-bet vs {facing}"
+    if ctx is NodeContext.TURN_BARREL:
+        return f"{pos} turn barrel vs {facing}"
+    if ctx is NodeContext.RIVER_BARREL:
+        return f"{pos} river barrel vs {facing}"
+    if ctx is NodeContext.VS_TURN_BET:
+        return f"{pos} vs {facing} turn bet"
+    if ctx is NodeContext.VS_RIVER_BET:
+        return f"{pos} vs {facing} river bet"
+    return f"{pos} {ctx.value}"  # future postflop contexts: honest fallback
+
+
+async def postflop_chart(
+    db: Session, session_id: str, owner_id: str = ""
+) -> PostflopChartView:
+    """Read-only: the grader's action mix for the hero's CURRENT postflop
+    decision (R5). available=false when it is not the hero's postflop turn,
+    the hand is over, or the decision point is unmappable — chart availability
+    ≡ gradeability (same map_decision_point gate), never a fabricated mix.
+
+    The actions are the SHARED provider singleton's `optimal(spot).per_action`
+    — the exact output `apply_hero_action`'s evaluate() grades with (chart ==
+    grader by construction; frequencies are never re-derived here). Writes
+    NOTHING: no sim_decision, no DrillAttempt."""
+    session = _get_session(db, session_id, owner_id)
+    if session is None:
+        raise SessionNotFound(session_id)
+    hand = _current_hand(db, session)
+    if hand is None or hand.state_json is None:
+        return PostflopChartView(available=False)
+    state = HandState.model_validate_json(hand.state_json)
+    if (
+        state.hand_over
+        or state.street not in _POSTFLOP_STREETS
+        or state.to_act_seat != HERO_SEAT
+    ):
+        return PostflopChartView(available=False)
+    spot = map_decision_point(state, HERO_SEAT)
+    if spot is None:
+        return PostflopChartView(available=False)
+    result = await _grading_provider().optimal(spot)
+    if result.coverage is Coverage.NOT_FOUND:
+        return PostflopChartView(available=False)  # never render a fabricated mix
+    cat = _hand_category(spot.hero.hole_cards, spot.board)
+    if spot.street is Street.RIVER:
+        # Busted-draw demotion (S7): the river graders never emit a "draw" row.
+        cat = _river_cat_effective(cat)
+    return PostflopChartView(
+        available=True,
+        node_label=_postflop_node_label(spot),
+        hand_category=cat,
+        actions=[
+            PostflopChartAction(
+                action=a.action.value,
+                size_bb=a.size_bb,
+                frequency=a.frequency,
+                ev_bb=a.ev_bb,
+            )
+            for a in result.per_action
+        ],
     )
 
 

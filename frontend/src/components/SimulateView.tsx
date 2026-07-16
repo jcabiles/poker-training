@@ -19,6 +19,7 @@ import type {
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
 import SimLedger from "./simulate/SimLedger";
+import SimPostflopChart from "./simulate/SimPostflopChart";
 import SimRangeChart from "./simulate/SimRangeChart";
 import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
@@ -710,6 +711,19 @@ export default function SimulateView() {
                 sessionId={view.session_id}
                 identityKey={`${view.session_id}#${hand.hand_no}#${hand.pot_bb}`}
                 heroCards={hand.hero.hole_cards}
+              />
+            )}
+
+            {/* Postflop action-mix chart (R5) — the grader's own baseline for
+                the current postflop decision, same point-of-need contract as
+                the preflop chart above. identityKey adds street + pot_bb: pot
+                strictly grows between hero turns on one street and the street
+                itself advances otherwise, so every postflop decision point in
+                a hand gets a distinct key (stale-guard discriminator). */}
+            {hand.is_hero_turn && hand.street !== "preflop" && !playing && view && (
+              <SimPostflopChart
+                sessionId={view.session_id}
+                identityKey={`${view.session_id}#${hand.hand_no}#${hand.street}#${hand.pot_bb}`}
               />
             )}
 

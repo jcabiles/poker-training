@@ -6,6 +6,39 @@
   "entries": [
     {
       "node_context": "vs_RFI",
+      "position": "UTG1",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "TT, JJ, AQs, AJs, KQs, KJs, QJs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "UTG opens the strongest range at the table and UTG+1 sits directly behind it with the whole field still to act, so this is the tightest vs-RFI spot in the pack: 3-bet only genuine value (QQ+, AK) plus the A5s blocker-bluff, and flat a narrow high-equity band (TT-JJ, AQs-AJs, suited Broadways) — dominated offsuit hands and thin suited hands can't continue profitably against a range this strong, and cold-calling with 5+ players still to act invites a squeeze, so the flat stays disciplined."
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "UTG2",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "99, TT, JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "UTG+2 sits one seat closer to the button than UTG+1, so its continuing range widens a touch: the pair floor drops to 99 and the call range picks up ATs/JTs, since one fewer player behind means less squeeze exposure — the 3-bet range stays the same genuine-value-plus-blocker shape because UTG's open is still the strongest range at the table."
+    },
+    {
+      "node_context": "vs_RFI",
+      "position": "UTG2",
+      "facing": "UTG1",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "99, TT, JJ, AQs, AJs, ATs, KQs, KJs, QJs, JTs", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "UTG+1's open is only a hair wider than UTG's and still EP-strong, so UTG+2 re-values essentially as it does facing UTG: 3-bet QQ+/AK plus the A5s blocker, flat the same 99-JJ/suited-Broadway band — the one-notch-wider opener doesn't justify loosening further against a value-heavy pool that rarely opens EP light."
+    },
+    {
+      "node_context": "vs_RFI",
       "position": "HJ",
       "facing": "UTG",
       "actions": [

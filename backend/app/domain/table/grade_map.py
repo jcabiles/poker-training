@@ -9,7 +9,7 @@ facing, or villain context.
 
 Street ownership (decoupled 2026-07-16 so R4/R5 own disjoint modules):
   - preflop shapes  → `grade_map_preflop.map_preflop`
-  - postflop shapes → `grade_map_postflop.map_flop_cbet`
+  - postflop shapes → `grade_map_postflop` (flop c-bet + R5 turn/river line)
   - shared helpers  → `grade_map_common`
 This module is just the dispatcher; street-specific logic lives in those
 modules. `_find_limp_entry` is re-exported for existing test imports.
@@ -19,7 +19,13 @@ from __future__ import annotations
 
 from app.domain.spot import Spot, Street
 from app.domain.table.engine import HandState
-from app.domain.table.grade_map_postflop import map_flop_cbet
+from app.domain.table.grade_map_postflop import (
+    map_flop_cbet,
+    map_river_barrel,
+    map_turn_barrel,
+    map_vs_river_bet,
+    map_vs_turn_bet,
+)
 from app.domain.table.grade_map_preflop import _find_limp_entry, map_preflop
 
 __all__ = ["map_decision_point", "_find_limp_entry"]
@@ -37,4 +43,11 @@ def map_decision_point(state: HandState, hero_seat: int) -> Spot | None:
         return map_preflop(state, hero_seat)
     if state.street is Street.FLOP:
         return map_flop_cbet(state, hero_seat)
-    return None  # turn/river grading is out of v1 scope
+    # R5: turn/river continuation-line shapes. The two mappers per street are
+    # disjoint by hero position (opener barrels vs BB defends), so `or` never
+    # masks one with the other. Everything else stays None ("no baseline yet").
+    if state.street is Street.TURN:
+        return map_turn_barrel(state, hero_seat) or map_vs_turn_bet(state, hero_seat)
+    if state.street is Street.RIVER:
+        return map_river_barrel(state, hero_seat) or map_vs_river_bet(state, hero_seat)
+    return None

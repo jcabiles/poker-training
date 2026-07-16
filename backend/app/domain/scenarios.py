@@ -47,6 +47,8 @@ _BLIND_SEATS = {Position.SB, Position.BB}
 
 RFI_POSITIONS = [
     Position.UTG,
+    Position.UTG1,
+    Position.UTG2,
     Position.LJ,
     Position.HJ,
     Position.CO,

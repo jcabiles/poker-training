@@ -133,6 +133,22 @@ def test_chart_grid_equals_practice_drill_grid_rfi(db):
     assert view.exploit_note is None  # RFI has no facing seat to key a persona
 
 
+def test_chart_grid_populated_for_utg1_rfi(db):
+    # R4: UTG1 RFI content now exists -- the chart must populate for it too
+    # (was "no chart yet" before R4).
+    state = _folded_to(Position.UTG1)
+    session_id = _persist(db, state)
+    view = preflop_chart(db, session_id)
+    assert view.available is True
+    entry = _find_entry(NodeContext.RFI, Position.UTG1, None)
+    spot = build_spot(
+        entry, random.Random(0), eff_bb=100.0,
+        hole_cards=state.seats[HERO_SEAT].hole_cards,
+    )
+    assert view.grid == range_grid(lookup(_INDEX, spot))
+    assert view.node_label == "UTG1 open (RFI)"
+
+
 def test_chart_grid_equals_practice_drill_grid_vs_rfi(db):
     state = _facing_open(Position.BB, Position.BTN, _OPEN_SIZE[Position.BTN])
     session_id = _persist(db, state)
