@@ -411,7 +411,17 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       through a server-side capability seam** (endpoint + a togglable flag), NOT an always-on
       client toggle — so the NEXT hidden-persona mode can withhold it later without a rewrite.
 
-- [ ] **R2 — Realistic persona-flavored fixed bet sizes** *(consumes RES-B)*. ICE 8·7·5.
+- [x] **R2 — Realistic persona-flavored fixed bet sizes** *(done 2026-07-16, PR #42 / d9eacea:
+      discovered persona preflop sizing levers were DEAD CODE — R2's core work was wiring them
+      through the predetermined bot/hero path via new pure `domain/table/sizing.py`
+      (`postflop_node_key`, `HERO_NODE_SIZE`, two-sided `preflop_raise_to` clamp,
+      `pot_fraction_to_bb`). Added node-aware postflop sizing: `PersonaPostflop.sizing_by_node`
+      override sampled only when `is_aggressor` (default False keeps S4 statistical bands +
+      range_estimator byte-identical). `LegalAction.size_bb` seam added (feeds R3). grade_map
+      bands widened (open→3.0/3bet→3.5×/4bet→2.4×) to fit realistic bot opens — user-approved over
+      constraining bots. De-flaked a PYTHONHASHSEED-dependent grading test (cap 160→500, swept
+      seeds 0-88 clean + deterministic band test). refuter FAIL→all 5 findings folded pre-build;
+      541 tests + verify.sh green across randomized runs.)* ICE 8·7·5.
       **Problem:** unrealistic sizings make every price wrong. **Outcome-link:** decisions
       graded at real prices. **Solution:** replace predetermined bot/hero sizings with the
       RES-B size table — fixed, keyed by node, flavored per persona (levers in the persona
