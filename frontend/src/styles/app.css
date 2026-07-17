@@ -3963,3 +3963,383 @@ kbd {
 .sim-vrange-cell-on .sim-vrange-label {
   color: var(--act-on);
 }
+
+/* ═══ N1 — North-star Dashboard ═══════════════════════════════════════════════
+   A standalone view: two aggregate KPI cards on top (Good Decision Rate is the
+   hero), then a by-street ledger with proportional brass fill bars. Reads as a
+   struck closing-record sheet in the Midnight Club language — Fraunces engraved
+   numerals, one champagne/bronze metal voice, ruled ledger rows. Every value is
+   a token; AA + visible focus in both themes. Motion is a staggered page-load
+   reveal, guarded by prefers-reduced-motion below. */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Page head — the display-serif title over one muted line of orientation. */
+.dash-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 62ch;
+}
+.dash-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-xl), 4vw, 30px);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  line-height: 1.1;
+  color: var(--text);
+}
+.dash-sub {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Best-effort load failure — a quiet note, never a blank page. */
+.dash-note {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ── Top: two KPI cards ─────────────────────────────────────────────────────
+   The primary card carries the hero number; the secondary sits smaller beside
+   it. On wide screens they share a row weighted toward the hero; they stack on
+   narrow. */
+.dash-kpis {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+.dash-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+/* Hero card — a gilt top rule (the closing-record cue from the recap ledger), a
+   faint gilt radial wash for depth, and the oversized engraved rate. */
+.dash-kpi-primary {
+  border-top: 3px solid var(--primary);
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--gold-glow), transparent 60%),
+    var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.dash-kpi-secondary {
+  background: var(--surface-2);
+}
+.dash-kpi-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dash-kpi-value {
+  margin: 0;
+  line-height: 1;
+}
+.dash-kpi-num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.dash-kpi-primary .dash-kpi-num {
+  font-size: clamp(56px, 12vw, 88px);
+  color: var(--primary);
+}
+.dash-kpi-secondary .dash-kpi-num {
+  font-size: clamp(40px, 8vw, 56px);
+}
+.dash-kpi-meta {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-md);
+  line-height: 1.4;
+  color: var(--muted);
+}
+/* No-baseline coverage line — the honesty note, one step quieter than meta. */
+.dash-kpi-nb {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted); /* solid (not mixed) — AA-safe for normal-weight coverage text */
+}
+
+/* ── Below: by-street ledger ────────────────────────────────────────────────
+   One ruled row per street; a proportional brass bar tracks the Good rate, with
+   Good / Optimal / EV-lost figures beneath it as mono tabular numerals. */
+.dash-streets {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+.dash-streets-title {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dash-street-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-street {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.dash-street:first-child {
+  padding-top: 0;
+}
+.dash-street:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.dash-street-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.dash-street-name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text);
+}
+.dash-street-count {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: right;
+}
+.dash-street-nb {
+  color: var(--muted); /* solid (not mixed) — AA-safe for normal-weight coverage text */
+}
+/* Proportional bar — a recessed track with a brass fill. The track reads as an
+   empty ledger rule for streets with no graded decisions (no fill span). */
+.dash-bar {
+  position: relative;
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+  overflow: hidden;
+}
+.dash-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--primary),
+    var(--gold-bright)
+  );
+}
+/* Figure trio — Good / Optimal / EV-lost as small labelled mono numerals. */
+.dash-street-rates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+}
+.dash-rate {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+.dash-rate-k {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dash-rate-v {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+}
+.dash-rate-good .dash-rate-v {
+  color: var(--good);
+}
+/* A no-data street shows "—", not a rate — mute it so success-green is reserved
+   for an actual Good rate (a green em-dash falsely implies a positive signal). */
+.dash-rate-good .dash-rate-v--empty {
+  color: var(--muted);
+}
+.dash-rate-ev .dash-rate-v {
+  font-weight: 600;
+  color: var(--muted);
+}
+.dash-foot {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* ── Empty state — honest, with a next action ───────────────────────────────*/
+.dash-empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-8) var(--space-6);
+  background: var(--surface);
+  text-align: center;
+}
+.dash-empty-lead {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-empty-body {
+  margin: 0 auto;
+  max-width: 48ch;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.dash-empty-nb {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  color: color-mix(in srgb, var(--muted) 85%, transparent);
+}
+
+/* ── Load skeleton — shaped to the real KPI + ledger layout ──────────────────*/
+.dash-skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.dash-skel-kpis {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: var(--space-4);
+}
+.dash-skel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.dash-skel-block {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--border) 45%, transparent);
+}
+.dash-skel-primary {
+  height: 168px;
+}
+.dash-skel-secondary {
+  height: 168px;
+}
+.dash-skel-row {
+  height: var(--space-8);
+}
+
+/* Staggered page-load reveal — the head, KPIs, then the ledger settle in. One
+   orchestrated moment, ease-out; reduced-motion users get the static layout. */
+@media (prefers-reduced-motion: no-preference) {
+  .dash-head,
+  .dash-kpis,
+  .dash-streets,
+  .dash-empty {
+    animation: reveal var(--dur-2) var(--ease-1) both;
+  }
+  .dash-kpis {
+    animation-delay: 60ms;
+  }
+  .dash-streets,
+  .dash-empty {
+    animation-delay: 120ms;
+  }
+}
+
+/* Narrow: KPI cards stack (hero on top), and the pinch point for two-up cards. */
+@media (max-width: 640px) {
+  .dash-kpis,
+  .dash-skel-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ═══ Slim side-panel headline (N1 sibling — parallel agent emits the markup) ══
+   Inside the existing .sim-report section: a compact two-rate headline for the
+   NARROW side column — the Good rate leads, Optimal sits beside it, a coverage
+   count below. Deliberately NOT the big dashboard-card treatment: this is a
+   quiet inline ledger stat, the full breakdown living on the Dashboard. */
+.sim-report-headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+}
+.sim-report-rate {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-1) / 2);
+}
+.sim-report-rate-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+.sim-report-rate-primary .sim-report-rate-value {
+  font-size: var(--text-xl);
+  color: var(--primary);
+}
+.sim-report-rate-secondary .sim-report-rate-value {
+  font-size: var(--text-lg);
+}
+.sim-report-rate-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sim-report-headline-count {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--muted);
+}

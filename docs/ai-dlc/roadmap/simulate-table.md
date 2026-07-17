@@ -432,7 +432,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       green; `verify.sh` green. **Appetite:** ~1 epic. **No-gos:** no sliders; no rake/ante;
       hero *choice* is R3, not here — R2 keeps hero on a single predetermined size.
 
-- [ ] **R3 — Hero bet-sizing feature: two size options — FLOP C-BET ONLY** *(consumes RES-B, after R2)*.
+- [x] **R3 — Hero bet-sizing feature: two size options — FLOP C-BET ONLY** *(done 2026-07-16, W1 / PR #44: `_hero_legal_actions` emits two fixed-pair BET legs 0.33/0.75 pot 1-dp via `min_bb` — matching `map_flop_cbet` byte-for-byte, NOT `HERO_NODE_SIZE` which collapses small==big on wet/mono; existing `grade_cbet` grades the choice, FE two-BET branch already renders B/V; 5 tests incl. wet/mono collapse regression + displayed==graded parity. vs-3bet/vs-4bet/turn-river sizing → R3b. Combined-refuter clean on this slice.)* *(consumes RES-B, after R2)*.
       ICE 8·7·5. *(Scope narrowed 2026-07-16 at Gate-2: W1 refuter proved the preflop grader
       `grading.py::grade()` matches by `ActionType` only and CANNOT distinguish a standard 4-bet
       from a shove — both grade byte-identically. So vs-3bet/vs-4bet size grading needs new
@@ -449,7 +449,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       **Appetite:** ~1 small epic. **No-gos:** no free-form slider; no more than two options; no
       solver EVs; no preflop/turn/river size grading here (R3b). Spec: `specs/r3-hero-bet-sizing.md`.
 
-- [ ] **R3b — Hero bet-sizing: preflop + turn/river size grading** *(consumes RES-B, after R3 + R5)*.
+- [~] **R3b — Hero bet-sizing: preflop + turn/river size grading** — **⤳ SUPERSEDED by Epic 3 · N3 (preflop open/3-bet sizing) + N4 (postflop sizing).** *(consumes RES-B, after R3 + R5)*.
       ICE 7·6·4.
       **Problem:** R3 shipped only flop-c-bet sizing; the juicy sizing skills — 4-bet-vs-shove,
       barrel sizing, check-raise sizing — remain ungraded. **Outcome-link:** the full RES-B
@@ -471,7 +471,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       the fact (a `chosen_size_bb` column would be migration 0012, ask-first if it becomes a real
       need).
 
-- [ ] **R4 — Preflop coverage: fill UTG+1/UTG+2 + all node contexts** *(consumes RES-A)*.
+- [x] **R4 — Preflop coverage: fill UTG+1/UTG+2 + all node contexts** *(done 2026-07-16, W1 / PR #44: authored UTG1/UTG2 RFI + vs_RFI + vs_3bet content verbatim from RES-A §10; added both to `RFI_POSITIONS` (also grows Challenge sampling 6→8, intended); personas UNTOUCHED (nit/station/fish stay wildcard — stat bands safe); `spot_signature()` byte-stable for legacy seats (additive, new seats mint new hashes); repointed `test_off_pack_rfi_position_returns_none`; nesting UTG⊆UTG1⊆UTG2⊆LJ golden + chart-populated + non-spot tests. vs_3bet coverage partial by design (single representative facing per RES-A). No schema/persona/migration change.)* *(consumes RES-A)*.
       ICE 8·8·6.
       **Problem:** early seats between UTG and LJ have no ranges → hero un-gradeable / no chart
       there. **Outcome-link:** ≥90% preflop-decision coverage (the north-star coverage metric).
@@ -489,7 +489,8 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       renumbering; no postflop (R5); no persona-adjusted squares on the chart (baseline +
       exploit note only, per the shipped-chart no-go).
 
-- [ ] **R5 — Postflop range chart: openable call/fold/raise ranges for the current spot**
+- [x] **R5 — Postflop range chart: openable call/fold/raise ranges for the current spot**
+      *(done 2026-07-16, W1 / PR #44: 4 canonical HU turn/river mappers (`map_turn_barrel`/`map_vs_turn_bet`/`map_river_barrel`/`map_vs_river_bet`) in `grade_map_postflop.py` mirroring `scenarios.build_*_spot`, strict multi-street None-on-doubt gates; dispatcher widened for TURN/RIVER. Read-only `GET /postflop-chart` renders the grader's own `per_action` via the SHARED provider singleton ⇒ chart==grader by construction, zero writes; new `SimPostflopChart` panel (reused chrome + action-mix render). Graders/`srs`/`leaks`/`grading` byte-unchanged; pins + `TAXONOMY_VERSION==5` intact; HU-only (multiway→"no baseline yet"). Combined-refuter HIGH fixed: widened the turn/river preflop-open gate to the `[2.0,3.0]` band (bots never open 2.5 — was zeroing HJ/CO/BTN coverage) + bot-driven belt test. **Two coverage followups tracked in NEXT** (`map_flop_cbet` still exact-open-gate ⇒ flop/turn inconsistency; vs-turn/river-bet mappers rarely fire vs bot 2-dp bets). **DESIGN-REVIEW of the chart panel NOT run** (sandbox can't drive Playwright — zombie servers).)* 
       *(consumes RES-C)*. ICE 9·6·4.
       **Problem:** no point-of-need postflop range view. **Outcome-link:** the deepest transfer
       gap — postflop strategy at the moment of decision. **Solution:** an openable panel (the
@@ -508,7 +509,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       tables; no browsable library; approximate labels mandatory; multiway handled or honestly
       "no baseline yet".
 
-- [ ] **R6 — Coaching: leak-by-spot analytics view** *(after R2/R4/R5)*. ICE 9·6·5.
+- [~] **R6 — Coaching: leak-by-spot analytics view** — **⤳ SUPERSEDED by Epic 3 · N1 (north-star dashboard) + N7 (leak-drill Practice).** *(after R2/R4/R5)*. ICE 9·6·5.
       **Problem:** feedback isn't spot-specific — the user can't find leaks by spot / position /
       street (gap #1 the user named). **Outcome-link:** the primary metric becomes *actionable*,
       not just measurable. **Solution:** a **leak-by-spot analytics view** — one aggregate
@@ -522,7 +523,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       layer); no trend/progress graphs (user ranked trend lower — stays NEXT); no SRS writes;
       no new `sim_decision` columns (read-model only — schema unchanged).
 
-- [ ] **R7 — Coaching: why-it's-wrong recap depth** *(after R6; consumes RES-A/B/C rationales)*.
+- [~] **R7 — Coaching: why-it's-wrong recap depth** — **⤳ SUPERSEDED by Epic 3 · N6 (LLM coach).** *(after R6; consumes RES-A/B/C rationales)*.
       ICE 8·6·5.
       **Problem:** verdicts say good/bad but don't teach the concept or the fix (gap #2 the user
       named). **Outcome-link:** mistakes become learnable, not just flagged. **Solution:**
@@ -536,9 +537,175 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       columns on `sim_decision`** — reload-durable reasoning stays the deferred NEXT bet
       (ask-first if it becomes a real ask); no exploit-aware "why"; no SRS.
 
+---
+
+## NOW — Epic 3: Grade every decision · measure the rate · coach the leaks (added 2026-07-16)
+
+> Third epic. Re-centers Simulate on the user's explicit **north-star metric** and supersedes the
+> thinner Epic-2 tail — **R3b/R6/R7 fold into the slices below**. Same primary outcome (become a
+> winning $2/$3 player), now with a measurable proxy the user named and a full
+> **grade → measure → coach** loop. Every page eventually supports the decisions hero makes in
+> Simulate (N7 makes Simulate the app home).
+>
+> **North-star metric (user-stated 2026-07-16):**
+> - **Good Decision Rate = (optimal + acceptable) / graded** — PRIMARY (the one metric if forced).
+> - **Optimal Play Rate = optimal / graded** — secondary.
+> - Both **exclude "no baseline yet"** from the denominator (shown as a coverage count), trended
+>   and broken out **by street** (v1).
+>
+> **Locked interview decisions (2026-07-16):**
+> - Dashboard v1 breaks the two rates **by street** (preflop/flop/turn/river); finer **by-spot-type**
+>   drill-down is a fast-follow (needs per-decision spot dims not stored today — ties to N5).
+> - **Two SEPARATE verdicts per decision** — one for the **action** (fold/call/raise/bet), one for
+>   the **sizing** — each optimal/acceptable/blunder, at every action and street.
+> - **Raise-depth cap: grade full sizing through the 3rd bet** (preflop open→3-bet; postflop
+>   bet→raise→re-raise); **beyond that hero gets shove/call/fold only, no sizing grade.**
+> - Grading display is **toggleable** (coach mode ↔ real-play mode); data is recorded either way.
+> - **Simulate becomes the app home AFTER** grading + dashboard land (N7), not before.
+> - **LLM coach (N6) built right after** the metrics; API-vs-local + prompt design settled at its
+>   own interview.
+> - **TBD (user-flagged for a future interview):** whether Practice-page reps count toward the
+>   cumulative Good-Decision/Optimal-Play totals, or the totals stay Simulate-only (resolved in N7).
+>
+> **Cross-cutting constraints (inherit into every slice):** heuristic / GTO-*simplified* only, no
+> solver tables · EVs labeled approximate · domain purity · results freq+EV never boolean · one
+> async `StrategyProvider` seam · strategy in versioned `content/` data · `spot_signature()` FROZEN
+> (the new sizing verdict rides an **additive** column, never a signature dim) · additive Alembic
+> migration per schema change · anti-sizing-tell (bot strength→size stays frequency-sampled) · CSS
+> from design tokens · AA contrast + visible focus both themes.
+
+### Build slices (ICE = Impact·Confidence·Ease, 1–10)
+
+- [x] **N1 — North-star dashboard: Good-Decision-Rate + Optimal-Play-Rate, by street.** ICE 10·8·6. *(DONE 2026-07-16 — `#/dashboard` view + slimmed side panel; FE-only, no migration; spec `specs/n1-north-star-dashboard.md`. Design-review PASS both themes.)*
+      *(Supersedes R6. Contract map: `contracts/*` R6 scan — `sim_decision` already carries
+      `correctness`/`street`/`coverage`/`ev_loss_bb`; NO migration.)*
+      **Problem:** the user's own north-star metric is visible nowhere — no way to see how solid
+      play is or track it. **Outcome-link:** makes the primary outcome *measurable* (can't improve
+      what you can't see) — the measurement backbone every later slice feeds.
+      **Solution:** a dedicated **dashboard page** — two KPI cards (Good-Decision-Rate =
+      (optimal+acceptable)/graded; Optimal-Play-Rate = optimal/graded) and a tokens-only
+      **by-street breakout** (preflop/flop/turn/river) below the cards, each street showing both
+      rates + graded count. Read-model over existing `sim_decision` (reuses the S10 street report's
+      no-baseline-exclusion contract). *(Scope revised at the 2026-07-16 `/ai-dlc` interview: the
+      over-time **trend** chart is DEFERRED to a Next slice — it needs a new date-bucketed
+      aggregation; v1 is the by-street "mix" breakout only. Spec: `specs/n1-north-star-dashboard.md`.)* **Pass/fail:** page shows both rates as cards with no-baseline
+      rows as a coverage count (never in the denominator); a per-street table/chart matches the S10
+      street-report numbers exactly; tokens-only CSS, AA + focus both themes; `verify.sh` + build
+      green; design-review both themes. **Appetite:** ~1 epic. **No-gos:** no by-spot-type
+      drill-down yet (fast-follow, needs N5's stored spot dims); no persona split (L1); the
+      **sizing-rate card lands with N3/N4** (no sizing verdict exists to chart yet); charts are
+      tokens-only CSS bars unless a library is ask-first'd; no SRS writes; read-model only (no new
+      columns).
+
+- [ ] **N2 — Grading visibility toggle: coach mode ↔ real-play mode.** ICE 8·9·8.
+      **Problem:** the live verdict badges + recap make it impossible to rehearse a hand "for real";
+      a coaching user wants them ON. **Outcome-link:** the same table serves rehearsal *and*
+      coaching. **Solution:** a persistent toggle that hides/shows all in-hand verdict badges + the
+      end-of-hand recap grading; **grading is still computed + recorded when hidden** (the dashboard
+      keeps filling). **Pass/fail:** toggling hides/shows every verdict badge + recap tier;
+      preference persists across reload; with grading hidden a played hand still writes
+      `sim_decision` rows (assert rows created); AA + focus both themes; `verify.sh` + build green;
+      design-review. **Appetite:** ~1 small epic. **No-gos:** no per-decision/per-street granular
+      toggles (one global switch); no change to what's recorded; no new endpoint if a client-only
+      preference suffices.
+
+- [ ] **N3 — Preflop sizing grades: open + 3-bet (4-bet+ = shove/call/fold).** ICE 9·7·5.
+      *(Supersedes R3b preflop half. Consumes RES-B. Contract map: this session's R3b scan.)*
+      **Problem:** hero can't choose or be graded on preflop sizing — the app picks the size.
+      **Outcome-link:** the sizing-verdict half of the north-star, preflop. **Solution:** emit two
+      size options for RFI-open and 3-bet in `_hero_legal_actions`; build size-matching into the
+      **Practice-shared** preflop grader `grading.py::grade()` (a `_match()` by nearest `size_bb` +
+      fix the `ActionType`-keyed `sizes` dict collision the R3 refuter caught — standard-4bet vs
+      shove grade byte-identically today); FE `decisions.ts` gains a **RAISE-aware two-size branch**
+      (two raises collide on key `R` today, second unreachable); **at 4-bet+ hero gets only
+      shove/call/fold, no sizing grade** (the cap). Persist the sizing verdict as a **SEPARATE
+      additive column** (migration; `spot_signature()` untouched). **Pass/fail:** hero opening/
+      3-betting sees two graded size options; standard-4bet vs shove no longer grade identically
+      (direction test); at 4-bet+ only shove/call/fold offered; **Practice single-raise flows
+      byte-unchanged** (the existing `test_grading.py` suite stays green — the new `_match()` path
+      must be a strict superset: identical output when ≤1 raise size is legal, incl. the untouched
+      CALL/BET/FOLD sizes — plus a new standard-vs-shove direction test); migration up/down clean,
+      existing rows read back unchanged; `verify.sh` + build green; design-review. **Appetite:** ~1 epic.
+      **No-gos:** no slider; no >2 sizes; no sizing grade past the 3-bet cap; anti-sizing-tell
+      intact; no signature-dim change. **⚠️ Interview at /ai-dlc:** the action-vs-sizing verdict
+      data model (blended row vs two verdict columns vs two rows) — decide before touching schema.
+
+- [ ] **N4 — Postflop sizing grades: bet / raise / re-raise, up to the 3-bet cap.** ICE 8·6·4.
+      *(Supersedes R3b postflop half. Consumes RES-B/RES-C. Contract map: this session's R3b scan.
+      May split at /ai-dlc — barrels vs facing-raises.)*
+      **Problem:** postflop sizing is graded only on the flop c-bet (R3); barrels, check-raises,
+      facing-bet raises aren't. **Outcome-link:** the sizing-verdict half, postflop. **Solution:**
+      two-size choices + grading for turn/river barrel (fix `_barrel_spot` to the RES-B 0.5/0.75 &
+      0.5/pot pairs — it hard-codes 0.33/0.75, a displayed≠graded bug), vs-cbet raise, flop
+      check-raise (2.5×/3.5×), facing-bet raise (2.5×/3×) — the last two need **new live flop
+      `VS_CBET`/`VS_CHECK_RAISE` mappers** (none exist) + `_match()` fixes on the four facing-side
+      graders (`grade_vs_cbet/_check_raise/_turn_bet/_river_bet` share the same ActionType-only RAISE
+      collapse). Capped at the 3rd bet. Reconcile the live-vs-graded raise-size formula (two exist:
+      `pot_fraction_to_bb` vs `_faced_bet_spot`'s flat `3×bet`). **Pass/fail:** each supported
+      postflop node up to the 3-bet grades the size choice freq+EV; **displayed==graded parity** per
+      node; beyond the 3-bet = shove/call/fold; postflop grader **hash-pins +
+      `TAXONOMY_VERSION`==5 unchanged**; `verify.sh` + build green; design-review. **Appetite:** ~1
+      large epic (split candidate). **No-gos:** no solver EVs; no sizing past the cap; multiway stays
+      "no baseline yet" if unmapped; never silently HU-grade multiway.
+
+- [ ] **N5 — Grade every action: close the high-frequency "no baseline yet" gaps (within the cap).** ICE 7·6·4.
+      **Problem:** the vision is a rating at *each* action/street, but many live spots still show
+      "no baseline yet" (RES-C §12 non-spot list) — thinning the north-star denominator + blocking
+      N1's by-spot-type drill-down. **Outcome-link:** raises graded-decision coverage (the
+      north-star's honest coverage floor) and unlocks the by-spot dashboard cut. **Solution:** close
+      the two W1-surfaced gate gaps — `map_flop_cbet` exact-open-gate → the `[2.0,3.0]` band (to
+      match the widened turn/river mappers; a standard 3.0 open currently maps the turn barrel but
+      not the flop c-bet on the same line) and `map_vs_turn_bet`/`map_vs_river_bet` bet-gate
+      tolerance (they demand a 1-dp bucket but bots bet `round(frac*pot,2)`, so BB turn/river charts
+      are near-empty) — then author + map the highest-frequency missing node families within the
+      3-bet cap (**research-gated: may need a RES-D spike** for donk/delayed-cbet/probe). Store the
+      per-decision spot dims N1's by-spot drill-down needs (additive). **Pass/fail (all runnable, no invented number):**
+      (a) the two named gate gaps demonstrably fire in a bot-driven belt test — `map_flop_cbet` maps
+      a standard 3.0 open, and `map_vs_turn_bet`/`map_vs_river_bet` fire against a bot
+      `round(frac*pot,2)` bet; (b) an **enumerated** set of previously-"no baseline" node families
+      within the cap now map (list fixed in the spec, asserted one-by-one); (c) measured
+      graded-decision coverage over a **fixed-seed** N-hand sim does **not regress** vs the pre-N5
+      baseline recorded in the slice notes; (d) every still-uncovered line stays honest "no baseline
+      yet"; (e) grader/`srs` pins + `TAXONOMY_VERSION`==5 unchanged; `verify.sh` green. **⚠️ Set the
+      numeric coverage-floor target (aspirational) at N5's /ai-dlc interview** — the checks above do
+      not depend on it. **Appetite:** ~1 epic (+ RES-D spike if needed). **No-gos:** never grade an unmapped spot silently; heuristics stay simplified
+      (no solver); state the hard ceiling (some lines never covered), don't fake it.
+
+### After the Build slices — sequenced, NOT yet spec-ready
+
+> These carry the user's ordering intent (N6 right after the metrics; N7 after grading + dashboard;
+> L1 much later) but are **not spec-ready vertical slices** — each needs its own interview before
+> `/ai-dlc`. Listed here only for sequence; their canonical homes are the doc's `## NEXT` / `## LATER`
+> columns below (cross-referenced there). **Do NOT hand these to `/ai-dlc` until N1–N5 land + the
+> flagged interview happens.**
+
+- **N6 — LLM coach (feedback on good/bad decisions).** *Supersedes R7. Sequence: right after N1–N5.*
+  Problem (P4): verdicts flag good/bad but don't *teach*. Direction: an LLM-backed coach that turns a
+  graded decision + spot context + RES-A/B/C rationales into a plain-language concept + fix.
+  **⚠️ NEEDS EXTENSIVE INTERVIEW before spec** — API-vs-local, model, cost/latency/privacy of sending
+  hand data off-device, prompt design, trigger conditions, capability-seam/toggle; **no external
+  dependency lands without that interview.** → graduates to `## NEXT` (canonical) once N1–N5 ship.
+
+- **N7 — IA restructure: Simulate as home + Practice organized around leaks.** *Sequence: after N1–N5.*
+  Problem (P5): the app is grader-first, not Simulate-first; Practice isn't organized around the
+  user's actual leaks. Direction: Simulate becomes the default/home view; Practice reframes around the
+  dashboard's low-rate spots. **⚠️ Interview:** resolve the standing TBD — do Practice reps count
+  toward the cumulative Good-Decision/Optimal-Play totals, or stay Simulate-only? → graduates to
+  `## NEXT` (canonical).
+
+- **L1 — Persona-aware metrics + per-player-type ranges.** *Much later. Absorbs the pre-existing
+  "Exploit-aware grading layer" NEXT item.* Problem (P6): baseline grading is blind to opponent type
+  — optimal play vs a maniac ≠ vs a nit. Bet: persona-conditioned verdicts + predefined
+  per-player-type ranges across spots; dashboard sliceable by villain type. *Confidence:* med ·
+  *assumptions to test:* does it change enough decisions to matter at $2/$3; per-persona authoring
+  volume · *review-by:* after N1–N6 ship + real data accrues. **⚠️ NEEDS EXTENSIVE INTERVIEW.** →
+  lives in `## LATER` (canonical).
+
+---
+
 ## NEXT — validated problems / opportunities (not yet spec'd)
 
-- **Exploit-aware grading layer.** *(gate-mandated follow-on)* *Evidence:* personas are
+- **Exploit-aware grading layer.** *(gate-mandated follow-on; → promoted to Epic 3 **L1**)* *Evidence:* personas are
   deliberately exploitable; baseline verdicts occasionally bless exploitatively-wrong plays
   (e.g. bluffing the station). `content/preflop/exploit.json` + N-slice exploit rationales are
   the seed. *Candidate slices:* persona-conditioned verdict adjustments per node family;

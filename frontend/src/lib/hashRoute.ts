@@ -6,9 +6,9 @@
 // moved from "drill" to "home".
 import type { Mode } from "../api/types";
 
-export type View = "home" | "drill" | "texture" | "equity" | "simulate";
+export type View = "home" | "drill" | "texture" | "equity" | "simulate" | "dashboard";
 
-const VIEW_IDS: readonly View[] = ["home", "drill", "texture", "equity", "simulate"];
+const VIEW_IDS: readonly View[] = ["home", "drill", "texture", "equity", "simulate", "dashboard"];
 
 const MODE_IDS: readonly Mode[] = [
   "random",

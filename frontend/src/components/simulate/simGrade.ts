@@ -1,4 +1,4 @@
-import type { GradeView } from "../../api/types";
+import type { GradeView, StreetReportRow } from "../../api/types";
 
 // Simulate S10 — the shared verdict vocabulary. One source of truth for how a
 // `correctness` value maps to the word the player reads and the tone class the
@@ -54,4 +54,34 @@ export function fmtEvLoss(bb: number): string {
 export function fmtBb(bb: number): string {
   if (!Number.isFinite(bb)) return "—"; // never render "NaNbb" on the felt
   return String(Number(bb.toFixed(2)));
+}
+
+// Good Decision Rate for one street — (optimal+acceptable)/graded as an integer %,
+// null when nothing is graded (mirrors the existing private accuracyPct in
+// SimStreetReport; N1 generalizes it here so the dashboard + panel share it).
+export function goodPct(row: StreetReportRow): number | null {
+  return row.graded === 0 ? null : Math.round(((row.optimal + row.acceptable) / row.graded) * 100);
+}
+
+// Optimal Play Rate for one street — optimal/graded as an integer %, null when unbaselined.
+export function optimalPct(row: StreetReportRow): number | null {
+  return row.graded === 0 ? null : Math.round((row.optimal / row.graded) * 100);
+}
+
+// All-streets aggregate for the dashboard KPI cards. Sums counts across rows; rates are
+// integer % over the SUMMED graded, null when total graded is 0. no_baseline is summed but
+// NEVER enters the graded denominator (sparse-coverage honesty — same rule as the per-street report).
+export function aggregateRates(rows: StreetReportRow[]): {
+  graded: number; optimal: number; acceptable: number; no_baseline: number;
+  goodPct: number | null; optimalPct: number | null;
+} {
+  const graded = rows.reduce((s, r) => s + r.graded, 0);
+  const optimal = rows.reduce((s, r) => s + r.optimal, 0);
+  const acceptable = rows.reduce((s, r) => s + r.acceptable, 0);
+  const no_baseline = rows.reduce((s, r) => s + r.no_baseline, 0);
+  return {
+    graded, optimal, acceptable, no_baseline,
+    goodPct: graded === 0 ? null : Math.round(((optimal + acceptable) / graded) * 100),
+    optimalPct: graded === 0 ? null : Math.round((optimal / graded) * 100),
+  };
 }
