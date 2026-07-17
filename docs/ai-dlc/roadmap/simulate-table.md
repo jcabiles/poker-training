@@ -597,7 +597,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       tokens-only CSS bars unless a library is ask-first'd; no SRS writes; read-model only (no new
       columns).
 
-- [ ] **N2 — Grading visibility toggle: coach mode ↔ real-play mode.** ICE 8·9·8.
+- [x] **N2 — Grading visibility toggle: coach mode ↔ real-play mode.** ICE 8·9·8. *(DONE 2026-07-17 — Coach↔Real-play pill in Simulate topbar; hides live badge + recap, keeps recording; default real-play; FE-only, no migration; spec `specs/n2-grading-visibility-toggle.md`. Refuter PASS, design-review PASS both themes.)*
       **Problem:** the live verdict badges + recap make it impossible to rehearse a hand "for real";
       a coaching user wants them ON. **Outcome-link:** the same table serves rehearsal *and*
       coaching. **Solution:** a persistent toggle that hides/shows all in-hand verdict badges + the

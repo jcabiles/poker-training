@@ -18,6 +18,7 @@ import type {
 } from "../api/types";
 import SimActionBar from "./simulate/SimActionBar";
 import SimEventLog from "./simulate/SimEventLog";
+import SimGradingToggle from "./simulate/SimGradingToggle";
 import SimLedger from "./simulate/SimLedger";
 import SimPostflopChart from "./simulate/SimPostflopChart";
 import SimRangeChart from "./simulate/SimRangeChart";
@@ -43,6 +44,7 @@ import SimVillainRange from "./simulate/SimVillainRange";
 const STORAGE_KEY = "simulate.session_id";
 const SPEED_KEY = "simulate.speed";
 const WATCH_KEY = "simulate.watch";
+const COACH_KEY = "simulate.coachMode";
 
 // The client's json<T>() throws Error("<url> -> <status>") on non-2xx, so a
 // lost/ended session surfaces as a message ending "-> 404".
@@ -83,6 +85,18 @@ function readWatch(): boolean {
     return window.localStorage.getItem(WATCH_KEY) !== "off";
   } catch {
     return true;
+  }
+}
+
+// In-hand grading visibility (client-only, localStorage). Coach mode (true)
+// shows the live hero verdict badge + end-of-hand recap; Real play (false,
+// default) hides both — grading is still computed + recorded either way.
+// Absent/garbage storage ⇒ default false (real-play/hidden).
+function readCoachMode(): boolean {
+  try {
+    return window.localStorage.getItem(COACH_KEY) === "on";
+  } catch {
+    return false;
   }
 }
 
@@ -135,6 +149,19 @@ export default function SimulateView() {
     setWatch(next);
     try {
       window.localStorage.setItem(WATCH_KEY, next ? "on" : "off");
+    } catch {
+      /* private-mode storage — setting still applies this session */
+    }
+  }, []);
+
+  // Grading-visibility toggle (Coach ↔ Real play). Read at render time — no
+  // ref needed, unlike watch/speed, because it only gates what renders below,
+  // not a click-time decision branch.
+  const [coachMode, setCoachMode] = useState<boolean>(readCoachMode);
+  const changeCoachMode = useCallback((next: boolean) => {
+    setCoachMode(next);
+    try {
+      window.localStorage.setItem(COACH_KEY, next ? "on" : "off");
     } catch {
       /* private-mode storage — setting still applies this session */
     }
@@ -642,6 +669,7 @@ export default function SimulateView() {
         {view && (
           <div className="sim-topbar-controls">
             <SimWatchToggle watch={watch} onChange={changeWatch} />
+            <SimGradingToggle coachMode={coachMode} onChange={changeCoachMode} />
             <SimSpeedPicker speed={speed} onChange={changeSpeed} />
             <button
               type="button"
@@ -668,7 +696,7 @@ export default function SimulateView() {
               hand={hand}
               stagedIndex={stagedIndex}
               revealAt={revealAt}
-              lastGrade={heroBadge}
+              lastGrade={coachMode ? heroBadge : null}
               openRangeSeat={openRangeSeat}
               onToggleRange={toggleRange}
               revealedBySeat={revealedBySeat}
@@ -741,7 +769,7 @@ export default function SimulateView() {
                   revealScope={revealScope}
                   onReveal={onReveal}
                 />
-                <SimRecap recap={mergedRecap} />
+                {coachMode && <SimRecap recap={mergedRecap} />}
               </>
             )}
 

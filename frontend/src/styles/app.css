@@ -3059,9 +3059,12 @@ kbd {
    prefers-reduced-motion collapses all motion (the JS already runs pacing at
    instant under reduce — this just kills the CSS entrance too). */
 
-/* Topbar right cluster: speed picker + leave button share a baseline row. */
+/* Topbar right cluster: watch + grading toggles, speed picker + leave button
+   share a baseline row. Wraps at narrow widths so the (now three) pills don't
+   overflow — no effect on desktop where the row fits on one line. */
 .sim-topbar-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-4);
 }
@@ -3149,7 +3152,10 @@ kbd {
    Mirrors ONE Speed chip's shape/size (a chip nested in a pill container);
    pressed wears the same gilt as a selected Speed chip. Bottom-aligned so its
    pill lines up with the Speed pill, which sits under its SPEED caption. Own
-   classes — no shared .sim-speed edits. */
+   classes — no shared .sim-speed edits.
+   Reused as-is (no new classes) by SimGradingToggle (N2, Coach ↔ Real play):
+   same pill/face/pressed/focus shape, just a different setting — see
+   .sim-watch usage in SimGradingToggle.tsx. */
 .sim-watch {
   align-self: flex-end;
   display: inline-flex;
