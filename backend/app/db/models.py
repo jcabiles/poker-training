@@ -106,6 +106,9 @@ class SimDecision(SQLModel, table=True):
     chosen_action: str
     # None = "no baseline yet" (coverage not_found or unmappable).
     correctness: str | None = Field(default=None)
+    # Preflop sizing verdict (N3, migration 0011). None unless hero raised at a
+    # two-size node (RFI/VS_RFI/BLIND_DEFENSE); independent of `correctness`.
+    sizing_correctness: str | None = Field(default=None)
     ev_loss_bb: float = 0.0
     leak_category: int | None = Field(default=None)
     # Coverage.value ('full'/'partial'/'not_found') or 'unmappable' (the spot

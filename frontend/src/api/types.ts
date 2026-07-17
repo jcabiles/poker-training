@@ -248,6 +248,8 @@ export interface GradeView {
   ordinal: number; // 0-based decision index within the hand
   chosen_action: string; // the action the hero took
   correctness: "optimal" | "acceptable" | "mistake" | "blunder" | null;
+  // N3 preflop sizing verdict; null unless hero raised at a two-size node.
+  sizing_correctness: "optimal" | "acceptable" | "mistake" | "blunder" | null;
   ev_loss_bb: number; // ≈ approximate (heuristic provider); 0 for no-baseline
   coverage: string; // "full" | "partial" | "not_found" | "unmappable"
   verdict: string | null; // tiered verdict line; null when no baseline / reloaded

@@ -294,19 +294,24 @@ function SimVerdictBadge({ grade }: { grade: GradeView }) {
   const meta = tierOf(grade.correctness);
   const graded = grade.correctness != null;
   const showLoss = graded && grade.ev_loss_bb > 0;
+  // N3: preflop sizing verdict — a secondary sub-note, additive to the action verdict.
+  const sizeMeta = grade.sizing_correctness != null ? tierOf(grade.sizing_correctness) : null;
   return (
     <div
       className={"sim-badge sim-tier-" + meta.tone}
       role="status"
       aria-label={
         graded
-          ? `Verdict: ${meta.label}${showLoss ? `, gave up about ${fmtEvLoss(grade.ev_loss_bb)}` : ""}`
+          ? `Verdict: ${meta.label}${showLoss ? `, gave up about ${fmtEvLoss(grade.ev_loss_bb)}` : ""}${sizeMeta ? `, sizing ${sizeMeta.label}` : ""}`
           : "No baseline for this spot yet"
       }
     >
       <span className="sim-badge-word">{meta.label}</span>
       {showLoss && (
         <span className="sim-badge-ev num">{fmtEvLoss(grade.ev_loss_bb)}</span>
+      )}
+      {sizeMeta && (
+        <span className="sim-badge-size">· size: {sizeMeta.label}</span>
       )}
     </div>
   );

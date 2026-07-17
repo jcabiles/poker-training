@@ -555,6 +555,16 @@
   margin-top: var(--space-4);
   flex-wrap: wrap;
 }
+/* N3: at narrow widths pair the buttons 2-up so the two raise-SIZE options read
+   as a matched either/or instead of the default flex-wrap stranding "Raise big"
+   as a lone full-width CTA below a cramped "Raise small". Scoped to Simulate's
+   action bar (.sim-actionbar) — Practice's shared .decisionbar is unaffected. */
+@media (max-width: 480px) {
+  .decisionbar.sim-actionbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
 .btn {
   background: var(--surface);
   color: var(--text);
@@ -3254,6 +3264,12 @@ kbd {
   font-weight: 700;
   opacity: 0.85;
 }
+/* N3 sizing sub-note — a secondary annotation beside the action verdict. */
+.sim-badge-size {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  opacity: 0.8;
+}
 
 /* Tone map — fill + ink per tier. One rule set drives badge, recap chip, and the
    report tally. The ink also colors the report's tally figures (on --surface). */
@@ -3389,6 +3405,12 @@ kbd {
   font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
   font-weight: 700;
+  color: var(--muted);
+}
+/* N3 sizing sub-note in the recap row — secondary to the action verdict. */
+.sim-recap-size {
+  font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--muted);
 }
 /* The teaching note — a gilt-ruled margin annotation under a miss. Indented past

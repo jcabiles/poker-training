@@ -609,7 +609,7 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       toggles (one global switch); no change to what's recorded; no new endpoint if a client-only
       preference suffices.
 
-- [ ] **N3 — Preflop sizing grades: open + 3-bet (4-bet+ = shove/call/fold).** ICE 9·7·5.
+- [x] **N3 — Preflop sizing grades: open + 3-bet (4-bet+ = shove/call/fold).** ICE 9·7·5. *(DONE 2026-07-17 — two graded open/3-bet sizes (rec=optimal, alt=acceptable) via graded-spot inject in apply_hero_action; grader collision fixed (4bet≠shove); sizing_correctness col + migration 0011; FE two-raise + sizing sub-note. Refuter PASS on diff; design-review HIGH+MED folded. Spec `specs/n3-preflop-sizing-grades.md`.)*
       *(Supersedes R3b preflop half. Consumes RES-B. Contract map: this session's R3b scan.)*
       **Problem:** hero can't choose or be graded on preflop sizing — the app picks the size.
       **Outcome-link:** the sizing-verdict half of the north-star, preflop. **Solution:** emit two

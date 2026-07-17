@@ -214,6 +214,7 @@ def _grade_view(row: SimDecision, tiers: FeedbackTiers | None = None) -> GradeVi
         ordinal=row.ordinal,
         chosen_action=row.chosen_action,
         correctness=row.correctness,
+        sizing_correctness=row.sizing_correctness,
         ev_loss_bb=row.ev_loss_bb,
         coverage=row.coverage,
         verdict=tiers.verdict if tiers is not None else None,
@@ -260,6 +261,9 @@ def _sim_decision_row(
         ordinal=ordinal,
         chosen_action=decision.action.value,
         correctness=result.correctness.value if result.correctness else None,
+        sizing_correctness=(
+            result.sizing_correctness.value if result.sizing_correctness else None
+        ),
         ev_loss_bb=result.ev_loss_bb,
         leak_category=result.leak_category,
         coverage=result.coverage.value,
@@ -346,6 +350,94 @@ def _hero_cbet_legal_actions(la: LegalAction, state) -> list[LegalAction]:
     ]
 
 
+# Preflop nodes that get a two-size (open / 3-bet) offer. VS_3BET (hero 4-bet)
+# and beyond stay single-size shove/call/fold — the cap.
+_TWO_SIZE_PREFLOP_NODES = frozenset(
+    {NodeContext.RFI, NodeContext.VS_RFI, NodeContext.BLIND_DEFENSE}
+)
+
+
+def _preflop_two_sizes(
+    recommended: float, min_bb: float, max_bb: float, node: NodeContext
+) -> list[float]:
+    """Two distinct preflop raise sizes: the authored `recommended` (smaller)
+    plus a synthesized bigger alternative. Open (RFI) adds +1.0bb; a 3-bet
+    (VS_RFI/BLIND_DEFENSE) uses round(rec*1.25, 1). Both clamped into
+    [min_bb, max_bb], 1-dp. Distinctness fallback: if the alt collapses
+    (<= recommended after clamp+round, or > max_bb), return ONE size only —
+    no two-size offer, no sizing grade for that spot (short-stack collapse)."""
+    rec = round(min(max(recommended, min_bb), max_bb), 1)
+    if node is NodeContext.RFI:
+        alt = rec + 1.0
+    else:
+        alt = round(rec * 1.25, 1)
+    alt = round(min(max(alt, min_bb), max_bb), 1)
+    if alt <= rec or alt > max_bb:
+        return [rec]
+    return [rec, alt]
+
+
+def _inject_two_sizes(spot: Spot) -> Spot:
+    """Graded-spot rewrite (N3, the refuter-HIGH fix): for a preflop open/3-bet
+    node, replace the single RAISE LegalAction with the two sizes from
+    `_preflop_two_sizes` so grade() can classify the size. Scoped to this call
+    site (apply_hero_action) ONLY — the chart/hero-size map_decision_point calls
+    stay single-RAISE, and Practice's build_spot path is untouched. Leaves the
+    spot unchanged for VS_3BET+/non-preflop/unmapped, and for the short-stack
+    single-fallback case (helper returns one size)."""
+    if spot.street is not Street.PREFLOP or not spot.node_context:
+        return spot
+    node = spot.node_context[0]
+    if node not in _TWO_SIZE_PREFLOP_NODES:
+        return spot
+    raise_la = next((la for la in spot.legal_actions if la.action is ActionType.RAISE), None)
+    if raise_la is None or raise_la.min_bb is None or raise_la.max_bb is None:
+        return spot
+    entry = _find_entry(node, spot.hero.position, spot.facing)
+    if entry is None or entry.sizing_bb is None:
+        return spot
+    sizes = _preflop_two_sizes(entry.sizing_bb, raise_la.min_bb, raise_la.max_bb, node)
+    if len(sizes) < 2:
+        return spot
+    raises = [raise_la.model_copy(update={"min_bb": s, "size_bb": s}) for s in sizes]
+    # Preserve original ordering: the two raises take the single RAISE's slot.
+    rebuilt: list[LegalAction] = []
+    inserted = False
+    for la in spot.legal_actions:
+        if la.action is ActionType.RAISE:
+            if not inserted:
+                rebuilt.extend(raises)
+                inserted = True
+            continue
+        rebuilt.append(la)
+    return spot.model_copy(update={"legal_actions": rebuilt})
+
+
+def _hero_open_or_3bet_legal_actions(la: LegalAction, state) -> list[LegalAction]:
+    """Two RAISE options (recommended + bigger alt) for an open/3-bet node, via
+    the SAME `_preflop_two_sizes` helper the graded-spot rewrite uses — so the
+    displayed sizes equal the graded sizes. Falls back to one RAISE (single-size)
+    when the pair can't be made distinct. `size_bb` carries the offered size."""
+    recommended = _hero_preflop_size_bb(state)
+    if recommended is None or la.min_bb is None or la.max_bb is None:
+        return [la]
+    node = _hero_preflop_node(state)
+    if node is None:
+        return [la]
+    sizes = _preflop_two_sizes(recommended, la.min_bb, la.max_bb, node)
+    return [la.model_copy(update={"size_bb": s}) for s in sizes]
+
+
+def _hero_preflop_node(state) -> NodeContext | None:
+    """The two-size preflop node for hero's turn, or None when this isn't one of
+    RFI/VS_RFI/BLIND_DEFENSE (VS_3BET+/unmapped ⇒ single size)."""
+    spot = map_decision_point(state, HERO_SEAT)
+    if spot is None or not spot.node_context:
+        return None
+    node = spot.node_context[0]
+    return node if node in _TWO_SIZE_PREFLOP_NODES else None
+
+
 def _hero_legal_actions(state) -> list[LegalAction]:
     """Legal actions for hero's turn, with a realistic `size_bb` suggestion set
     on each BET/RAISE (R2). Clamped legal; None (unmapped) ⇒ FE uses min_bb.
@@ -358,6 +450,13 @@ def _hero_legal_actions(state) -> list[LegalAction]:
     for la in legal:
         if la.action is ActionType.BET and _is_flop_cbet_node(state, legal):
             out.extend(_hero_cbet_legal_actions(la, state))
+            continue
+        if (
+            la.action is ActionType.RAISE
+            and state.street is Street.PREFLOP
+            and _hero_preflop_node(state) is not None
+        ):
+            out.extend(_hero_open_or_3bet_legal_actions(la, state))
             continue
         if la.action in (ActionType.BET, ActionType.RAISE):
             raw = (
@@ -525,6 +624,8 @@ async def apply_hero_action(
     # --- S10 grading (baseline only, behind the one StrategyProvider) ---
     prior = _hand_decisions(db, hand.id)
     spot = map_decision_point(state, HERO_SEAT)
+    if spot is not None:
+        spot = _inject_two_sizes(spot)
     result = None
     if spot is not None:
         result = await _grading_provider().evaluate(spot, decision)

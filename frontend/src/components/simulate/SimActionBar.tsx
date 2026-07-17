@@ -26,7 +26,8 @@ export default function SimActionBar({
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const activeSafe = Math.min(activeIndex, options.length - 1);
 
-  // Global single-letter shortcuts (F/C/R/K/B/V) — the same keyboard affordance
+  // Global single-letter shortcuts (F/C/R/K/B/V/E — E = the bigger of two
+  // preflop raise sizes, N3) — the same keyboard affordance
   // Practice powers from App.tsx (whose handler is gated to the drill view, so
   // it never fires on Simulate). Local here so the kbd hints on the buttons are
   // truthful. Ignore keys when a form control is focused (roving-tabindex

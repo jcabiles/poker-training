@@ -22,6 +22,10 @@ const BASE_KEY: Record<string, string> = {
 export function legalDecisions(spot: Spot): DecisionOption[] {
   const bets = spot.legal_actions.filter((l) => l.action === "bet");
   const minBet = Math.min(...bets.map((b) => b.min_bb ?? Number.POSITIVE_INFINITY));
+  // N3: preflop open/3-bet offers TWO raise sizes distinguished by size_bb
+  // (they share min_bb). Small keeps "R"; big gets its own key "E".
+  const raises = spot.legal_actions.filter((l) => l.action === "raise");
+  const minRaise = Math.min(...raises.map((r) => r.size_bb ?? Number.POSITIVE_INFINITY));
   return spot.legal_actions.map((la) => {
     if (la.action === "bet" && bets.length > 1) {
       const small = (la.min_bb ?? 0) === minBet;
@@ -30,6 +34,16 @@ export function legalDecisions(spot: Spot): DecisionOption[] {
         size_bb: la.min_bb,
         key: small ? "B" : "V",
         label: `${small ? "Bet small" : "Bet big"} ${la.min_bb}bb`,
+        primary: !small,
+      };
+    }
+    if (la.action === "raise" && raises.length > 1) {
+      const small = (la.size_bb ?? 0) === minRaise;
+      return {
+        action: "raise",
+        size_bb: la.size_bb,
+        key: small ? "R" : "E",
+        label: `${small ? "Raise small" : "Raise big"} ${la.size_bb}bb`,
         primary: !small,
       };
     }

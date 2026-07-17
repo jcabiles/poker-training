@@ -21,7 +21,7 @@ from app.domain.evaluation import (
 )
 from app.domain.hand_rank import hand_rank
 from app.domain.leaks import LeakCategory
-from app.domain.spot import ActionType, NodeContext, Position, Spot
+from app.domain.spot import ActionType, LegalAction, NodeContext, Position, Spot
 
 # Tunable constants (documented placeholder EV model).
 PEN_MIX = 0.3
@@ -159,13 +159,33 @@ def _tags(chosen: ActionType, top: ActionType, correctness: Correctness) -> list
     return ["off_chart"]
 
 
+def _match(evals: list[ActionEval], decision: Decision) -> ActionEval | None:
+    """Resolve the chosen ActionEval, disambiguating multiple RAISE sizes.
+
+    Strict superset of `next(e for e in evals if e.action == decision.action)`:
+    with <=1 RAISE eval this returns the same eval. With >=2 RAISE evals a
+    RAISE decision picks the eval whose `size_bb` is nearest the chosen size
+    (target None -> the first raise eval). Non-raise actions match by action.
+    """
+    same = [e for e in evals if e.action == decision.action]
+    if not same:
+        return None
+    if decision.action != ActionType.RAISE or len(same) == 1:
+        return same[0]
+    target = decision.size_bb
+    if target is None:
+        return same[0]
+    return min(same, key=lambda e: abs((e.size_bb or 0.0) - target))
+
+
 def grade(spot: Spot, entry: Entry | None, decision: Decision | None) -> EvaluationResult:
     hand = hole_cards_to_class(*spot.hero.hole_cards)
     rank = hand_rank(hand)
-    legal = [la.action for la in spot.legal_actions] or [ActionType.FOLD]
-    if ActionType.FOLD not in legal:
-        legal = [*legal, ActionType.FOLD]
-    sizes = {la.action: la.min_bb for la in spot.legal_actions}
+    # One eval per legal action (each RAISE keeps its own size_bb — no
+    # action-keyed dedup, so two open/3-bet sizes stay distinguishable).
+    legal_actions = list(spot.legal_actions)
+    if not any(la.action == ActionType.FOLD for la in legal_actions):
+        legal_actions = [*legal_actions, LegalAction(action=ActionType.FOLD)]
 
     mix = _chart_mix(entry, hand)
     full = dict(mix)
@@ -175,7 +195,8 @@ def grade(spot: Spot, entry: Entry | None, decision: Decision | None) -> Evaluat
     floor = _range_floor(entry)  # range edge
 
     evals: list[ActionEval] = []
-    for a in legal:
+    for la in legal_actions:
+        a = la.action
         f = full.get(a, 0.0)
         if f > 0:
             ev = -PEN_MIX * (top_freq - f)
@@ -187,7 +208,7 @@ def grade(spot: Spot, entry: Entry | None, decision: Decision | None) -> Evaluat
             dist = max(0.0, floor - rank)  # how far below the range edge this hand is
             ev = -(OFF_BASE + OFF_SLOPE * dist)  # near-edge call/raise = small, far = big
         evals.append(
-            ActionEval(action=a, size_bb=sizes.get(a), frequency=round(f, 3), ev_bb=round(ev, 2))
+            ActionEval(action=a, size_bb=la.min_bb, frequency=round(f, 3), ev_bb=round(ev, 2))
         )
 
     best = max(evals, key=lambda e: e.ev_bb)
@@ -206,12 +227,24 @@ def grade(spot: Spot, entry: Entry | None, decision: Decision | None) -> Evaluat
             explanation=f"{hand} from {spot.hero.position.value}: {top.value} is the play.",
         )
 
-    ce = next((e for e in evals if e.action == decision.action), None)
+    ce = _match(evals, decision)
     if ce is None:
         chosen = ChosenEval(frequency=0.0, ev_bb=min(e.ev_bb for e in evals) - 1.0)
     else:
         chosen = ChosenEval(frequency=ce.frequency, ev_bb=ce.ev_bb)
     ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    # Preflop sizing verdict (N3): only when hero raised and the spot offers >=2
+    # RAISE sizes. Smallest raise = the recommended (authored) size -> OPTIMAL;
+    # the bigger synthesized alt -> ACCEPTABLE. Independent of the action verdict.
+    sizing_correctness: Correctness | None = None
+    raise_evals = [e for e in evals if e.action == ActionType.RAISE]
+    if decision.action == ActionType.RAISE and len(raise_evals) >= 2 and ce is not None:
+        smallest = min(raise_evals, key=lambda e: (e.size_bb or 0.0))
+        matched_recommended = (ce.size_bb or 0.0) == (smallest.size_bb or 0.0)
+        sizing_correctness = (
+            Correctness.OPTIMAL if matched_recommended else Correctness.ACCEPTABLE
+        )
 
     if decision.action == top:
         correctness = Correctness.OPTIMAL
@@ -239,6 +272,7 @@ def grade(spot: Spot, entry: Entry | None, decision: Decision | None) -> Evaluat
         chosen_eval=chosen,
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=sizing_correctness,
         provider=ProviderKind.HEURISTIC,
         coverage=Coverage.FULL,
         leak_category=leak,

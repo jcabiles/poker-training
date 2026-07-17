@@ -64,6 +64,9 @@ class EvaluationResult(BaseModel):
     chosen_eval: ChosenEval | None = None  # None when optimal() is called without a Decision
     ev_loss_bb: float = 0.0
     correctness: Correctness | None = None
+    # Preflop sizing verdict (N3): separate from the action `correctness`. None
+    # unless the graded spot offers >=2 RAISE sizes and hero raised.
+    sizing_correctness: Correctness | None = None
     rationale_tags: list[str] = Field(default_factory=list)
     explanation: str = ""
     provider: ProviderKind

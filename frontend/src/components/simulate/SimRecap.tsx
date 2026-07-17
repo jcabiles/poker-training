@@ -77,6 +77,16 @@ export default function SimRecap({ recap }: { recap: GradeView[] }) {
                 <span className={"sim-badge sim-badge-inline sim-tier-" + meta.tone}>
                   <span className="sim-badge-word">{meta.label}</span>
                 </span>
+                {/* N3: preflop sizing verdict — a secondary sub-note directly
+                    beside the action verdict badge, never altering it. Placed
+                    BEFORE the margin-left:auto EV figure so it always sits next
+                    to the verdict, not stranded at the row's right edge. Only
+                    when hero raised at a two-size node. */}
+                {g.sizing_correctness != null && (
+                  <span className="sim-recap-size">
+                    · size: {tierOf(g.sizing_correctness).label}
+                  </span>
+                )}
                 {rowGraded && g.ev_loss_bb > 0 && (
                   <span className="sim-recap-ev num">{fmtEvLoss(g.ev_loss_bb)}</span>
                 )}

@@ -48,6 +48,8 @@ class GradeView(BaseModel):
     ordinal: int
     chosen_action: str
     correctness: str | None
+    # N3 preflop sizing verdict; None unless hero raised at a two-size node.
+    sizing_correctness: str | None = None
     ev_loss_bb: float  # ≈ approximate (heuristic provider)
     coverage: str  # full / partial / not_found / unmappable
     verdict: str | None  # FeedbackTiers.verdict; None when no baseline

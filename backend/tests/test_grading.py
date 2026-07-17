@@ -258,6 +258,96 @@ def test_exploit_explanation_carries_rationale():
     assert "station" in res.tiers.reasoning.lower()
 
 
+# --- N3: per-RAISE eval-build + nearest-size _match + sizing verdict ---
+def _two_size_rfi_spot():
+    """An RFI spot carrying TWO RAISE legal actions (Simulate two-size case)."""
+    spot = make_rfi_spot(hole_cards=("Ah", "Kh"), position=Position.CO)  # AKs
+    return spot.model_copy(
+        update={
+            "legal_actions": [
+                LegalAction(action=ActionType.FOLD),
+                LegalAction(action=ActionType.RAISE, min_bb=2.5, max_bb=100.0),
+                LegalAction(action=ActionType.RAISE, min_bb=3.5, max_bb=100.0),
+            ],
+        }
+    )
+
+
+def test_two_raise_sizes_recommended_is_optimal_bigger_is_acceptable():
+    spot = _two_size_rfi_spot()
+    entry = rfi_entry(Position.CO, "22+, A2s+, AKo")
+    small = grade(spot, entry, Decision(action=ActionType.RAISE, size_bb=2.5))
+    big = grade(spot, entry, Decision(action=ActionType.RAISE, size_bb=3.5))
+    # action verdict unchanged (raising AKs is optimal either way)
+    assert small.correctness == Correctness.OPTIMAL
+    assert big.correctness == Correctness.OPTIMAL
+    # sizing verdict distinguishes the two: smallest = recommended = OPTIMAL
+    assert small.sizing_correctness == Correctness.OPTIMAL
+    assert big.sizing_correctness == Correctness.ACCEPTABLE
+
+
+def test_two_raise_match_picks_nearest_size():
+    spot = _two_size_rfi_spot()
+    entry = rfi_entry(Position.CO, "22+, A2s+, AKo")
+    # chosen size 3.4 is nearest the 3.5 (bigger) eval -> ACCEPTABLE
+    res = grade(spot, entry, Decision(action=ActionType.RAISE, size_bb=3.4))
+    assert res.sizing_correctness == Correctness.ACCEPTABLE
+    # chosen size 2.6 is nearest the 2.5 (recommended) eval -> OPTIMAL
+    res2 = grade(spot, entry, Decision(action=ActionType.RAISE, size_bb=2.6))
+    assert res2.sizing_correctness == Correctness.OPTIMAL
+
+
+def test_standard_4bet_vs_shove_no_longer_grade_identically():
+    """Direction test for the collision fix: two RAISE sizes at one node yield
+    distinct evals (the old sizes-dict collapsed them into one)."""
+    spot = make_rfi_spot(hole_cards=("Ah", "Ad"), position=Position.BTN).model_copy(
+        update={
+            "node_context": [NodeContext.VS_3BET],
+            "facing": Position.CO,
+            "legal_actions": [
+                LegalAction(action=ActionType.FOLD),
+                LegalAction(action=ActionType.CALL, min_bb=10.0),
+                LegalAction(action=ActionType.RAISE, min_bb=22.0, max_bb=100.0),  # standard 4-bet
+                LegalAction(action=ActionType.RAISE, min_bb=100.0, max_bb=100.0),  # shove
+            ],
+        }
+    )
+    entry = rfi_entry(Position.BTN, "AA, KK")
+    res = grade(spot, entry, None)
+    raise_evals = [e for e in res.per_action if e.action == ActionType.RAISE]
+    # BOTH RAISE evals survive with distinct sizes (no action-keyed collision)
+    assert len(raise_evals) == 2
+    assert {e.size_bb for e in raise_evals} == {22.0, 100.0}
+
+
+def test_single_raise_spot_has_no_sizing_verdict():
+    """VS_4BET (cap): a single RAISE legal -> sizing_correctness stays None."""
+    res = grade(
+        _vs4bet_spot(("Ah", "Ad")),
+        _vs4bet_entry(),
+        Decision(action=ActionType.RAISE, size_bb=100.0),
+    )
+    assert res.correctness == Correctness.OPTIMAL
+    assert res.sizing_correctness is None
+
+
+def test_strict_superset_single_raise_byte_identical():
+    """With <=1 RAISE legal, grade() output must match the pre-N3 next(...) match
+    exactly (Practice + 4-bet+ unchanged). Assert full result equality against a
+    hand-computed reference on a single-RAISE spot."""
+    spot = make_rfi_spot(hole_cards=("Ah", "Kh"), position=Position.CO)  # AKs, single RAISE
+    entry = rfi_entry(Position.CO, "22+, A2s+, AKo")
+    dec = Decision(action=ActionType.RAISE, size_bb=2.5)
+    res = grade(spot, entry, dec)
+    # the chosen eval is the sole RAISE eval; no sizing verdict on a single raise
+    raise_evals = [e for e in res.per_action if e.action == ActionType.RAISE]
+    assert len(raise_evals) == 1
+    assert res.sizing_correctness is None
+    assert res.chosen_eval is not None
+    assert res.chosen_eval.ev_bb == raise_evals[0].ev_bb
+    assert res.chosen_eval.frequency == raise_evals[0].frequency
+
+
 def test_marginal_offchart_call_is_not_a_blunder():
     # Q5o calling a CO open from the BB is a loose/thin call, not a blunder (calibration).
     p = _get_provider()
