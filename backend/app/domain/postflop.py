@@ -580,6 +580,45 @@ def _bet_sizing_verdict(
     )
 
 
+def _raise_sizing_verdict(
+    spot: Spot, decision: Decision, wetness: str, chosen_eval: ActionEval
+) -> Correctness | None:
+    """N4b additive size verdict for a facing-node RAISE (independent of the
+    action correctness). INTENTIONALLY diverges from `_bet_sizing_verdict`'s
+    merit-comparison shape: the facing merits (`_merits_vs_*`) compute ONE
+    scalar raise merit — there are no per-size raise merits to compare — so
+    this is a texture-rule overlay applying RES-B §5.1 directly: on dry flops
+    the small (pot-controlled) raise is the teach, on wet flops the big
+    (equity-denying) raise; a medium flop has no forced optimal (both
+    acceptable). `wetness` is the FLOP texture on every street, matching the
+    graders' own convention.
+
+    None when there's nothing to grade or raising itself wasn't reasonable:
+      - hero didn't raise (or sent no size to attribute),
+      - fewer than two distinct RAISE legs were offered (short-stack collapse
+        and all pre-N4b single-leg flows),
+      - the raise frequency clamps to 0 (raising is the mistake; no
+        "size: Best" sub-note beside a raise-blunder).
+    """
+    if decision is None or decision.action != ActionType.RAISE or decision.size_bb is None:
+        return None
+    legs = sorted(
+        la.min_bb
+        for la in spot.legal_actions
+        if la.action == ActionType.RAISE and la.min_bb
+    )
+    if len(legs) < 2 or legs[-1] <= legs[0]:
+        return None
+    if chosen_eval.frequency <= 0.0:
+        return None  # zero-frequency raise — raising isn't the play
+    small, big = legs[0], legs[-1]
+    hero_leg = small if abs(decision.size_bb - small) <= abs(decision.size_bb - big) else big
+    if wetness == "medium":
+        return Correctness.ACCEPTABLE  # no forced optimal on a neutral board
+    optimal_leg = small if wetness == "dry" else big
+    return Correctness.OPTIMAL if hero_leg == optimal_leg else Correctness.ACCEPTABLE
+
+
 def _match(evals: list[ActionEval], decision: Decision, small, big) -> ActionEval:
     """Resolve the chosen ActionEval, disambiguating small vs big bets by size."""
     if decision.action == ActionType.CHECK:
@@ -692,9 +731,13 @@ def grade_vs_cbet(
     price = faced / pot if pot > 0 else 0.5
     rationale = _postflop_rationale(NodeContext.VS_CBET, spot.hero.position, aggressor)
 
-    raise_size = next(
+    # N4b: the spot may offer two RAISE legs (small/big). The single action-level
+    # RAISE eval keys on the BIG leg — max(), not first-leg next(), so a two-leg
+    # spot can't ordering-dependently grab the small leg. On single-leg spots
+    # (all pre-N4b flows) max == the one leg: byte-identical.
+    raise_size = max(
         (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
-        None,
+        default=None,
     )
     m_fold, m_call, m_raise = _merits_vs_cbet(value, adv, price, tex, cat)
     if is_multiway(spot):
@@ -771,6 +814,7 @@ def grade_vs_cbet(
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_raise_sizing_verdict(spot, decision, tex.wetness, chosen),
         rationale_tags=["vs_cbet", adv, cat, tex.wetness],
         explanation=why,
     )
@@ -880,9 +924,13 @@ def grade_vs_check_raise(
         NodeContext.VS_CHECK_RAISE, spot.hero.position, _villain_pos(spot)
     )
 
-    raise_size = next(
+    # N4b: the spot may offer two RAISE legs (small/big). The single action-level
+    # RAISE eval keys on the BIG leg — max(), not first-leg next(), so a two-leg
+    # spot can't ordering-dependently grab the small leg. On single-leg spots
+    # (all pre-N4b flows) max == the one leg: byte-identical.
+    raise_size = max(
         (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
-        None,
+        default=None,
     )
     m_fold, m_call, m_raise = _merits_vs_check_raise(value, adv, price, tex, cat)
     if is_multiway(spot):
@@ -963,6 +1011,7 @@ def grade_vs_check_raise(
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_raise_sizing_verdict(spot, decision, tex.wetness, chosen),
         rationale_tags=["vs_check_raise", adv, cat, tex.wetness],
         explanation=why,
     )
@@ -1207,9 +1256,13 @@ def grade_vs_turn_bet(
     price = faced / pot if pot > 0 else 0.5
     rationale = _postflop_rationale(NodeContext.VS_TURN_BET, spot.hero.position, aggressor)
 
-    raise_size = next(
+    # N4b: the spot may offer two RAISE legs (small/big). The single action-level
+    # RAISE eval keys on the BIG leg — max(), not first-leg next(), so a two-leg
+    # spot can't ordering-dependently grab the small leg. On single-leg spots
+    # (all pre-N4b flows) max == the one leg: byte-identical.
+    raise_size = max(
         (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
-        None,
+        default=None,
     )
     m_fold, m_call, m_raise = _merits_vs_turn_bet(value, price, cat, tclass)
     if is_multiway(spot):
@@ -1287,6 +1340,7 @@ def grade_vs_turn_bet(
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_raise_sizing_verdict(spot, decision, tex.wetness, chosen),
         rationale_tags=tags,
         explanation=why,
     )
@@ -1543,9 +1597,13 @@ def grade_vs_river_bet(
     price = faced / pot if pot > 0 else 0.5
     rationale = _postflop_rationale(NodeContext.VS_RIVER_BET, spot.hero.position, aggressor)
 
-    raise_size = next(
+    # N4b: the spot may offer two RAISE legs (small/big). The single action-level
+    # RAISE eval keys on the BIG leg — max(), not first-leg next(), so a two-leg
+    # spot can't ordering-dependently grab the small leg. On single-leg spots
+    # (all pre-N4b flows) max == the one leg: byte-identical.
+    raise_size = max(
         (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
-        None,
+        default=None,
     )
     m_fold, m_call, m_raise = _merits_vs_river_bet(value, price, cat_effective, rclass)
     if is_multiway(spot):
@@ -1623,6 +1681,7 @@ def grade_vs_river_bet(
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_raise_sizing_verdict(spot, decision, tex.wetness, chosen),
         rationale_tags=tags,
         explanation=why,
     )

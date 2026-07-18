@@ -189,3 +189,98 @@ def test_short_stack_barrel_offers_one_size_matching_grade_collapse():
     assert map_turn_barrel(short, HERO_SEAT) is None  # grading bailed to one/none
     short_bets = [la for la in _hero_legal_actions(short) if la.action is ActionType.BET]
     assert len(short_bets) == 1  # display offers exactly one — parity holds
+
+
+# ---------------------------------------------- N4b: facing-raise sizing e2e
+
+
+def _raise_move(pos, size):
+    return (pos, Decision(action=ActionType.RAISE, size_bb=size))
+
+
+def _vs_cbet_state(
+    opener: Position = Position.CO, stacks: float = 100.0, seed: int = 39
+) -> HandState:
+    """Hero = BB who called the open, checked the flop, and faces the opener's
+    0.33-pot c-bet. Seed 39 (CO open): DRY flop, hero holds trips — the raise
+    frequency is positive, so the sizing verdict engages (dry -> small leg
+    optimal)."""
+    osize = _OPEN_SIZE[opener]
+    state = _state(Position.BB, stacks=stacks, seed=seed)
+    moves = [_fold(p) for p in _before(opener) if p not in _BLINDS]
+    moves.append(_raise_move(opener, osize))
+    moves += [
+        _fold(p)
+        for p in _SEAT_ORDER[_SEAT_ORDER.index(opener) + 1 :]
+        if p not in _BLINDS
+    ]
+    moves += [_fold(Position.SB), _call(Position.BB)]
+    state = _play(state, moves)
+    fp = round(2 * osize + 0.5, 2)
+    cbet = round(0.33 * fp, 1)
+    return _play(state, [_check(Position.BB), _bet(opener, cbet)])
+
+
+def test_vs_cbet_raise_persists_sizing_correctness(db):
+    from app.domain.table.grade_map import map_decision_point
+    from app.domain.texture import classify
+
+    state = _vs_cbet_state()
+    assert classify(state.board[:3]).wetness == "dry"  # dry -> small leg optimal
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    legs = [la.min_bb for la in spot.legal_actions if la.action is ActionType.RAISE]
+    assert legs == [4.5, 6.3]  # check_raise mults 2.5x/3.5x the 1.8 c-bet
+
+    # Displayed == graded: the offered RAISE sizes ARE the mapped spot's legs.
+    offered = [
+        la.size_bb
+        for la in _hero_legal_actions(state)
+        if la.action is ActionType.RAISE
+    ]
+    assert offered == legs
+
+    # Hand A: the small (dry-optimal) check-raise -> OPTIMAL persists.
+    sid_a = _persist_hand(db, _vs_cbet_state(), sid="n4b-a")
+    asyncio.run(
+        apply_hero_action(db, sid_a, Decision(action=ActionType.RAISE, size_bb=4.5))
+    )
+    row_a = db.exec(select(SimDecision).where(SimDecision.session_id == sid_a)).all()[-1]
+    assert row_a.street == "flop"
+    assert row_a.sizing_correctness == "optimal"
+
+    # Hand B (identical): the big check-raise -> ACCEPTABLE persists.
+    sid_b = _persist_hand(db, _vs_cbet_state(), sid="n4b-b")
+    asyncio.run(
+        apply_hero_action(db, sid_b, Decision(action=ActionType.RAISE, size_bb=6.3))
+    )
+    row_b = db.exec(select(SimDecision).where(SimDecision.session_id == sid_b)).all()[-1]
+    assert row_b.sizing_correctness == "acceptable"
+
+
+def test_short_stack_facing_raise_parity():
+    # Stacks 7.0: the mapper's legs collapse to ONE (small == BB's remaining
+    # 4.5); display must offer exactly one RAISE with that size, and the graded
+    # single-leg spot yields NO sizing verdict (two-distinct-legs gate).
+    short = _vs_cbet_state(stacks=7.0)
+    from app.domain.table.grade_map import map_decision_point
+
+    spot = map_decision_point(short, HERO_SEAT)
+    assert spot is not None
+    legs = [la.min_bb for la in spot.legal_actions if la.action is ActionType.RAISE]
+    assert legs == [4.5]
+    offered = [
+        la.size_bb
+        for la in _hero_legal_actions(short)
+        if la.action is ActionType.RAISE
+    ]
+    assert offered == [4.5]
+
+    # Too shallow for even the small leg: mapper None -> display falls back to
+    # the generic single engine RAISE (no fabricated two-size offer).
+    too_shallow = _vs_cbet_state(stacks=6.9)
+    assert map_decision_point(too_shallow, HERO_SEAT) is None
+    raises = [
+        la for la in _hero_legal_actions(too_shallow) if la.action is ActionType.RAISE
+    ]
+    assert len(raises) == 1

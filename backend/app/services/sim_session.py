@@ -58,7 +58,14 @@ from app.domain.table.engine import (
     start_hand,
 )
 from app.domain.table.grade_map import map_decision_point
-from app.domain.table.grade_map_postflop import map_river_barrel, map_turn_barrel
+from app.domain.table.grade_map_postflop import (
+    map_flop_vs_cbet,
+    map_flop_vs_check_raise,
+    map_river_barrel,
+    map_turn_barrel,
+    map_vs_river_bet,
+    map_vs_turn_bet,
+)
 from app.domain.table.play import ActionEvent, advance_to_hero, assign_lineup
 from app.domain.table.range_estimate import (
     PublicAction,
@@ -394,6 +401,41 @@ def _barrel_two_sizes(la: LegalAction, state, street: str) -> list[LegalAction]:
     ]
 
 
+def _facing_raise_spot(state) -> Spot | None:
+    """The mapped facing-node spot for hero's CURRENT decision, or None (N4b).
+    Gates the two-size RAISE offer on the mapper being non-None — the same
+    display==grade discipline as `_is_turn_barrel_node` — and doubles as the
+    source of the offered sizes (see `_facing_raise_legal_actions`)."""
+    if state.street is Street.FLOP:
+        return map_flop_vs_cbet(state, HERO_SEAT) or map_flop_vs_check_raise(
+            state, HERO_SEAT
+        )
+    if state.street is Street.TURN:
+        return map_vs_turn_bet(state, HERO_SEAT)
+    if state.street is Street.RIVER:
+        return map_vs_river_bet(state, HERO_SEAT)
+    return None
+
+
+def _facing_raise_legal_actions(la: LegalAction, spot: Spot) -> list[LegalAction]:
+    """Hero's RAISE options at a facing node, read DIRECTLY off the mapped
+    spot's RAISE legs — the exact values the grader will see, so displayed ==
+    graded by construction (the mapper already applied `FACING_RAISE_MULTS` +
+    clamp + short-stack collapse; a collapsed spot yields ONE option here).
+    `size_bb` carries the offer (the N3 preflop two-raise FE convention).
+    Defensive fallback: if a leg somehow falls outside the engine's legal
+    bracket (never in practice — mapper legs are proven within it), keep the
+    single engine option rather than offer an illegal size."""
+    legs = [
+        x.min_bb for x in spot.legal_actions if x.action is ActionType.RAISE and x.min_bb
+    ]
+    lo = la.min_bb if la.min_bb is not None else 0.0
+    hi = la.max_bb if la.max_bb is not None else float("inf")
+    if not legs or any(leg < lo - 0.01 or leg > hi + 0.01 for leg in legs):
+        return [la]
+    return [la.model_copy(update={"size_bb": leg}) for leg in legs]
+
+
 # Preflop nodes that get a two-size (open / 3-bet) offer. VS_3BET (hero 4-bet)
 # and beyond stay single-size shove/call/fold — the cap.
 _TWO_SIZE_PREFLOP_NODES = frozenset(
@@ -503,6 +545,13 @@ def _hero_legal_actions(state) -> list[LegalAction]:
         if la.action is ActionType.BET and _is_river_barrel_node(state):
             out.extend(_barrel_two_sizes(la, state, "river"))
             continue
+        if la.action is ActionType.RAISE and state.street is not Street.PREFLOP:
+            # N4b: facing a bet/check-raise at a mapped node → the graded spot's
+            # own RAISE legs become the offered sizes (display == grade).
+            fspot = _facing_raise_spot(state)
+            if fspot is not None:
+                out.extend(_facing_raise_legal_actions(la, fspot))
+                continue
         if (
             la.action is ActionType.RAISE
             and state.street is Street.PREFLOP

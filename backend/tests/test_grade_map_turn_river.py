@@ -249,9 +249,11 @@ def test_vs_turn_bet_maps_with_builder_ranges(opener, frac):
     turn_pot = round(fp + 2 * cbet, 2)
     tbet = round(frac * turn_pot, 1)
     assert spot.pot_bb == round(turn_pot + tbet, 2)  # pot INCLUDES the turn bet
+    # N4b: two RAISE legs (2.5x small / 3.0x big — the big equals the old flat 3x)
     assert [(la.action, la.min_bb) for la in spot.legal_actions] == [
         (ActionType.FOLD, None),
         (ActionType.CALL, tbet),
+        (ActionType.RAISE, round(2.5 * tbet, 1)),
         (ActionType.RAISE, round(3 * tbet, 1)),
     ]
 
@@ -293,9 +295,11 @@ def test_vs_river_bet_maps_with_builder_ranges(opener):
     river_pot = round(turn_pot + 2 * tbet, 2)
     rbet = round(0.5 * river_pot, 1)  # N4a: canonical river size = 0.5 pot
     assert spot.pot_bb == round(river_pot + rbet, 2)
+    # N4b: two RAISE legs (2.5x small / 3.0x big — the big equals the old flat 3x)
     assert [(la.action, la.min_bb) for la in spot.legal_actions] == [
         (ActionType.FOLD, None),
         (ActionType.CALL, rbet),
+        (ActionType.RAISE, round(2.5 * rbet, 1)),
         (ActionType.RAISE, round(3 * rbet, 1)),
     ]
 

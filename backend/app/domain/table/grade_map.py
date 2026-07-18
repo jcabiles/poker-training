@@ -21,6 +21,8 @@ from app.domain.spot import Spot, Street
 from app.domain.table.engine import HandState
 from app.domain.table.grade_map_postflop import (
     map_flop_cbet,
+    map_flop_vs_cbet,
+    map_flop_vs_check_raise,
     map_river_barrel,
     map_turn_barrel,
     map_vs_river_bet,
@@ -42,7 +44,15 @@ def map_decision_point(state: HandState, hero_seat: int) -> Spot | None:
     if state.street is Street.PREFLOP:
         return map_preflop(state, hero_seat)
     if state.street is Street.FLOP:
-        return map_flop_cbet(state, hero_seat)
+        # N4b: three flop shapes, disjoint by hero role + street action shape —
+        # c-bet (hero = opener, BB checked), vs c-bet (hero = BB facing the
+        # opener's bet), vs check-raise (hero = opener facing the BB's raise) —
+        # so `or` never masks one with the other.
+        return (
+            map_flop_cbet(state, hero_seat)
+            or map_flop_vs_cbet(state, hero_seat)
+            or map_flop_vs_check_raise(state, hero_seat)
+        )
     # R5: turn/river continuation-line shapes. The two mappers per street are
     # disjoint by hero position (opener barrels vs BB defends), so `or` never
     # masks one with the other. Everything else stays None ("no baseline yet").

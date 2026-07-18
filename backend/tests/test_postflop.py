@@ -736,3 +736,114 @@ def test_grade_river_barrel_no_size_verdict_beside_a_bet_blunder():
     )
     assert res.correctness == Correctness.BLUNDER
     assert res.sizing_correctness is None
+
+
+# --- N4b: facing-raise sizing verdict (texture overlay) + big-leg build ---
+
+
+def _two_raise_legs(spot, small, big):
+    """Swap the spot's single RAISE leg for a small/big pair (the N4b mapper shape)."""
+    legs = [la for la in spot.legal_actions if la.action != ActionType.RAISE]
+    legs += [
+        LegalAction(action=ActionType.RAISE, min_bb=small, max_bb=100),
+        LegalAction(action=ActionType.RAISE, min_bb=big, max_bb=100),
+    ]
+    return spot.model_copy(update={"legal_actions": legs})
+
+
+def test_two_leg_raise_eval_keys_on_big_leg():
+    # Refuter HIGH-2 regression: with two RAISE legs the action-level RAISE eval
+    # must key on the BIG leg (max), never ordering-dependently grab the first.
+    spot = _two_raise_legs(
+        _vscbet_spot(("As", "Ac"), ["Ah", "Kd", "2c"], faced=SMALL), 5.0, 6.0
+    )
+    res = grade_vs_cbet(spot, spot.hero_range, spot.villain_range, None)
+    raise_eval = next(e for e in res.per_action if e.action == ActionType.RAISE)
+    assert raise_eval.size_bb == 6.0
+
+
+def test_single_leg_facing_flow_has_no_sizing_verdict():
+    # Strict superset: pre-N4b single-leg spots grade exactly as before —
+    # same RAISE eval size, sizing_correctness stays unset.
+    spot = _vscbet_spot(("As", "Ac"), ["Ah", "Kd", "2c"], faced=SMALL)
+    res = grade_vs_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.RAISE, size_bb=3 * SMALL),
+    )
+    raise_eval = next(e for e in res.per_action if e.action == ActionType.RAISE)
+    assert raise_eval.size_bb == round(3 * SMALL, 1)
+    assert res.sizing_correctness is None
+
+
+def test_raise_sizing_verdict_dry_small_optimal():
+    spot = _two_raise_legs(
+        _vscbet_spot(("As", "Ac"), ["Ah", "Kd", "2c"], faced=SMALL), 5.0, 6.0
+    )  # Ah Kd 2c classifies dry
+    assert classify(spot.board).wetness == "dry"
+    small_res = grade_vs_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.RAISE, size_bb=5.0),
+    )
+    big_res = grade_vs_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.RAISE, size_bb=6.0),
+    )
+    assert small_res.sizing_correctness == Correctness.OPTIMAL
+    assert big_res.sizing_correctness == Correctness.ACCEPTABLE
+    # the size verdict never moves the action verdict
+    assert small_res.correctness == big_res.correctness
+
+
+def test_raise_sizing_verdict_wet_big_optimal():
+    spot = _two_raise_legs(
+        _vscbet_spot(("8s", "8d"), ["8h", "7h", "6c"], faced=SMALL), 5.0, 6.0
+    )  # 8h 7h 6c classifies wet; top set keeps the raise frequency positive
+    assert classify(spot.board).wetness == "wet"
+    small_res = grade_vs_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.RAISE, size_bb=5.0),
+    )
+    big_res = grade_vs_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.RAISE, size_bb=6.0),
+    )
+    assert big_res.sizing_correctness == Correctness.OPTIMAL
+    assert small_res.sizing_correctness == Correctness.ACCEPTABLE
+
+
+def test_raise_sizing_verdict_medium_both_acceptable():
+    spot = _two_raise_legs(
+        _vscbet_spot(("As", "Ac"), ["Ah", "Kd", "9c"], faced=SMALL), 5.0, 6.0
+    )  # Ah Kd 9c classifies medium — no forced optimal
+    assert classify(spot.board).wetness == "medium"
+    for size in (5.0, 6.0):
+        res = grade_vs_cbet(
+            spot, spot.hero_range, spot.villain_range,
+            Decision(action=ActionType.RAISE, size_bb=size),
+        )
+        assert res.sizing_correctness == Correctness.ACCEPTABLE
+
+
+def test_raise_sizing_verdict_none_beside_raise_blunder():
+    # Air facing a check-raise on a dry board: raise frequency clamps to 0 —
+    # raising is the mistake, so no size verdict prints beside it.
+    spot = _two_raise_legs(
+        _vscr_spot(("7d", "2h"), ["Ah", "Kd", "4c"], faced=SMALL), 12.0, 14.0
+    )
+    res = grade_vs_check_raise(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.RAISE, size_bb=12.0),
+    )
+    raise_eval = next(e for e in res.per_action if e.action == ActionType.RAISE)
+    assert raise_eval.frequency == 0.0
+    assert res.sizing_correctness is None
+
+
+def test_raise_sizing_verdict_non_raise_decision_none():
+    spot = _two_raise_legs(
+        _vscbet_spot(("As", "Ac"), ["Ah", "Kd", "2c"], faced=SMALL), 5.0, 6.0
+    )
+    res = grade_vs_cbet(
+        spot, spot.hero_range, spot.villain_range, Decision(action=ActionType.CALL)
+    )
+    assert res.sizing_correctness is None

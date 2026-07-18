@@ -30,6 +30,7 @@ from app.domain.spot import (
     Stakes,
     Street,
 )
+from app.domain.table.sizing import FACING_RAISE_MULTS
 
 # Canonical 9-max preflop action order (blinds act last preflop).
 _SEAT_ORDER = [
@@ -485,7 +486,9 @@ def build_vs_cbet_spot(
     villain_remaining = round(eff_bb - osize - cbet, 2)
     effective = min(hero_remaining, villain_remaining)
     spr = round(effective / pot, 1)
-    raise_size = round(3 * cbet, 1)
+    # N4b: hero's raise here is a CHECK-RAISE of the c-bet — the drill's single
+    # size is the BIG fork of the shared flop check-raise mults (3.5x, RES-B).
+    raise_size = round(FACING_RAISE_MULTS["check_raise"][1] * cbet, 1)
 
     players, history = _hu_srp_seats(
         hero=caller,
@@ -573,7 +576,9 @@ def build_check_raise_spot(
     effective = min(hero_remaining, villain_remaining)
     spr = round(effective / pot, 1)
     call_amt = round(raise_to - cbet, 2)  # INCREMENTAL amount hero owes, NOT raise_to
-    raise_size = round(3 * raise_to, 2)  # a further 4-bet
+    # N4b: hero's re-raise is a plain facing-bet raise — the BIG fork of the
+    # shared raise mults (3.0x: same value as the historical flat 3x).
+    raise_size = round(FACING_RAISE_MULTS["raise"][1] * raise_to, 2)  # a further 4-bet
 
     players, history = _hu_srp_seats(
         hero=opener,

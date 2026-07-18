@@ -39,6 +39,18 @@ POSTFLOP_BET_FRACS: dict[str, tuple[float, float]] = {
     "river": (0.5, 1.0),
 }
 
+# N4b — the two graded/offered RAISE multipliers (on the faced bet/raise-to
+# amount) when hero faces a postflop bet or check-raise (RES-B §5.1 :148-149).
+# SINGLE source of truth for the mapper's graded legs, sim_session's offered
+# sizes, AND the Practice builders. "check_raise" is FLOP-scoped research
+# (hero check-raising the c-bet); every other facing raise — flop re-raise
+# over a check-raise, all turn/river raises — uses "raise". The 3.0 big leg
+# equals the historical flat 3x, keeping existing turn/river grades unchanged.
+FACING_RAISE_MULTS: dict[str, tuple[float, float]] = {
+    "check_raise": (2.5, 3.5),
+    "raise": (2.5, 3.0),
+}
+
 
 def last_aggressor_position(action_history: list[HistoryAction]) -> Position | None:
     """Position of the most recent BET/RAISE in the hand, or None if the pot was

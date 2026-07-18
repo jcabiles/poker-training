@@ -37,7 +37,7 @@ from app.domain.spot import (
 from app.domain.table.engine import HandState
 from app.domain.table.grade_map_common import _BLIND_POSITIONS, _EPS, _street_actions
 from app.domain.table.grade_map_preflop import _STD_OPEN_CAP
-from app.domain.table.sizing import POSTFLOP_BET_FRACS
+from app.domain.table.sizing import FACING_RAISE_MULTS, POSTFLOP_BET_FRACS
 
 
 def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
@@ -147,9 +147,20 @@ def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
 # mapper (refuter HIGH).
 
 
+# Fraction-recognition tolerance. Hero's offered sizes are `round(f*pot, 1)`
+# (up to 0.05 off the exact fraction) but BOT bets are `round(f*pot, 2)`
+# (personas_postflop, ≤0.005 off) — with the old exact-match-vs-1dp check a
+# tag's 0.33-pot c-bet of 1.82bb never equalled the canonical 1.8bb, so every
+# villain-bet-gated facing mapper was DEAD in live play (design-review HIGH:
+# 0 postflop facing offers in 1,123 hands). 0.06bb accepts both roundings;
+# the nearest wrong fraction (0.33 vs 0.5 vs 0.75 pot) is whole bbs away at
+# any realistic pot, so no ambiguity.
+_CANON_BET_TOL = 0.06
+
+
 def _is_canonical_bet(amount_bb: float, pot_before: float, street: Street) -> bool:
     return any(
-        abs(amount_bb - round(f * pot_before, 1)) <= _EPS
+        abs(amount_bb - f * pot_before) <= _CANON_BET_TOL
         for f in POSTFLOP_BET_FRACS[street.value]
     )
 
@@ -232,6 +243,38 @@ def _check_bet(
     if not _is_canonical_bet(bet.amount_bb, pot_before, street):
         return None
     return bet.amount_bb
+
+
+def _check_bet_raise(
+    state: HandState, street: Street, opener_pos: Position, pot_before: float
+) -> tuple[float, float] | None:
+    """Gate: this street went EXACTLY check(BB) → bet(opener=hero, canonical
+    size) → raise(BB), hero now facing the check-raise. Returns
+    (cbet, raise_to) or None.
+
+    The check-raise SIZE is deliberately un-bucketed: personas raise on a
+    continuous pot-fraction grid (`raise_to = bet + f*(pot+to_call)`), so a
+    canonical-size gate would zero live coverage; the graders price any faced
+    amount continuously. The raise must be COMPLETE — an incomplete all-in
+    raise leaves the raiser ALLIN, which `_hu_srp_preflop` already rejects."""
+    acts = _street_actions(state, street)
+    if len(acts) != 3:
+        return None
+    chk, bet, cr = acts
+    if chk.action is not ActionType.CHECK or chk.position is not Position.BB:
+        return None
+    if bet.action is not ActionType.BET or bet.position is not opener_pos:
+        return None
+    if not _is_canonical_bet(bet.amount_bb, pot_before, street):
+        return None
+    if cr.action is not ActionType.RAISE or cr.position is not Position.BB:
+        return None
+    # BB checked, so nothing invested this street: the history INCREMENT is the
+    # full raise-TO.
+    raise_to = cr.amount_bb
+    if raise_to <= bet.amount_bb + _EPS:
+        return None  # degenerate: a "raise" no bigger than the bet
+    return bet.amount_bb, raise_to
 
 
 def _bb_checked_only(state: HandState, street: Street) -> bool:
@@ -328,16 +371,41 @@ def _faced_bet_spot(
     ctx: NodeContext,
     hero_range: str,
     villain_range: str,
+    mults: tuple[float, float] = FACING_RAISE_MULTS["raise"],
+    call_amt: float | None = None,
 ) -> Spot | None:
-    """Hero = BB defender facing the opener's bet: fold / call / raise
-    (mirrors build_vs_turn_bet_spot / build_vs_river_bet_spot; CALL.min_bb is
-    the INCREMENTAL bet — hero has nothing invested this street yet)."""
+    """Hero facing a bet (or check-raise): fold / call / raise-small / raise-big
+    (mirrors build_vs_turn_bet_spot / build_vs_river_bet_spot). `bet` is the
+    raise-SIZING base (the faced bet, or the full raise-to for a check-raise);
+    `call_amt` is the INCREMENTAL amount hero owes — defaults to `bet` (correct
+    when hero has nothing invested this street), but a check-raise caller must
+    pass `raise_to - hero's own bet` or pot-odds and `faced_bet_bucket` corrupt.
+
+    N4b: two RAISE legs from `mults` (small first). Each leg clamps to hero's
+    stack; legs collapse to one when big <= small after the clamp (short-stack).
+    The affordability gate keys on the SMALL leg (widened from the old flat-3x
+    single leg)."""
     hero = state.seats[hero_seat]
-    raise_size = round(3 * bet, 1)
+    small_mult, big_mult = mults
+    raise_small = round(small_mult * bet, 1)
+    raise_big = round(big_mult * bet, 1)
     hero_remaining = hero.stack_bb
     villain_remaining = villain.stack_bb
-    if hero_remaining < raise_size or villain_remaining <= 0:
-        return None  # too shallow for the canonical raise bucket
+    # The legs are raise-TO totals, so affordability keys on hero's all-in-TO
+    # (chips behind + already invested THIS street), not chips behind alone.
+    # Zero-invested callers (vs_cbet, vs turn/river bet: hero=BB pre-decision)
+    # are byte-identical; the check-raise-defense hero has the c-bet invested,
+    # and gating on stack alone would silently un-map legal mid-stack raises
+    # (refuter-on-diff HIGH).
+    hero_raise_ceiling = round(hero.invested_street_bb + hero.stack_bb, 2)
+    if hero_raise_ceiling < raise_small or villain_remaining <= 0:
+        return None  # too shallow for even the small canonical raise bucket
+    # Floor (not round) the clamped big leg to 1dp: stays <= the all-in ceiling
+    # AND keeps both button labels at the same 1-dp precision (design-review LOW).
+    raise_big = round(int(min(raise_big, hero_raise_ceiling) * 10 + 1e-9) / 10, 1)
+    raise_legs = [raise_small]
+    if raise_big - raise_small > _EPS:
+        raise_legs.append(raise_big)
     effective = round(min(hero_remaining, villain_remaining), 2)
     return Spot(
         game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
@@ -354,13 +422,83 @@ def _faced_bet_spot(
         to_act=hero.position,
         legal_actions=[
             LegalAction(action=ActionType.FOLD),
-            LegalAction(action=ActionType.CALL, min_bb=bet),
-            LegalAction(action=ActionType.RAISE, min_bb=raise_size, max_bb=hero_remaining),
+            LegalAction(action=ActionType.CALL, min_bb=call_amt if call_amt is not None else bet),
+            *(
+                LegalAction(action=ActionType.RAISE, min_bb=leg, max_bb=hero_raise_ceiling)
+                for leg in raise_legs
+            ),
         ],
         node_context=[ctx],
         facing=villain.position,
         hero_range=hero_range,
         villain_range=villain_range,
+    )
+
+
+def map_flop_vs_cbet(state: HandState, hero_seat: int) -> Spot | None:
+    """HU vs flop c-bet (N4b): hero = BB who called a canonical open, checked
+    the flop, and now faces the opener's canonical c-bet. Hero's RAISE here is
+    a check-raise, so the legs use the flop-scoped check_raise mults
+    (RES-B :148: 2.5x/3.5x the c-bet)."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3 or hero.position is not Position.BB:
+        return None
+    gate = _hu_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, bb, osize = gate
+    if bb.seat != hero_seat:
+        return None
+    flop_pot = round(2 * osize + 0.5, 2)
+    cbet = _check_bet(state, Street.FLOP, opener.position, flop_pot)
+    if cbet is None:
+        return None
+    pot = _live_pot(state)
+    if abs(pot - (flop_pot + cbet)) > _EPS:
+        return None
+    ranges = _srp_ranges(opener.position)
+    if ranges is None:
+        return None
+    opener_range, bb_range = ranges
+    return _faced_bet_spot(
+        state, hero_seat, opener, pot, cbet,
+        Street.FLOP, NodeContext.VS_CBET, bb_range, opener_range,
+        mults=FACING_RAISE_MULTS["check_raise"],
+    )
+
+
+def map_flop_vs_check_raise(state: HandState, hero_seat: int) -> Spot | None:
+    """HU vs flop check-raise (N4b): hero opened canonically, c-bet the flop at
+    a canonical size, and the BB check-raised (any complete size). Hero's
+    re-raise is a plain facing-bet raise (RES-B :149: 2.5x/3.0x the raise-to).
+    CALL is the INCREMENTAL amount hero owes (raise_to - cbet) — hero already
+    has the c-bet invested this street (mirrors build_check_raise_spot)."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _hu_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, bb, osize = gate
+    if opener.seat != hero_seat:
+        return None
+    flop_pot = round(2 * osize + 0.5, 2)
+    faced = _check_bet_raise(state, Street.FLOP, hero.position, flop_pot)
+    if faced is None:
+        return None
+    cbet, raise_to = faced
+    pot = _live_pot(state)
+    if abs(pot - (flop_pot + cbet + raise_to)) > _EPS:
+        return None
+    ranges = _srp_ranges(hero.position)
+    if ranges is None:
+        return None
+    opener_range, bb_range = ranges
+    return _faced_bet_spot(
+        state, hero_seat, bb, pot, raise_to,
+        Street.FLOP, NodeContext.VS_CHECK_RAISE, opener_range, bb_range,
+        mults=FACING_RAISE_MULTS["raise"],
+        call_amt=round(raise_to - cbet, 2),
     )
 
 
