@@ -539,17 +539,45 @@ def grade_cbet(
             f"(-{ev_loss}bb)."
         )
 
+    bet_evals = [e for e in evals if e.action == ActionType.BET]
     result = EvaluationResult(
         **base_kwargs,
         chosen_eval=ChosenEval(frequency=chosen_freq, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_bet_sizing_verdict(bet_evals, chosen),
         rationale_tags=["cbet", adv, cat, tex.wetness],
         explanation=why,
     )
     if rationale:
         result.authored_rationale = rationale
     return result
+
+
+def _bet_sizing_verdict(
+    bet_evals: list[ActionEval], chosen_eval: ActionEval
+) -> Correctness | None:
+    """N4a additive size verdict for a postflop BET (independent of the action
+    correctness). OPTIMAL when `chosen_eval` is the higher-merit (frequency) of
+    the two BET sizes, ACCEPTABLE for the lower.
+
+    None when there's nothing to grade or betting itself wasn't reasonable:
+      - hero didn't bet (chosen isn't a BET eval),
+      - fewer than two BET sizes were offered,
+      - BOTH BET frequencies clamp to 0 (air/weak — betting is the mistake; no
+        "size: Best" sub-note beside a bet-blunder).
+    A tie between two POSITIVE-frequency sizes resolves to OPTIMAL.
+    """
+    if chosen_eval.action != ActionType.BET or len(bet_evals) < 2:
+        return None
+    top_freq = max(e.frequency for e in bet_evals)
+    if top_freq <= 0.0:
+        return None  # both sizes zero-frequency — betting isn't the play
+    return (
+        Correctness.OPTIMAL
+        if chosen_eval.frequency >= top_freq
+        else Correctness.ACCEPTABLE
+    )
 
 
 def _match(evals: list[ActionEval], decision: Decision, small, big) -> ActionEval:
@@ -1146,11 +1174,13 @@ def grade_turn_barrel(
             f"(-{ev_loss}bb)."
         )
 
+    bet_evals = [e for e in evals if e.action == ActionType.BET]
     result = EvaluationResult(
         **base_kwargs,
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_bet_sizing_verdict(bet_evals, chosen),
         rationale_tags=tags,
         explanation=why,
     )
@@ -1475,11 +1505,13 @@ def grade_river_barrel(
             f"(-{ev_loss}bb)."
         )
 
+    bet_evals = [e for e in evals if e.action == ActionType.BET]
     result = EvaluationResult(
         **base_kwargs,
         chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
         ev_loss_bb=ev_loss,
         correctness=correctness,
+        sizing_correctness=_bet_sizing_verdict(bet_evals, chosen),
         rationale_tags=tags,
         explanation=why,
     )

@@ -37,6 +37,7 @@ from app.domain.spot import (
 from app.domain.table.engine import HandState
 from app.domain.table.grade_map_common import _BLIND_POSITIONS, _EPS, _street_actions
 from app.domain.table.grade_map_preflop import _STD_OPEN_CAP
+from app.domain.table.sizing import POSTFLOP_BET_FRACS
 
 
 def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
@@ -90,8 +91,9 @@ def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
     pot = round(sum(s.invested_total_bb for s in state.seats), 2)
     if abs(pot - (2 * osize + 0.5)) > _EPS:
         return None  # anything but open + BB call + dead SB is off-shape
-    small = round(0.33 * pot, 1)
-    big = round(0.75 * pot, 1)
+    _fsmall, _fbig = POSTFLOP_BET_FRACS["flop"]  # single source (shared w/ the canonical-bet gate)
+    small = round(_fsmall * pot, 1)
+    big = round(_fbig * pot, 1)
     hero_remaining = hero.stack_bb
     villain_remaining = villain.stack_bb
     if hero_remaining < big or villain_remaining <= 0:
@@ -137,14 +139,19 @@ def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
 
 # --- R5: turn/river mappers (HU SRP continuation line only) -----------------
 # Each mapper re-verifies the FULL prior line street by street. The canonical
-# bet buckets are the builders' 0.33/0.75-of-pot sizes rounded to 1dp — any
-# other size (or an uncalled bet, a raise, a lead, a check-back) ⇒ None.
+# bet buckets are the RES-B per-street pot-fractions (`POSTFLOP_BET_FRACS`)
+# rounded to 1dp — any other size (or an uncalled bet, a raise, a lead, a
+# check-back) ⇒ None. STREET-AWARE (N4a): a canonical FLOP bet is 0.33/0.75 pot,
+# a TURN bet 0.5/0.75, a RIVER bet 0.5/1.0. Without this, re-verifying a prior
+# 0.5-pot turn barrel against the flop-only 0.33/0.75 would orphan the river
+# mapper (refuter HIGH).
 
-_BET_FRACS = (0.33, 0.75)
 
-
-def _is_canonical_bet(amount_bb: float, pot_before: float) -> bool:
-    return any(abs(amount_bb - round(f * pot_before, 1)) <= _EPS for f in _BET_FRACS)
+def _is_canonical_bet(amount_bb: float, pot_before: float, street: Street) -> bool:
+    return any(
+        abs(amount_bb - round(f * pot_before, 1)) <= _EPS
+        for f in POSTFLOP_BET_FRACS[street.value]
+    )
 
 
 def _hu_srp_preflop(state: HandState) -> tuple | None:
@@ -202,7 +209,7 @@ def _check_bet_call(
         return None
     if call.action is not ActionType.CALL or call.position is not Position.BB:
         return None
-    if not _is_canonical_bet(bet.amount_bb, pot_before):
+    if not _is_canonical_bet(bet.amount_bb, pot_before, street):
         return None
     if abs(call.amount_bb - bet.amount_bb) > _EPS:
         return None  # short call = someone is all-in — off-shape
@@ -222,7 +229,7 @@ def _check_bet(
         return None
     if bet.action is not ActionType.BET or bet.position is not opener_pos:
         return None
-    if not _is_canonical_bet(bet.amount_bb, pot_before):
+    if not _is_canonical_bet(bet.amount_bb, pot_before, street):
         return None
     return bet.amount_bb
 
@@ -278,8 +285,9 @@ def _barrel_spot(
     """Hero = aggressor deciding check / bet small / bet big (mirrors
     build_turn_barrel_spot / build_river_barrel_spot legal-action shape)."""
     hero = state.seats[hero_seat]
-    small = round(0.33 * pot, 1)
-    big = round(0.75 * pot, 1)
+    small_frac, big_frac = POSTFLOP_BET_FRACS[street.value]
+    small = round(small_frac * pot, 1)
+    big = round(big_frac * pot, 1)
     hero_remaining = hero.stack_bb
     villain_remaining = villain.stack_bb
     if hero_remaining < big or villain_remaining <= 0:

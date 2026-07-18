@@ -58,6 +58,7 @@ from app.domain.table.engine import (
     start_hand,
 )
 from app.domain.table.grade_map import map_decision_point
+from app.domain.table.grade_map_postflop import map_river_barrel, map_turn_barrel
 from app.domain.table.play import ActionEvent, advance_to_hero, assign_lineup
 from app.domain.table.range_estimate import (
     PublicAction,
@@ -66,6 +67,7 @@ from app.domain.table.range_estimate import (
 )
 from app.domain.table.sizing import (
     HERO_NODE_SIZE,
+    POSTFLOP_BET_FRACS,
     last_aggressor_position,
     postflop_node_key,
     pot_fraction_to_bb,
@@ -340,13 +342,55 @@ def _hero_cbet_legal_actions(la: LegalAction, state) -> list[LegalAction]:
     (`cbet_wet`==0.75). Mirrors `map_flop_cbet`'s unconditional small/big split
     (`grade_map_postflop.py`) so the displayed size equals the graded size."""
     pot_bb = sum(s.invested_total_bb for s in state.seats)
-    small = round(0.33 * pot_bb, 1)
-    big = round(0.75 * pot_bb, 1)
+    _fsmall, _fbig = POSTFLOP_BET_FRACS["flop"]  # single source (shared w/ graded sizes + gate)
+    small = round(_fsmall * pot_bb, 1)
+    big = round(_fbig * pot_bb, 1)
     lo = la.min_bb if la.min_bb is not None else small
     hi = la.max_bb if la.max_bb is not None else big
     return [
         la.model_copy(update={"min_bb": min(max(small, lo), hi), "size_bb": None}),
         la.model_copy(update={"min_bb": min(max(big, lo), hi), "size_bb": None}),
+    ]
+
+
+def _is_turn_barrel_node(state) -> bool:
+    """True when hero's BET here is a gradeable turn barrel — the node
+    `map_turn_barrel` recognizes (aggressor, HU SRP line, BB checked the turn).
+    Gating on the mapper (not just the street) keeps the displayed two-size
+    offer in lockstep with the graded spot — no display-vs-grade divergence."""
+    return (
+        state.street is Street.TURN
+        and map_turn_barrel(state, HERO_SEAT) is not None
+    )
+
+
+def _is_river_barrel_node(state) -> bool:
+    """True when hero's BET here is a gradeable river barrel (mapper non-None)."""
+    return (
+        state.street is Street.RIVER
+        and map_river_barrel(state, HERO_SEAT) is not None
+    )
+
+
+def _barrel_two_sizes(la: LegalAction, state, street: str) -> list[LegalAction]:
+    """Two FIXED-pair BET options for a turn/river barrel from the SAME
+    `POSTFLOP_BET_FRACS[street]` fractions + current pot the graded `_barrel_spot`
+    uses — displayed == graded by construction. Distinctness fallback: when the
+    two clamped sizes collapse to one value (short stack), offer ONE size only
+    (mirrors `_preflop_two_sizes`) — no two-vs-one display/grade divergence."""
+    small_frac, big_frac = POSTFLOP_BET_FRACS[street]
+    pot_bb = sum(s.invested_total_bb for s in state.seats)
+    small = round(small_frac * pot_bb, 1)
+    big = round(big_frac * pot_bb, 1)
+    lo = la.min_bb if la.min_bb is not None else small
+    hi = la.max_bb if la.max_bb is not None else big
+    small_c = round(min(max(small, lo), hi), 1)
+    big_c = round(min(max(big, lo), hi), 1)
+    if big_c <= small_c:  # short-stack collapse → one size only
+        return [la.model_copy(update={"min_bb": small_c, "size_bb": None})]
+    return [
+        la.model_copy(update={"min_bb": small_c, "size_bb": None}),
+        la.model_copy(update={"min_bb": big_c, "size_bb": None}),
     ]
 
 
@@ -444,12 +488,20 @@ def _hero_legal_actions(state) -> list[LegalAction]:
 
     R3: the flop c-bet is special-cased to TWO BET `LegalAction`s (fixed
     0.33/0.75 pot pair) instead of one — see `_hero_cbet_legal_actions`.
+    N4a: turn/river barrels likewise offer TWO BET sizes (RES-B 0.5/0.75,
+    0.5/1.0 pot), gated on the barrel mapper being non-None so display == grade.
     """
     legal = legal_actions(state)
     out: list[LegalAction] = []
     for la in legal:
         if la.action is ActionType.BET and _is_flop_cbet_node(state, legal):
             out.extend(_hero_cbet_legal_actions(la, state))
+            continue
+        if la.action is ActionType.BET and _is_turn_barrel_node(state):
+            out.extend(_barrel_two_sizes(la, state, "turn"))
+            continue
+        if la.action is ActionType.BET and _is_river_barrel_node(state):
+            out.extend(_barrel_two_sizes(la, state, "river"))
             continue
         if (
             la.action is ActionType.RAISE

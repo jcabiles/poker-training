@@ -96,7 +96,7 @@ def _river_barrel_state(hero_pos: Position = Position.BTN, seed: int = 7) -> Han
     fp = round(2 * _OPEN_SIZE[hero_pos] + 0.5, 2)
     cbet = round(0.33 * fp, 1)
     turn_pot = round(fp + 2 * cbet, 2)
-    tbet = round(0.33 * turn_pot, 1)
+    tbet = round(0.5 * turn_pot, 1)  # N4a: canonical turn barrel = 0.5 pot
     return _play(
         state,
         [

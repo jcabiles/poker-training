@@ -1,8 +1,9 @@
 from app.domain.action import Decision
-from app.domain.evaluation import Correctness
+from app.domain.evaluation import ActionEval, Correctness
 from app.domain.leaks import LeakCategory
 from app.domain.postflop import (
     _CAT_VALUE,
+    _bet_sizing_verdict,
     _cbet_fold_equity_value,
     _hand_category,
     _merits,
@@ -10,6 +11,8 @@ from app.domain.postflop import (
     _villain_pos,
     cbet_fold_pct,
     grade_cbet,
+    grade_river_barrel,
+    grade_turn_barrel,
     grade_vs_cbet,
     grade_vs_check_raise,
     range_advantage,
@@ -579,3 +582,157 @@ def test_grade_cbet_falls_back_to_category_value_without_a_villain_range():
     assert _cbet_fold_equity_value(spot, spot.board, tex, None) is not None  # "*" fallback range
     spot_no_pot = spot.model_copy(update={"pot_bb": 0.0})
     assert _cbet_fold_equity_value(spot_no_pot, spot_no_pot.board, tex, None) is None
+
+
+# --- N4a: additive bet-sizing verdict (`_bet_sizing_verdict`) ---------------
+
+
+def _bet(size, freq, ev=0.0):
+    return ActionEval(action=ActionType.BET, size_bb=size, frequency=freq, ev_bb=ev)
+
+
+def _check_eval(freq=0.0):
+    return ActionEval(action=ActionType.CHECK, size_bb=None, frequency=freq, ev_bb=0.0)
+
+
+def test_bet_sizing_verdict_higher_freq_size_is_optimal():
+    small, big = _bet(2.0, 0.7), _bet(4.5, 0.3)
+    assert _bet_sizing_verdict([small, big], small) == Correctness.OPTIMAL
+    assert _bet_sizing_verdict([small, big], big) == Correctness.ACCEPTABLE
+
+
+def test_bet_sizing_verdict_positive_tie_resolves_optimal():
+    small, big = _bet(2.0, 0.4, ev=1.0), _bet(4.5, 0.4, ev=1.0)
+    # Two POSITIVE-frequency sizes tied -> either chosen is OPTIMAL.
+    assert _bet_sizing_verdict([small, big], small) == Correctness.OPTIMAL
+    assert _bet_sizing_verdict([small, big], big) == Correctness.OPTIMAL
+
+
+def test_bet_sizing_verdict_none_when_hero_checked():
+    small, big = _bet(2.0, 0.7), _bet(4.5, 0.3)
+    assert _bet_sizing_verdict([small, big], _check_eval(0.5)) is None
+
+
+def test_bet_sizing_verdict_none_when_single_size():
+    only = _bet(2.0, 0.6)
+    assert _bet_sizing_verdict([only], only) is None
+
+
+def test_bet_sizing_verdict_none_when_both_merits_zero():
+    # Air/weak hand: BOTH bet sizes clamp to 0 frequency -> betting itself is the
+    # mistake; no "size: Best" sub-note beside a bet-blunder (refuter LOW).
+    small, big = _bet(2.0, 0.0), _bet(4.5, 0.0)
+    assert _bet_sizing_verdict([small, big], small) is None
+    assert _bet_sizing_verdict([small, big], big) is None
+
+
+# --- N4a: graders populate sizing_correctness (additive; action unchanged) ---
+
+
+def test_grade_cbet_populates_sizing_correctness_optimal():
+    spot = _cbet_spot(("Ah", "Qc"), ["As", "Kd", "2c"])  # top pair, dry, hero adv
+    res = grade_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.BET, size_bb=SMALL),
+    )
+    # Small is the higher-frequency c-bet size on a dry hero-adv board.
+    assert res.sizing_correctness == Correctness.OPTIMAL
+    other = grade_cbet(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.BET, size_bb=BIG),
+    )
+    assert other.sizing_correctness == Correctness.ACCEPTABLE
+
+
+def test_grade_cbet_check_has_no_sizing_verdict():
+    spot = _cbet_spot(("Ah", "Qc"), ["As", "Kd", "2c"])
+    res = grade_cbet(
+        spot, spot.hero_range, spot.villain_range, Decision(action=ActionType.CHECK)
+    )
+    assert res.sizing_correctness is None
+
+
+def test_grade_cbet_action_verdict_unchanged_by_sizing_retrofit():
+    # The additive sizing_correctness must not move the action correctness (R3
+    # c-bet non-regression): re-assert the R3 anchor cases hold byte-for-byte.
+    dry = _cbet_spot(("Ah", "Qc"), ["As", "Kd", "2c"])
+    res = grade_cbet(
+        dry, dry.hero_range, dry.villain_range,
+        Decision(action=ActionType.BET, size_bb=SMALL),
+    )
+    assert res.correctness == Correctness.OPTIMAL
+    assert res.best_action.action == ActionType.BET and res.best_action.size_bb == SMALL
+
+    wet = _cbet_spot(
+        ("As", "Kd"), ["9h", "8h", "6c"], hero_pos=Position.CO, villain_pos=Position.BTN
+    )
+    bad = grade_cbet(
+        wet, wet.hero_range, wet.villain_range,
+        Decision(action=ActionType.BET, size_bb=BIG),
+    )
+    assert bad.best_action.action == ActionType.CHECK
+    assert bad.correctness in (Correctness.MISTAKE, Correctness.BLUNDER)
+
+
+def _turn_barrel_spot(hole, board, hero_pos=Position.BTN, villain_pos=Position.BB):
+    return _cbet_spot(hole, board, hero_pos, villain_pos).model_copy(
+        update={"street": Street.TURN, "node_context": [NodeContext.TURN_BARREL]}
+    )
+
+
+def _river_barrel_spot(hole, board, hero_pos=Position.BTN, villain_pos=Position.BB):
+    return _cbet_spot(hole, board, hero_pos, villain_pos).model_copy(
+        update={"street": Street.RIVER, "node_context": [NodeContext.RIVER_BARREL]}
+    )
+
+
+def test_grade_turn_barrel_populates_sizing_correctness():
+    spot = _turn_barrel_spot(("Ah", "Ks"), ["Ac", "Kd", "Qh", "2s"])
+    ungraded = grade_turn_barrel(spot, spot.hero_range, spot.villain_range, None)
+    bet_freqs = {
+        e.size_bb: e.frequency for e in ungraded.per_action if e.action == ActionType.BET
+    }
+    top = max(bet_freqs, key=lambda s: bet_freqs[s])
+    if bet_freqs[top] <= 0.0:  # degenerate spot — no size verdict at all
+        res = grade_turn_barrel(
+            spot, spot.hero_range, spot.villain_range,
+            Decision(action=ActionType.BET, size_bb=top),
+        )
+        assert res.sizing_correctness is None
+        return
+    hi = grade_turn_barrel(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.BET, size_bb=top),
+    )
+    assert hi.sizing_correctness == Correctness.OPTIMAL
+    check = grade_turn_barrel(
+        spot, spot.hero_range, spot.villain_range, Decision(action=ActionType.CHECK)
+    )
+    assert check.sizing_correctness is None
+
+
+def test_grade_river_barrel_check_has_no_sizing_verdict():
+    spot = _river_barrel_spot(("Ah", "Ks"), ["Ac", "Kd", "Qh", "2s", "7d"])
+    res = grade_river_barrel(
+        spot, spot.hero_range, spot.villain_range, Decision(action=ActionType.CHECK)
+    )
+    assert res.sizing_correctness is None
+
+
+def test_grade_river_barrel_no_size_verdict_beside_a_bet_blunder():
+    # Refuter LOW, through a real grader: OOP air on a villain-advantage runout —
+    # BOTH bet sizes clamp to 0 frequency, so betting is a BLUNDER and NO size
+    # verdict prints beside it (no "· size: Best" next to "Blunder").
+    spot = _river_barrel_spot(
+        ("7c", "2d"), ["9h", "8h", "6c", "Ah", "Ks"],
+        hero_pos=Position.CO, villain_pos=Position.BTN,
+    )
+    ungraded = grade_river_barrel(spot, spot.hero_range, spot.villain_range, None)
+    bet_freqs = [e.frequency for e in ungraded.per_action if e.action == ActionType.BET]
+    assert all(f == 0.0 for f in bet_freqs)  # air: both sizes zero-frequency
+    res = grade_river_barrel(
+        spot, spot.hero_range, spot.villain_range,
+        Decision(action=ActionType.BET, size_bb=SMALL),
+    )
+    assert res.correctness == Correctness.BLUNDER
+    assert res.sizing_correctness is None

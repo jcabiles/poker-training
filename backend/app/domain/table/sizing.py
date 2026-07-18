@@ -28,6 +28,17 @@ HERO_NODE_SIZE: dict[str, float] = {
     "raise": 1.0,
 }
 
+# N4a — the two graded/offered BET pot-fractions per postflop street (RES-B
+# §5.1). SINGLE source of truth for the offered sizes, the graded `_barrel_spot`
+# sizes, AND the canonical-bet recognition gate in `grade_map_postflop`. Flop
+# stays 0.33/0.75 (the R3 flop c-bet pair is unchanged); only turn/river get the
+# RES-B fix (previously all three were graded against the flop's 0.33/0.75).
+POSTFLOP_BET_FRACS: dict[str, tuple[float, float]] = {
+    "flop": (0.33, 0.75),
+    "turn": (0.5, 0.75),
+    "river": (0.5, 1.0),
+}
+
 
 def last_aggressor_position(action_history: list[HistoryAction]) -> Position | None:
     """Position of the most recent BET/RAISE in the hand, or None if the pot was

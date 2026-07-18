@@ -137,7 +137,7 @@ def _turn_barrel_state(
 
 
 def _vs_turn_bet_state(
-    opener: Position, tbet_frac: float = 0.33, tbet_override: float | None = None
+    opener: Position, tbet_frac: float = 0.5, tbet_override: float | None = None
 ) -> HandState:
     """Hero = BB defender; opener c-bet (hero called) and now bets the turn."""
     state = _srp_flop_bb(opener)
@@ -165,7 +165,7 @@ def _river_barrel_state(
     fp = _flop_pot(hero_pos)
     cbet = round(0.33 * fp, 1)
     turn_pot = round(fp + 2 * cbet, 2)
-    tbet = tbet_override if tbet_override is not None else round(0.33 * turn_pot, 1)
+    tbet = tbet_override if tbet_override is not None else round(0.5 * turn_pot, 1)
     return _play(
         state,
         [
@@ -184,9 +184,9 @@ def _vs_river_bet_state(
     fp = _flop_pot(opener)
     cbet = round(0.33 * fp, 1)
     turn_pot = round(fp + 2 * cbet, 2)
-    tbet = round(0.33 * turn_pot, 1)
+    tbet = round(0.5 * turn_pot, 1)
     river_pot = round(turn_pot + 2 * tbet, 2)
-    rbet = rbet_override if rbet_override is not None else round(0.33 * river_pot, 1)
+    rbet = rbet_override if rbet_override is not None else round(0.5 * river_pot, 1)
     return _play(
         state,
         [
@@ -222,15 +222,16 @@ def test_turn_barrel_maps_with_builder_ranges(hero_pos, frac):
     cbet = round(frac * fp, 1)
     pot = round(fp + 2 * cbet, 2)
     assert spot.pot_bb == pot
+    # N4a: turn barrel graded against RES-B turn sizes (0.5/0.75 pot).
     assert [(la.action, la.min_bb) for la in spot.legal_actions] == [
         (ActionType.CHECK, None),
-        (ActionType.BET, round(0.33 * pot, 1)),
+        (ActionType.BET, round(0.5 * pot, 1)),
         (ActionType.BET, round(0.75 * pot, 1)),
     ]
 
 
 @pytest.mark.parametrize("opener", [Position.UTG, Position.CO, Position.BTN])
-@pytest.mark.parametrize("frac", [0.33, 0.75])
+@pytest.mark.parametrize("frac", [0.5, 0.75])
 def test_vs_turn_bet_maps_with_builder_ranges(opener, frac):
     state = _vs_turn_bet_state(opener, tbet_frac=frac)
     assert state.street is Street.TURN and state.to_act_seat == HERO_SEAT
@@ -288,9 +289,9 @@ def test_vs_river_bet_maps_with_builder_ranges(opener):
     fp = _flop_pot(opener)
     cbet = round(0.33 * fp, 1)
     turn_pot = round(fp + 2 * cbet, 2)
-    tbet = round(0.33 * turn_pot, 1)
+    tbet = round(0.5 * turn_pot, 1)  # N4a: canonical turn size = 0.5 pot
     river_pot = round(turn_pot + 2 * tbet, 2)
-    rbet = round(0.33 * river_pot, 1)
+    rbet = round(0.5 * river_pot, 1)  # N4a: canonical river size = 0.5 pot
     assert spot.pot_bb == round(river_pot + rbet, 2)
     assert [(la.action, la.min_bb) for la in spot.legal_actions] == [
         (ActionType.FOLD, None),
@@ -433,6 +434,48 @@ def test_off_size_river_bet_gates_vs_river_bet():
     state = _vs_river_bet_state(Position.BTN, rbet_override=2.0)
     assert state.street is Street.RIVER and state.to_act_seat == HERO_SEAT
     assert map_decision_point(state, HERO_SEAT) is None
+
+
+def test_new_size_turn_barrel_keeps_river_mappable():
+    # Refuter HIGH: a canonical 0.5-pot turn barrel (the new RES-B turn size)
+    # must not orphan the river mapper. `map_river_barrel` re-verifies the prior
+    # turn bet via `_check_bet_call(..., Street.TURN, ...)`; with the street-aware
+    # canonical gate a 0.5-pot turn bet is canonical, so the river still MAPS.
+    # (Before the fix it was validated against the flop-only 0.33/0.75 and the
+    # river silently became None.)
+    fp = _flop_pot(Position.BTN)
+    cbet = round(0.33 * fp, 1)
+    turn_pot = round(fp + 2 * cbet, 2)
+    tbet = round(0.5 * turn_pot, 1)  # the new canonical turn size
+    state = _river_barrel_state(Position.BTN, tbet_override=tbet)
+    assert state.street is Street.RIVER and state.to_act_seat == HERO_SEAT
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.node_context == [NodeContext.RIVER_BARREL]
+
+
+def test_new_size_turn_barrel_bet_grades_through_apply_hero_action(db):
+    # Same regression, driven through the SERVICE wire: persist a turn-barrel
+    # node and have the hero BET the new 0.5-pot canonical turn size via
+    # `apply_hero_action`. The turn decision must GRADE (mapper recognized the
+    # 0.5-pot size), and the persisted sizing_correctness rides along.
+    state = _turn_barrel_state(Position.BTN)
+    turn_spot = map_decision_point(state, HERO_SEAT)
+    assert turn_spot is not None
+    bet = next(
+        la.min_bb for la in turn_spot.legal_actions
+        if la.action is ActionType.BET and la.min_bb is not None
+    )
+    assert bet == round(0.5 * turn_spot.pot_bb, 1)  # RES-B turn small = 0.5 pot
+    session_id = _persist_hand(db, state)
+    asyncio.run(
+        apply_hero_action(
+            db, session_id, Decision(action=ActionType.BET, size_bb=bet)
+        )
+    )
+    rows = db.exec(select(SimDecision)).all()
+    assert len(rows) == 1 and rows[0].street == "turn"
+    assert rows[0].correctness in ("optimal", "acceptable", "mistake", "blunder")
 
 
 # ------------------------------------------------------------- grade wire

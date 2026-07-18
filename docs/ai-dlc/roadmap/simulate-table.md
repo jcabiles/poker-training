@@ -630,7 +630,9 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       intact; no signature-dim change. **⚠️ Interview at /ai-dlc:** the action-vs-sizing verdict
       data model (blended row vs two verdict columns vs two rows) — decide before touching schema.
 
-- [ ] **N4 — Postflop sizing grades: bet / raise / re-raise, up to the 3-bet cap.** ICE 8·6·4.
+- [ ] **N4 — Postflop sizing grades: bet / raise / re-raise, up to the 3-bet cap.** ICE 8·6·4. *(SPLIT at /ai-dlc 2026-07-17 → **N4a (barrels)** + **N4b (facing-raises)** — cleanly separable, no shared function bodies. Track as the two sub-slices below.)*
+    - [x] **N4a — Barrel sizing grades (turn/river barrels + flop c-bet consistency).** *(DONE 2026-07-18)* Two-size turn/river barrel offer + a SEPARATE additive `sizing_correctness` on the 3 aggressor bet graders (reuses N3 plumbing — no migration/schema/FE); fixed the `_barrel_spot` 0.33/0.75 bug → RES-B pairs (turn 0.5/0.75, river 0.5/1.0) via `POSTFLOP_BET_FRACS` + street-aware canonical-bet gate (refuter HIGH — a new turn size would've orphaned the river mapper). 617 tests, pins byte-unchanged, refuter+design-review PASS. Spec: `specs/n4a-barrel-sizing-grades.md`.
+    - [ ] **N4b — Facing-raise sizing grades (vs-cbet / vs-check-raise / vs-turn-bet / vs-river-bet).** The hard half: generalize `_match` for the 4 facing graders + two NEW flop VS_CBET/VS_CHECK_RAISE mappers + reconcile the 3 competing raise-size formulas (RES-B 2.5×/3× facing, 2.5×/3.5× check-raise). Follows N4a.
       *(Supersedes R3b postflop half. Consumes RES-B/RES-C. Contract map: this session's R3b scan.
       May split at /ai-dlc — barrels vs facing-raises.)*
       **Problem:** postflop sizing is graded only on the flop c-bet (R3); barrels, check-raises,
