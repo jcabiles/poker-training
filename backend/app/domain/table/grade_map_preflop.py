@@ -45,6 +45,17 @@ from app.domain.table.grade_map_common import _BLIND_POSITIONS, _EPS, _street_ac
 # shift materially. Grading a standard 3bb open against the canonical (2.5) entry
 # stays within the ≈-approximate EV labels (same W1 rationale as the 2.0 relax).
 _STD_OPEN_CAP = max(_OPEN_SIZE.values())  # 3.0bb universal standard open
+# Coverage widen (2026-07-19): FACING a villain open, accept up to the largest
+# persona open (maniac 4.5bb) so station (3.5) / fish (4.0) / maniac (4.5) opens
+# map to the standard defense chart instead of showing "no baseline yet" — half
+# the persona pool opens above 3.0, which was leaving most facing-a-raise spots
+# ungradeable in live play. The chart lookup keys on node/position, never bet
+# size, so this reuses the same defense entry; the EV stays ≈-approximate, and
+# the approximation is wider vs an oversize (defense really does tighten) — an
+# accepted tradeoff for coverage. Opens ABOVE 4.5 (jams, off-the-charts sizes)
+# still return None. Applies ONLY to the facing-open gate — the hero's own open
+# in a 3-bet/4-bet pot stays capped at the standard _STD_OPEN_CAP.
+_OVERSIZE_OPEN_CAP = 4.5
 _THREEBET_MULT_CAP = 3.5  # standard 3-bet = 3.5x the open
 _FOURBET_MULT_CAP = 2.4  # standard 4-bet = 2.4x the 3-bet
 
@@ -106,15 +117,15 @@ def _map_vs_open(
     hero = state.seats[hero_seat]
     opener_pos = raises[0].position
     canonical_open = _OPEN_SIZE.get(opener_pos)
-    # Open-size band [min-raise 2.0 .. standard 3.0] (R2): bots now open at the
-    # persona open_bb (tag/nit/lag 3.0), so the cap rises from the per-seat
-    # canonical (2.5/3.0) to the universal 3bb standard. Grading a 3bb open
-    # against the canonical entry is no more approximate than the ≈ EV labels
-    # (registry keys by node/position, never bet size). Oversized persona opens
-    # (station 3.5 / fish 4.0 / maniac 4.5) still return None — defense ranges
-    # tighten materially vs oversizes.
+    # Open-size band [min-raise 2.0 .. _OVERSIZE_OPEN_CAP 4.5]: bots open at the
+    # persona open_bb, and half the pool opens above the 3.0 standard (station
+    # 3.5 / fish 4.0 / maniac 4.5). Those now map to the standard defense entry
+    # instead of "no baseline yet" — the registry keys by node/position, never
+    # bet size, so the same chart is reused; EV stays ≈-approximate (wider vs an
+    # oversize, an accepted coverage tradeoff — 2026-07-19). Opens above 4.5
+    # (jams, off-the-charts) still return None.
     if canonical_open is None or not (
-        2.0 - _EPS <= state.current_bet_bb <= _STD_OPEN_CAP + _EPS
+        2.0 - _EPS <= state.current_bet_bb <= _OVERSIZE_OPEN_CAP + _EPS
     ):
         return None
     ctx = (

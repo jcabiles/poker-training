@@ -432,10 +432,22 @@ def test_min_raise_open_maps_within_band():
     assert spot.facing is Position.CO
 
 
-def test_oversize_open_returns_none():
-    # Larger-than-canonical opens stay out — defense ranges tighten
-    # materially vs oversizes (band is [2.0..canonical], not open-ended).
-    state = _facing_open(Position.BTN, Position.CO, 4.0)
+@pytest.mark.parametrize("open_size", [3.5, 4.0, 4.5])
+def test_persona_oversize_opens_now_map(open_size):
+    # Coverage widen (2026-07-19): station 3.5 / fish 4.0 / maniac 4.5 opens now
+    # map to the standard defense chart (band [2.0..4.5]) so facing a raise from
+    # half the persona pool is no longer "no baseline yet".
+    state = _facing_open(Position.BTN, Position.CO, open_size)
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert NodeContext.VS_RFI in spot.node_context
+    assert spot.facing is Position.CO
+
+
+def test_open_above_oversize_cap_returns_none():
+    # Above the largest persona open (4.5) stays out — a 5.0bb+ jam-adjacent open
+    # is off every defense chart.
+    state = _facing_open(Position.BTN, Position.CO, 5.0)
     assert map_decision_point(state, HERO_SEAT) is None
 
 
@@ -581,9 +593,9 @@ def test_graded_decision_writes_sim_decision_and_tagged_attempt(db):
 
 
 def test_unmappable_decision_writes_no_baseline_row_and_no_attempt(db):
-    # Off-size (oversize 4.0bb) open: unmappable ⇒ SimDecision only, no
-    # attempt. (Min-raise opens map since the W1 band relaxation.)
-    session_id = _persist_hand(db, _facing_open(Position.BTN, Position.CO, 4.0))
+    # Off-size open above the persona-open cap (5.0bb): unmappable ⇒ SimDecision
+    # only, no attempt. (Opens up to 4.5 now map since the coverage widen.)
+    session_id = _persist_hand(db, _facing_open(Position.BTN, Position.CO, 5.0))
     view = asyncio.run(
         apply_hero_action(db, session_id, Decision(action=ActionType.FOLD))
     )
@@ -732,5 +744,5 @@ def test_realistic_bot_open_maps_to_vs_rfi():
     assert spot is not None
     assert NodeContext.VS_RFI in spot.node_context
     assert spot.facing is Position.CO
-    # a genuine oversize (fish/maniac territory) still returns None
-    assert map_decision_point(_facing_open(Position.BTN, Position.CO, 4.0), HERO_SEAT) is None
+    # above the persona-open cap (4.5) still returns None
+    assert map_decision_point(_facing_open(Position.BTN, Position.CO, 5.0), HERO_SEAT) is None

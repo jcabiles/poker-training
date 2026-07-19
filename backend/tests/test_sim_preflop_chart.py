@@ -227,8 +227,9 @@ def test_postflop_is_unavailable(db):
 
 
 def test_unmappable_preflop_spot_is_unavailable(db):
-    # Oversize open (4bb > canonical CO 2.5): hero's preflop turn, unmappable.
-    state = _facing_open(Position.BTN, Position.CO, 4.0)
+    # Open above the persona-open cap (5bb): hero's preflop turn, unmappable.
+    # (Opens up to 4.5 now map since the coverage widen — 2026-07-19.)
+    state = _facing_open(Position.BTN, Position.CO, 5.0)
     session_id = _persist(db, state)
     assert preflop_chart(db, session_id).available is False
 
