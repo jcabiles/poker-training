@@ -569,6 +569,32 @@ export default function SimulateView() {
   // click, not the bot playback, so it may show immediately.
   const revealHandEnd = !playing;
 
+  // Enter deals the next hand once the hand has settled — the topbar button can
+  // sit above the fold, but Enter saves the reach entirely. Skipped when focus
+  // is on an interactive control so we never hijack an Enter meant for another
+  // button (Watch, reveal, etc.); busyRef is the same sync guard run() uses, so
+  // a stray double-fire (global handler + a focused button's own Enter) can't
+  // deal twice.
+  useEffect(() => {
+    if (!hand?.hand_over || !revealHandEnd) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          'button, a, input, textarea, select, [role="button"], [contenteditable="true"]',
+        )
+      ) {
+        return;
+      }
+      if (busyRef.current) return;
+      e.preventDefault();
+      nextHand();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hand?.hand_over, revealHandEnd, nextHand]);
+
   // ── R1 reveal-after-fold ────────────────────────────────────────────────────
   // Did the hero fold this hand? Only then are the villains withheld (face-down)
   // and the reveal buttons meaningful; a hero-in showdown auto-reveals instead.
@@ -682,6 +708,20 @@ export default function SimulateView() {
         <h1 className="sim-heading">Simulate</h1>
         {view && (
           <div className="sim-topbar-controls">
+            {/* Primary next-step lives here, first in the cluster and above the
+                fold — the old home in SimShowdown sat below the tall felt and
+                needed a scroll every hand. Present only once the hand has
+                settled (same gate the result panel uses); Enter deals too. */}
+            {hand?.hand_over && revealHandEnd && (
+              <button
+                type="button"
+                className="btn btn-primary sim-next-btn"
+                onClick={nextHand}
+                disabled={busy}
+              >
+                {busy ? "Dealing…" : "Next hand →"}
+              </button>
+            )}
             <SimWatchToggle watch={watch} onChange={changeWatch} />
             <SimGradingToggle coachMode={coachMode} onChange={changeCoachMode} />
             <SimSpeedPicker speed={speed} onChange={changeSpeed} />
@@ -779,8 +819,6 @@ export default function SimulateView() {
                 <SimShowdown
                   showdown={hand.showdown}
                   seats={hand.seats}
-                  onNextHand={nextHand}
-                  dealing={busy}
                   heroFolded={heroFolded}
                   revealScope={revealScope}
                   onReveal={onReveal}

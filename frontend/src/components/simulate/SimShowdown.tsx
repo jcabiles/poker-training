@@ -3,8 +3,10 @@ import { fmtBb } from "./simGrade";
 import Card from "../Card";
 
 // Simulate S9 hand-over recap — the settlement slip. Lists the seats that
-// reached showdown with their revealed cards and this-hand chip delta, plus the
-// "Deal next hand" control. Folded villains are never in `showdown`, so no
+// reached showdown with their revealed cards and this-hand chip delta. Dealing
+// the next hand now lives on the topbar "Next hand →" control (SimulateView),
+// which sits above the fold; this panel no longer carries its own deal button.
+// Folded villains are never in `showdown`, so no
 // hidden hole cards leak here. When the hand ends without a showdown (everyone
 // folded to one seat), `showdown` is empty and we show the fold-out line
 // instead. Position labels come from the seat roster.
@@ -23,16 +25,12 @@ function fmtDelta(delta: number): string {
 export default function SimShowdown({
   showdown,
   seats,
-  onNextHand,
-  dealing,
   heroFolded,
   revealScope,
   onReveal,
 }: {
   showdown: ShowdownSeatView[];
   seats: SeatView[];
-  onNextHand: () => void;
-  dealing: boolean;
   // R1: true only when the hero folded this hand — the sole case where villains
   // stayed face-down and there is anything to reveal. Otherwise the buttons are
   // hidden (a genuine showdown already auto-revealed).
@@ -92,14 +90,6 @@ export default function SimShowdown({
           ))}
         </div>
       )}
-      <button
-        type="button"
-        className="btn btn-primary sim-deal-btn"
-        onClick={onNextHand}
-        disabled={dealing}
-      >
-        {dealing ? "Dealing…" : "Deal next hand"}
-      </button>
     </section>
   );
 }

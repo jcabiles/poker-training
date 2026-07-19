@@ -2630,6 +2630,16 @@ kbd {
   color: var(--text);
   border-color: var(--primary);
 }
+/* Topbar "Next hand" — the primary next-step, first in the control cluster and
+   above the fold (its old home in SimShowdown sat below the tall felt). Sized to
+   the ≥32px control row so it sits level with the leave/speed controls. */
+.sim-next-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-8);
+  font-size: var(--text-md);
+  padding: var(--space-1) var(--space-4);
+}
 
 /* Layout: the table + its console on the left, the call sheet + rail sheet on
    the right — a two-column reading like a felt and its side table. Collapses to
@@ -2998,16 +3008,12 @@ kbd {
   color: var(--muted);
   font-style: italic;
 }
-.sim-deal-btn {
-  width: 100%;
-}
-/* R1 reveal-after-fold: the two "reveal villain hands" buttons, sat above the
-   deal control on a hero-folded hand. Two equal-share ghost buttons; the active
-   scope reads as pressed (gilded) so the hero knows which set is on the felt. */
+/* R1 reveal-after-fold: the two "reveal villain hands" buttons on a hero-folded
+   hand. Two equal-share ghost buttons; the active scope reads as pressed
+   (gilded) so the hero knows which set is on the felt. */
 .sim-reveal-actions {
   display: flex;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
 }
 .sim-reveal-btn {
   flex: 1 1 0;
