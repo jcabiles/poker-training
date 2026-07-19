@@ -25,13 +25,16 @@ import StudyTestToggle, { type StudyTestMode } from "./components/StudyTestToggl
 import { legalDecisions } from "./lib/decisions";
 import { formatHash, parseHash, type View } from "./lib/hashRoute";
 
+// N7: Simulate is the app home (first + default view); the old curriculum hub
+// stays reachable, relabeled "Learn". Nav order leads with the play surface,
+// then the dashboard that measures it, then Practice + quizzes + Learn.
 const VIEWS: { id: View; label: string }[] = [
-  { id: "home", label: "Home" },
+  { id: "simulate", label: "Simulate" },
+  { id: "dashboard", label: "Dashboard" },
   { id: "drill", label: "Practice" },
   { id: "texture", label: "Texture quiz" },
   { id: "equity", label: "Equity quiz" },
-  { id: "simulate", label: "Simulate" },
-  { id: "dashboard", label: "Dashboard" },
+  { id: "home", label: "Learn" },
 ];
 
 // Spot-selection strategy: which spot to serve next, within the current mode.

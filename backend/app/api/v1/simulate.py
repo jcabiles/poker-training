@@ -7,6 +7,8 @@ POST /simulate/session/{id}/action   -> hero acts; bots advance to the next
 POST /simulate/session/{id}/hand     -> deal the next hand (carry-over stacks).
 POST /simulate/session/{id}/leave    -> end the session (no longer restorable).
 GET  /simulate/report/streets        -> all-time per-street grading report (S10).
+GET  /simulate/report/leaks          -> worst-first Simulate spot families by
+                                         Good-Decision-Rate (N7); links to Practice.
 GET  /simulate/{id}/preflop-chart    -> baseline range chart for the hero's
                                          current preflop decision (chart slice C1).
 GET  /simulate/{id}/postflop-chart   -> the grader's action mix for the hero's
@@ -34,6 +36,7 @@ from app.domain.action import Decision
 from app.schemas.simulate import (
     CoachExplainRequest,
     CoachExplainView,
+    LeakReportView,
     PostflopChartView,
     PreflopChartView,
     RevealView,
@@ -93,6 +96,14 @@ async def leave(session_id: str, db: Session = Depends(get_session)) -> None:
 @router.get("/report/streets", response_model=StreetReportView)
 async def street_report(db: Session = Depends(get_session)) -> StreetReportView:
     return sim_session.street_report(db, owner_id=_OWNER_ID)
+
+
+@router.get("/report/leaks", response_model=LeakReportView)
+async def leak_report(db: Session = Depends(get_session)) -> LeakReportView:
+    # N7: worst-first Simulate spot families (Good-Decision-Rate). All-time,
+    # session-independent (like /report/streets). Reads sim_decision only —
+    # Practice reps never enter these numbers (Simulate-only metric lock).
+    return sim_session.leak_by_spot(db, owner_id=_OWNER_ID)
 
 
 @router.get("/{session_id}/preflop-chart", response_model=PreflopChartView)

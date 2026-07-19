@@ -1,9 +1,10 @@
 // N6: minimal hash routing — `#/<view>` plus an optional drill-mode segment
 // `#/drill/<mode>`. The hash IS the persistence (deep-link + reload restore).
-// N7: invalid or empty hashes fall back to `home` (the new default view); a
-// recognized `drill` view with a bogus/missing mode segment still falls back
-// to drill/random, unchanged from N6 — only the unrecognized-VIEW fallback
-// moved from "drill" to "home".
+// N7 (IA restructure): invalid or empty hashes fall back to `simulate` — the
+// app's home surface now that grading + the dashboard have landed. A recognized
+// `drill` view with a bogus/missing mode segment still falls back to drill/random.
+// (The prior curriculum hub is still the `home` view, reachable + relabeled
+// "Learn" in the nav — only the unrecognized-VIEW fallback moved to "simulate".)
 import type { Mode } from "../api/types";
 
 export type View = "home" | "drill" | "texture" | "equity" | "simulate" | "dashboard";
@@ -33,7 +34,7 @@ export interface Route {
 
 export function parseHash(hash: string): Route {
   const [rawView, rawMode] = hash.replace(/^#\/?/, "").split("/");
-  const view = VIEW_IDS.find((v) => v === rawView) ?? "home";
+  const view = VIEW_IDS.find((v) => v === rawView) ?? "simulate";
   const mode = (view === "drill" && MODE_IDS.find((m) => m === rawMode)) || "random";
   return { view, mode };
 }

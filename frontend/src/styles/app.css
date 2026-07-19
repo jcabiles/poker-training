@@ -4289,6 +4289,90 @@ kbd {
   color: var(--muted);
 }
 
+/* ── N7 leaks: worst spot families, each a doorway into Practice ─────────────*/
+.dash-leaks {
+  margin-top: var(--space-6);
+}
+.dash-leak-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.dash-leak {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.dash-leak-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.dash-leak-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-leak-street {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+.dash-leak-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+}
+.dash-leak-rate {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+.dash-leak-count {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.dash-leak-drill {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--primary) 70%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dash-leak-drill:hover {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+.dash-leak-drill:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.dash-leak-only {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* ── Empty state — honest, with a next action ───────────────────────────────*/
 .dash-empty {
   border: 1px dashed var(--border);
@@ -4380,6 +4464,21 @@ kbd {
      recap's full width instead of a ~28ch column (design-review med). */
   .sim-recap-coach {
     margin-left: 0;
+  }
+  /* Leak rows stack at mobile so the drill action lands in the SAME place on
+     every row (design-review low) and reaches a comfortable 44px touch target. */
+  .dash-leak {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-leak-stats {
+    align-items: flex-start;
+  }
+  .dash-leak-drill {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 

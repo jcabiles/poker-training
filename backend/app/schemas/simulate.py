@@ -112,6 +112,31 @@ class StreetReportView(BaseModel):
     total_decisions: int  # graded + no_baseline across all streets
 
 
+class LeakSpotRow(BaseModel):
+    """One ranked leak: a Simulate spot family (node_context x position) the hero
+    plays below their overall Good-Decision-Rate (N7). Over GRADED rows only.
+    drill_mode is the Practice mode that trains it, or None ('Simulate only' —
+    turn/river barrels have no Practice drill)."""
+
+    node_context: str
+    position: str
+    street: str
+    node_label: str  # display, e.g. "BB · facing a c-bet"
+    graded: int
+    good: int  # optimal + acceptable
+    good_rate: float  # good / graded, 0-1
+    ev_loss_bb: float  # ≈ sum over the group's graded rows
+    drill_mode: str | None  # a Practice #/drill/<mode>, or None if not drillable
+
+
+class LeakReportView(BaseModel):
+    """Worst-first ranked leaks over all Simulate sessions (N7). Empty when no
+    spot family has >= min_sample graded decisions yet."""
+
+    rows: list[LeakSpotRow]  # worst-first, capped
+    min_sample: int  # groups below this are omitted (surface as an empty state)
+
+
 class SimulateHandView(BaseModel):
     hand_no: int
     button_seat: int

@@ -5,6 +5,7 @@ import type {
   CoachExplainView,
   Decision,
   EvaluationResult,
+  LeakReportView,
   LeakStat,
   Mode,
   NextDrillResponse,
@@ -159,6 +160,13 @@ export async function explainDecision(
 // when a hand completes. Always returns all four street rows.
 export async function getStreetReport(): Promise<StreetReportView> {
   return json(await fetch(`${BASE}/simulate/report/streets`));
+}
+
+// N7 — worst-first Simulate spot families (Good-Decision-Rate), all-time and
+// session-independent. Reads sim_decision only (Practice reps never counted).
+// Empty `rows` is a normal 200 (no family past min_sample yet).
+export async function getLeakReport(): Promise<LeakReportView> {
+  return json(await fetch(`${BASE}/simulate/report/leaks`));
 }
 
 // Preflop chart (C1/C2) — the baseline range chart for the hero's CURRENT

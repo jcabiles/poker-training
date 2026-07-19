@@ -87,6 +87,8 @@ from app.schemas.simulate import (
     EventView,
     ExploitNoteView,
     GradeView,
+    LeakReportView,
+    LeakSpotRow,
     PostflopChartAction,
     PostflopChartView,
     PreflopChartView,
@@ -855,6 +857,111 @@ def street_report(db: Session, owner_id: str = "") -> StreetReportView:
     return StreetReportView(
         rows=[StreetReportRow(street=s, **by_street[s]) for s in _STREET_ORDER],
         total_decisions=sum(a["graded"] + a["no_baseline"] for a in by_street.values()),
+    )
+
+
+# N7 — leak-by-spot ranking. node_context -> the Practice drill mode that trains
+# it (None = no Practice drill exists for that node, e.g. turn/river barrels —
+# shown "Simulate only", never routed to a bogus mode). Every non-None value is a
+# real dispatchable mode (drill.py::next_drill + FE Mode union — refuter-verified).
+_NODE_TO_DRILL_MODE: dict[str, str] = {
+    "rfi": "rfi",
+    "vs_rfi": "vs_rfi",
+    "vs_3bet": "vs_3bet",
+    "blind_defense": "blind_defense",
+    "vs_limpers": "vs_limpers",
+    "cbet": "postflop",
+    "vs_cbet": "vs_cbet",
+    "vs_check_raise": "vs_check_raise",
+}
+
+# Self-contained leak labels (node_context string -> phrase). Deliberately NOT
+# the Spot-based _node_label/_postflop_node_label helpers — those need a full Spot
+# and split by street (spec-refuter low-2); leak_by_spot has only the stored
+# string dims, so it composes its own label here.
+_LEAK_NODE_PHRASE: dict[str, str] = {
+    "rfi": "opening",
+    "vs_rfi": "facing an open",
+    "vs_3bet": "facing a 3-bet",
+    "blind_defense": "blind defense",
+    "vs_limpers": "facing limpers",
+    "cbet": "c-bet",
+    "vs_cbet": "facing a c-bet",
+    "vs_check_raise": "facing a check-raise",
+    "turn_barrel": "turn barrel",
+    "vs_turn_bet": "facing a turn bet",
+    "river_barrel": "river barrel",
+    "vs_river_bet": "facing a river bet",
+}
+
+_LEAK_MIN_SAMPLE = 5
+_LEAK_TOP_N = 6
+
+
+def _leak_node_label(node_context: str, position: str) -> str:
+    phrase = _LEAK_NODE_PHRASE.get(node_context, node_context)
+    return f"{position} · {phrase}"
+
+
+def leak_by_spot(
+    db: Session, owner_id: str = "", min_sample: int = _LEAK_MIN_SAMPLE
+) -> LeakReportView:
+    """N7 — rank the hero's worst Simulate spot families by Good-Decision-Rate.
+
+    Over GRADED sim_decision rows only (correctness not None); unmappable /
+    'no baseline yet' rows are coverage gaps, not leaks, and are excluded. Groups
+    by (node_context, position). Keeps groups with graded >= min_sample; ranks
+    worst-first by good_rate asc, then ev_loss_bb desc, then (node_context,
+    position) asc for a deterministic tertiary tiebreak (spec-refuter low-3);
+    caps at _LEAK_TOP_N. drill_mode is the Practice mode for the node, or None.
+
+    Reads SimDecision ONLY — never DrillAttempt — so Practice reps never enter
+    these numbers (the Simulate-only metric lock, N7 decision B)."""
+    rows = db.exec(
+        select(SimDecision)
+        .where(SimDecision.owner_id == owner_id)
+        .where(SimDecision.correctness.is_not(None))
+    ).all()
+    groups: dict[tuple[str, str], dict] = {}
+    for r in rows:
+        # Defensive: a graded row should always carry node_context + position
+        # (graded ⇒ mapped Spot), but a future mapper could grade with an empty
+        # node_context; skip rather than form a null-keyed group (refuter low-1).
+        if r.node_context is None or r.position is None:
+            continue
+        key = (r.node_context, r.position)
+        agg = groups.setdefault(
+            key, {"graded": 0, "good": 0, "ev_loss_bb": 0.0, "street": r.street}
+        )
+        agg["graded"] += 1
+        if r.correctness in ("optimal", "acceptable"):
+            agg["good"] += 1
+        agg["ev_loss_bb"] = round(agg["ev_loss_bb"] + r.ev_loss_bb, 2)
+
+    ranked = [
+        (node, pos, agg)
+        for (node, pos), agg in groups.items()
+        if agg["graded"] >= min_sample
+    ]
+    ranked.sort(
+        key=lambda t: (t[2]["good"] / t[2]["graded"], -t[2]["ev_loss_bb"], t[0], t[1])
+    )
+    return LeakReportView(
+        rows=[
+            LeakSpotRow(
+                node_context=node,
+                position=pos,
+                street=agg["street"],
+                node_label=_leak_node_label(node, pos),
+                graded=agg["graded"],
+                good=agg["good"],
+                good_rate=round(agg["good"] / agg["graded"], 4),
+                ev_loss_bb=round(agg["ev_loss_bb"], 2),
+                drill_mode=_NODE_TO_DRILL_MODE.get(node),
+            )
+            for node, pos, agg in ranked[:_LEAK_TOP_N]
+        ],
+        min_sample=min_sample,
     )
 
 

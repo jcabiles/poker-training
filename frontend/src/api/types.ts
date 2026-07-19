@@ -304,6 +304,26 @@ export interface StreetReportView {
   total_decisions: number; // graded + no_baseline across all streets
 }
 
+// N7 — one ranked leak: a Simulate spot family (node_context × position) the
+// hero plays below par. Over GRADED rows only. drill_mode is the Practice
+// #/drill/<mode> that trains it, or null ("Simulate only" — no Practice drill).
+export interface LeakSpotRow {
+  node_context: string;
+  position: string;
+  street: string;
+  node_label: string; // e.g. "BB · facing a c-bet"
+  graded: number;
+  good: number; // optimal + acceptable
+  good_rate: number; // good / graded, 0-1
+  ev_loss_bb: number; // ≈ sum over the group
+  drill_mode: string | null; // a Mode to route to, or null if not drillable
+}
+
+export interface LeakReportView {
+  rows: LeakSpotRow[]; // worst-first, capped
+  min_sample: number; // groups below this omitted → empty state
+}
+
 export interface SimulateHandView {
   hand_no: number; // 1-based, increments per hand
   button_seat: number; // seat index holding the dealer button

@@ -699,12 +699,22 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   cross-session PIDs) — fixes verified in source + build + hand-computed contrast; browser re-review
   offered on request. No `spot_signature()`/grader/pin/`TAXONOMY_VERSION` change.
 
-- **N7 — IA restructure: Simulate as home + Practice organized around leaks.** *Sequence: after N1–N5.*
-  Problem (P5): the app is grader-first, not Simulate-first; Practice isn't organized around the
-  user's actual leaks. Direction: Simulate becomes the default/home view; Practice reframes around the
-  dashboard's low-rate spots. **⚠️ Interview:** resolve the standing TBD — do Practice reps count
-  toward the cumulative Good-Decision/Optimal-Play totals, or stay Simulate-only? → graduates to
-  `## NEXT` (canonical).
+- [x] **N7 — IA restructure: Simulate as home + Practice organized around leaks.** *(DONE 2026-07-18
+  — spec `specs/n7-simulate-home-leak-practice.md`. Interview: Practice reps stay **OUT** of the
+  cumulative totals — Simulate-only, resolving the standing TBD.)* Shipped: (A) Simulate is the
+  default/first view (hashRoute fallback home→simulate; VIEWS reorder; old hub relabeled "Learn",
+  still reachable — all `view==="home"` guards key on the unchanged id, no ripple). (B) Metric-only-
+  Simulate **lock** — `street_report`/`leak_by_spot` read `SimDecision` only; a regression test proves
+  a `source='simulate'` `DrillAttempt` moves neither report. (C) `leak_by_spot` read-model (groups
+  graded rows by node_context×position, worst-first by Good-rate, min_sample 5 / top 6, null-node
+  defensive skip) + `GET /simulate/report/leaks` + a Dashboard **"Your leaks"** panel: each family
+  links into the matching Practice drill mode (`_NODE_TO_DRILL_MODE`, all 8 real modes) or shows
+  "Simulate only" (turn/river barrels have no Practice drill). **No migration** (reuses N5 dims);
+  no `spot_signature()`/grader/pin/`TAXONOMY_VERSION` change. 688 tests + verify.sh + FE typecheck/
+  build green. Spec-refuter PASS (3 low folded), refuter-on-diff PASS (0 issues). Design-review on a
+  fresh :5174 server (orphaned :5173 stale-server worked around). **v1 interpretation:** Practice's
+  own drill selection is not rewired — the dashboard leak links carry the "organized around leaks"
+  intent (lower risk).
 
 - **L1 — Persona-aware metrics + per-player-type ranges.** *Much later. Absorbs the pre-existing
   "Exploit-aware grading layer" NEXT item.* Problem (P6): baseline grading is blind to opponent type
