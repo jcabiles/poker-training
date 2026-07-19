@@ -132,6 +132,12 @@ def range_advantage(
     barreler's story, draw-completing rivers favor the two-time caller. Same
     (positions, texture) can therefore label differently street to street.
     `texture` is the FLOP texture in all branches.
+
+    HU-SHAPED (N5 annotation): a range-vs-range read against ONE villain. On a
+    multiway spot the true opposition is the UNION of ranges — someone-has-it
+    probability is higher — so this read is HU-optimistic 3-way;
+    `_apply_multiway`'s value-lean/catch-tighten is the deliberate downstream
+    correction, not a substitute for a real multiway range model.
     """
     if node_context in _RIVER_CTX:
         score = 0.0  # two called bets: the aggressor's edge has decayed past the turn's 0.5
@@ -208,7 +214,12 @@ def range_advantage(
 def _villain_pos(spot: Spot) -> Position:
     """The live opponent's position: prefer `spot.facing` (always set by the
     builders), else the first non-hero player still IN the hand — never a
-    FOLDED seat, so enriched 9-seat player lists can't mis-pick the villain."""
+    FOLDED seat, so enriched 9-seat player lists can't mis-pick the villain.
+
+    HU-SHAPED (N5 annotation): collapses the opposition to ONE seat. On a
+    multiway spot this is the AGGRESSOR only — the extra callers' ranges are
+    invisible here by design, and `_apply_multiway`'s dampens are the
+    deliberate downstream correction. Don't mistake this for multiway-aware."""
     if spot.facing is not None:
         return spot.facing
     for p in spot.players:
@@ -308,6 +319,11 @@ def _cbet_fold_equity_value(
     to the merit-unit scale so it composes with the wetness/position bumps in
     `_merits()` below. Returns None (falls back to `_CAT_VALUE`) if the pot or
     villain range makes the formula undefined.
+
+    HU-SHAPED (N5 annotation): single villain range, single fold%. Multiway,
+    total fold equity COMPOUNDS multiplicatively across defenders (P1×P2×…) —
+    strictly lower — so this OVERESTIMATES bluff EV 3-way. `_apply_multiway`'s
+    bluff dampen is the deliberate downstream correction; keep both in sync.
     """
     pot = spot.pot_bb
     if not pot or pot <= 0:
@@ -390,6 +406,11 @@ def _merits(
 _MW_BLUFF_DAMPEN = 0.6  # in (0,1): scales DOWN aggressive merit for bluff candidates
 _MW_VALUE_LEAN = 1.15  # >= 1.0: scales UP value-category aggressive merit
 _MW_CATCH_TIGHTEN = 1.3  # >= 1.0: scales UP fold merit for the air bluff-catch
+# N5: thin-value dampen — "thin value disappears multiway" is the most-cited
+# published multiway result (equity dilution: one-pair value bets that print
+# HU become checks 3-way). Sits between the bluff dampen (0.6) and neutral:
+# weak_made keeps SOME betting merit but stops betting thin by default.
+_MW_THIN_VALUE_DAMPEN = 0.7
 
 
 def _apply_multiway(merits: dict, *, cat_effective: str, facing_side: bool) -> dict:
@@ -419,6 +440,12 @@ def _apply_multiway(merits: dict, *, cat_effective: str, facing_side: bool) -> d
         for k in ("small", "big"):
             if out[k] > 0:
                 out[k] = out[k] * _MW_BLUFF_DAMPEN
+    elif cat_effective == "weak_made":
+        # N5: thin value stops betting multiway (research: value thresholds
+        # rise as equity dilutes — marginal made hands check, they don't bet).
+        for k in ("small", "big"):
+            if out[k] > 0:
+                out[k] = out[k] * _MW_THIN_VALUE_DAMPEN
     elif cat_effective == "strong":
         for k in ("small", "big"):
             if out[k] > 0:

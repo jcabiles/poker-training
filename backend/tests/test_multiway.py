@@ -313,3 +313,31 @@ def test_make_cbet_spot_factory_still_heads_up_by_default():
     spot = make_cbet_spot()
     assert spot.street == Street.FLOP
     assert sum(1 for p in spot.players if p.status.value == "in") == 2
+
+
+# --- N5: thin-value dampen (weak_made stops betting thin multiway) ---
+
+
+def test_apply_multiway_weak_made_thin_value_dampen_unit():
+    from app.domain.postflop import _MW_THIN_VALUE_DAMPEN, _apply_multiway
+
+    merits = {"check": 1.0, "small": 2.0, "big": -0.5}
+    out = _apply_multiway(merits, cat_effective="weak_made", facing_side=False)
+    assert out["small"] == 2.0 * _MW_THIN_VALUE_DAMPEN
+    assert out["big"] == -0.5  # negatives never scaled (would perversely rise)
+    assert out["check"] == 1.0  # only the aggressive keys dampen
+
+
+def test_cbet_multiway_weak_made_bet_freq_strictly_lower():
+    # Research: thin value disappears multiway — a marginal made hand's bet
+    # frequency must drop 3-way vs the identical HU spot (was previously
+    # untouched: only air/draw dampened, strong leaned).
+    _require_multiway_seams("build_cbet_spot")
+    from app.domain.postflop import _hand_category, grade_cbet
+
+    weak_made_hole = ("Qs", "7d")  # pair of sevens on the seed-3 Ts 4c 7s board
+    hu, mw = _hu_and_mw("build_cbet_spot", seed=3, hole=weak_made_hole)
+    assert _hand_category(weak_made_hole, hu.board) == "weak_made"
+    hu_res = grade_cbet(hu, hu.hero_range, hu.villain_range, None)
+    mw_res = grade_cbet(mw, mw.hero_range, mw.villain_range, None)
+    assert _bet_or_raise_freq(mw_res) < _bet_or_raise_freq(hu_res)

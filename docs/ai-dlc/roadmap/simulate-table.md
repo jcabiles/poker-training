@@ -650,8 +650,8 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       large epic (split candidate). **No-gos:** no solver EVs; no sizing past the cap; multiway stays
       "no baseline yet" if unmapped; never silently HU-grade multiway.
 
-- [ ] **N5 — Grade every action: close the high-frequency "no baseline yet" gaps (within the cap).** ICE 7·6·4.
-      **Problem:** the vision is a rating at *each* action/street, but many live spots still show
+- [x] **N5 — Grade every action: close the high-frequency "no baseline yet" gaps (within the cap).** ICE 7·6·4. *(DONE 2026-07-18 — spec `specs/n5-coverage-expansion.md`.)* Shipped: flop c-bet open gate → the `[2.0,3.0]` band with ACTUAL-open pot math; 9 blind-defense content fills (v2, nesting-tested, SB stays 3-bet-or-fold); `sim_decision` spot dims (migration 0012, position-always/unmappable-nulls); `_MW_THIN_VALUE_DAMPEN=0.7` + HU-shaped-input annotations; **3-way multiway BB-defense mappers** (hero=BB closes — engine sim disproved the cold-caller-closes plan; caller entry gate-only; caller-folded degrades to 2-live; dormant "mw" signature dim now live, HU hashes byte-identical); fixed-seed coverage baseline (225→228/1220). Refuter-on-diff PASS + 1 MED documented: MW mappers 0 fires in the 400-hand probe (shape ×4, chain variance — watch live; dominant chokes = the deferred persona-mix/open-band levers). 669 tests. Still-None enumerated + pinned: limped MW, donk leads, 4+-way, caller raises, delayed c-bets, non-closing spots.
+      **Problem (original):** the vision is a rating at *each* action/street, but many live spots still show
       "no baseline yet" (RES-C §12 non-spot list) — thinning the north-star denominator + blocking
       N1's by-spot-type drill-down. **Outcome-link:** raises graded-decision coverage (the
       north-star's honest coverage floor) and unlocks the by-spot dashboard cut. **Solution:** close

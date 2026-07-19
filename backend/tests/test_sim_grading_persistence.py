@@ -311,3 +311,61 @@ def test_practice_and_null_source_rows_still_appear_in_all_five_reads(engine):
         today_entry = next(d for d in days if d["date"] == date.today().isoformat())
         assert today_entry["attempts"] == 2
         assert recap(s)["hands"] == 2
+
+
+# --------------------------------------------------------- migration 0012
+
+
+def test_migration_0012_up_down_up_spot_dims(tmp_path):
+    url = f"sqlite:///{tmp_path / 'mig12.db'}"
+    cfg = make_alembic_config(url)
+
+    # Land on 0011 (pre-N5), insert a decision row the old schema's way.
+    command.upgrade(cfg, "0011")
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO sim_session (id, owner_id, button_seat, hand_no, created_at) "
+                "VALUES ('m12', '', 0, 1, '2026-01-01 00:00:00')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO sim_hand (session_id, hand_no, button_seat, rng_seed, "
+                "status, state_json, created_at) "
+                "VALUES ('m12', 1, 0, '1', 'complete', '{}', '2026-01-01 00:00:00')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO sim_decision (owner_id, session_id, sim_hand_id, street, "
+                "ordinal, chosen_action, ev_loss_bb, coverage, created_at) "
+                "VALUES ('', 'm12', 1, 'flop', 0, 'call', 0.0, 'full', '2026-01-01 00:00:00')"
+            )
+        )
+    engine.dispose()
+
+    # Up to head: additive nullable — the pre-existing row reads back NULL dims.
+    command.upgrade(cfg, "head")
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT position, facing_position, players_in_pot, node_context, "
+                "chosen_action FROM sim_decision WHERE session_id='m12'"
+            )
+        ).fetchone()
+        assert row == (None, None, None, None, "call")
+    engine.dispose()
+
+    # Down to 0011 (drops the four dims), back up — clean both ways.
+    command.downgrade(cfg, "0011")
+    engine = create_engine(url, connect_args={"check_same_thread": False})
+    with engine.begin() as conn:
+        cols = {
+            r[1] for r in conn.execute(text("PRAGMA table_info(sim_decision)")).fetchall()
+        }
+        assert "players_in_pot" not in cols and "node_context" not in cols
+    engine.dispose()
+    command.upgrade(cfg, "head")

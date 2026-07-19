@@ -46,6 +46,7 @@ from app.domain.spot import (
     PlayerStatus,
     Spot,
     Street,
+    players_in_pot,
 )
 from app.domain.table.deck import deal_hand
 from app.domain.table.engine import (
@@ -61,6 +62,9 @@ from app.domain.table.grade_map import map_decision_point
 from app.domain.table.grade_map_postflop import (
     map_flop_vs_cbet,
     map_flop_vs_check_raise,
+    map_mw_flop_vs_cbet,
+    map_mw_vs_river_bet,
+    map_mw_vs_turn_bet,
     map_river_barrel,
     map_turn_barrel,
     map_vs_river_bet,
@@ -245,10 +249,25 @@ def _sim_decision_row(
     ordinal: int,
     decision: Decision,
     result: EvaluationResult | None,
+    spot: Spot | None = None,
+    hero_position: str | None = None,
 ) -> SimDecision:
     """The SimDecision row for a hero decision. result=None ⇒ the mapper found
     no canonical Spot ('unmappable'); a NOT_FOUND result ⇒ mapped but off-pack
-    ('not_found'). Both mean "no baseline yet" (correctness None)."""
+    ('not_found'). Both mean "no baseline yet" (correctness None).
+
+    N5 spot dims: `position` (hero's seat) is ALWAYS written — the caller
+    passes it from live state, so it survives unmappable decisions; the
+    spot-derived dims (facing/players_in_pot/node_context) stay None unless
+    a canonical Spot was built."""
+    dims = {
+        "position": hero_position,
+        "facing_position": spot.facing.value if spot is not None and spot.facing else None,
+        "players_in_pot": players_in_pot(spot) if spot is not None else None,
+        "node_context": (
+            spot.node_context[0].value if spot is not None and spot.node_context else None
+        ),
+    }
     if result is None or result.coverage == Coverage.NOT_FOUND:
         return SimDecision(
             owner_id=session.owner_id,
@@ -261,6 +280,7 @@ def _sim_decision_row(
             ev_loss_bb=0.0,
             leak_category=None,
             coverage="unmappable" if result is None else Coverage.NOT_FOUND.value,
+            **dims,
         )
     return SimDecision(
         owner_id=session.owner_id,
@@ -276,6 +296,7 @@ def _sim_decision_row(
         ev_loss_bb=result.ev_loss_bb,
         leak_category=result.leak_category,
         coverage=result.coverage.value,
+        **dims,
     )
 
 
@@ -407,13 +428,17 @@ def _facing_raise_spot(state) -> Spot | None:
     display==grade discipline as `_is_turn_barrel_node` — and doubles as the
     source of the offered sizes (see `_facing_raise_legal_actions`)."""
     if state.street is Street.FLOP:
-        return map_flop_vs_cbet(state, HERO_SEAT) or map_flop_vs_check_raise(
-            state, HERO_SEAT
+        return (
+            map_flop_vs_cbet(state, HERO_SEAT)
+            or map_flop_vs_check_raise(state, HERO_SEAT)
+            or map_mw_flop_vs_cbet(state, HERO_SEAT)
         )
     if state.street is Street.TURN:
-        return map_vs_turn_bet(state, HERO_SEAT)
+        return map_vs_turn_bet(state, HERO_SEAT) or map_mw_vs_turn_bet(state, HERO_SEAT)
     if state.street is Street.RIVER:
-        return map_vs_river_bet(state, HERO_SEAT)
+        return map_vs_river_bet(state, HERO_SEAT) or map_mw_vs_river_bet(
+            state, HERO_SEAT
+        )
     return None
 
 
@@ -731,7 +756,8 @@ async def apply_hero_action(
     if spot is not None:
         result = await _grading_provider().evaluate(spot, decision)
     sim_row = _sim_decision_row(
-        session, hand, state.street.value, len(prior), decision, result
+        session, hand, state.street.value, len(prior), decision, result,
+        spot=spot, hero_position=state.seats[HERO_SEAT].position.value,
     )
     db.add(sim_row)
     graded = result is not None and result.coverage != Coverage.NOT_FOUND

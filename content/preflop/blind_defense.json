@@ -1,8 +1,8 @@
 {
   "id": "preflop-blind-defense",
-  "version": 1,
+  "version": 2,
   "domain": "preflop",
-  "description": "SB/BB facing a single open: defend by 3-bet (value+bluff) / call / fold. BB defends wide vs late opens; SB plays 3-bet-or-fold vs steals.",
+  "description": "SB/BB facing a single open: defend by 3-bet (value+bluff) / call / fold. BB defends wide vs late opens; SB plays 3-bet-or-fold vs steals. v2 (N5): fills the 9 missing opener seats (BB vs UTG1/UTG2/LJ/HJ, SB vs UTG..HJ) by monotonic interpolation between the v1 anchors (RES-A method).",
   "entries": [
     {
       "node_context": "blind_defense",
@@ -27,6 +27,52 @@
       ],
       "sizing_bb": 10.0,
       "rationale": "The CO opens tighter than the BTN, so you shade your BB defense down a notch — a narrower value 3-bet (JJ+/AQs/AK, one wheel bluff) and a flat that drops the weakest connectors — while still calling wide on your ~30% pot odds, because over-folding the BB surrenders blinds you've already partly invested (doc 01 §8)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "HJ",
+      "actions": [
+        { "action": "raise", "combos": "JJ+, AQs, AKs, AKo, A5s", "frequency": 1.0 },
+        { "action": "call", "combos": "22-TT, ATs, AJs, A9s, KTs, KJs, KQs, QTs, QJs, JTs, T9s, 98s, 87s, 76s, AQo, KQo", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "The HJ opens one seat earlier — and thus slightly tighter — than the CO, so BB defense sits one hair inside the CO line: the same JJ+/AQs+/A5s value-and-blocker 3-bet, a flat that keeps the pairs and suited connectors but trims 65s, adding AJo only because the HJ range is still wide enough to dominate less often (N5 interpolation between the v1 UTG and CO anchors, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "LJ",
+      "actions": [
+        { "action": "raise", "combos": "JJ+, AQs, AKs, AKo", "frequency": 1.0 },
+        { "action": "raise", "combos": "A5s", "frequency": 0.5 },
+        { "action": "call", "combos": "22-TT, AJs, ATs, A9s, KTs, KJs, KQs, QTs, QJs, JTs, T9s, 98s, 87s, AQo, KQo", "frequency": 1.0 },
+        { "action": "call", "combos": "A5s", "frequency": 0.5 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "Against the lojack the value 3-bet stays JJ+/AQs+/AK but A5s downgrades to a 50/50 split — the earlier open means the blocker bluff gets called by a stronger range more often. The flat keeps all pairs (set-mining odds hold) and the suited-Broadway core, dropping 76s/65s whose implied odds thin out vs a tighter, uncapped range (N5 interpolation, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "UTG2",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo", "frequency": 1.0 },
+        { "action": "call", "combos": "77-JJ, AQs, AJs, ATs, A9s, A5s, KTs, KJs, KQs, QJs, JTs, T9s, 98s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "UTG+2 is still an early-position open, so the 3-bet stays at the tight QQ+/AK family core — light 3-bets burn money into a range this strong. The flat widens a measured notch over the UTG anchor: 77-88 join for set value, A9s/A5s and KTs/98s add suited playability that flops well multiway (N5 interpolation, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "BB",
+      "facing": "UTG1",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AKs, AKo", "frequency": 1.0 },
+        { "action": "call", "combos": "99-JJ, AQs, AJs, ATs, A5s, KQs, KJs, QJs, JTs, T9s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "One seat off UTG the open is nearly as strong, so BB defense is nearly the UTG anchor: QQ+/AK 3-bet only, and a tight high-equity flat that adds just A5s (wheel-ace playability) and T9s over the UTG line (N5 interpolation, RES-A §4 method)."
     },
     {
       "node_context": "blind_defense",
@@ -58,6 +104,56 @@
       ],
       "sizing_bb": 10.0,
       "rationale": "Same 3-bet-or-fold logic as versus the BTN, tightened because the CO opens a stronger range: you lift the pair threshold to 77+ and the suited-ace floor to ATs, keeping A5s as the lone blocker-bluff — merged rather than polarized so you're never flatting out of position against a range that already dominates you (doc 01 §8)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "HJ",
+      "actions": [
+        { "action": "raise", "combos": "88+, ATs+, KQs, AQo+, A5s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "One seat earlier than the CO, one notch tighter: pair floor lifts to 88, the suited-Broadway tail (KJs/QJs) drops, A5s stays as the lone blocker-bluff. Still strictly 3-bet-or-fold — the SB never flats out of position (N5 interpolation inside the v1 SB anchors, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "LJ",
+      "actions": [
+        { "action": "raise", "combos": "99+, AJs+, KQs, AQo+, A5s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "Versus a lojack open the merged 3-bet tightens again — 99+, AJs+, KQs, AQo+ with the A5s blocker — because the opening range is strong enough that dominated suited aces and mid pairs shift from profitable 3-bets to folds (N5 interpolation, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "UTG2",
+      "actions": [
+        { "action": "raise", "combos": "TT+, AJs+, KQs, AKo, AQo, A5s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "An early-position open pushes the SB toward premiums: TT+ pairs, AJs+/KQs suited, AQo+ offsuit, and the A5s blocker as the only bluff. Anything weaker either folds or is dominated too often to 3-bet into an EP range (N5 interpolation, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "UTG1",
+      "actions": [
+        { "action": "raise", "combos": "TT+, AQs+, AKo, A5s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "One off UTG, the defend narrows to TT+/AQs+/AKo plus the A5s blocker — AJs and AQo shift to folds because UTG+1's range dominates them too frequently to 3-bet out of position (N5 interpolation, RES-A §4 method)."
+    },
+    {
+      "node_context": "blind_defense",
+      "position": "SB",
+      "facing": "UTG",
+      "actions": [
+        { "action": "raise", "combos": "QQ+, AQs, AKs, AKo, A5s", "frequency": 1.0 }
+      ],
+      "sizing_bb": 10.0,
+      "rationale": "Versus the table's strongest range, from the worst seat, the SB defend collapses to premiums-or-fold: QQ+/AQs+/AKo plus the single A5s blocker (~2.6% of hands). This thinness is the honest answer, not a gap — nearly everything is a fold here (N5, corroborated by 3-bet-or-fold doctrine; RES-A §4 method)."
     }
   ]
 }

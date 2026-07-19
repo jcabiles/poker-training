@@ -284,3 +284,89 @@ def test_short_stack_facing_raise_parity():
         la for la in _hero_legal_actions(too_shallow) if la.action is ActionType.RAISE
     ]
     assert len(raises) == 1
+
+
+# ------------------------------------------------- N5: spot-dims persistence
+
+
+def test_spot_dims_persist_on_graded_and_unmappable(db):
+    # Graded decision: all four dims populated from the mapped spot.
+    sid = _persist_hand(db, _vs_cbet_state(), sid="n5-dims")
+    asyncio.run(
+        apply_hero_action(db, sid, Decision(action=ActionType.RAISE, size_bb=4.5))
+    )
+    row = db.exec(select(SimDecision).where(SimDecision.session_id == sid)).all()[-1]
+    assert row.position == "BB"
+    assert row.facing_position == "CO"
+    assert row.players_in_pot == 2
+    assert row.node_context == "vs_cbet"
+
+    # Unmappable decision (too shallow for any raise leg -> mapper None):
+    # position still written from live state, spot-derived dims stay NULL.
+    sid2 = _persist_hand(db, _vs_cbet_state(stacks=6.9), sid="n5-dims-unmap")
+    asyncio.run(apply_hero_action(db, sid2, Decision(action=ActionType.FOLD)))
+    row2 = db.exec(select(SimDecision).where(SimDecision.session_id == sid2)).all()[-1]
+    assert row2.coverage == "unmappable"
+    assert row2.position == "BB"
+    assert row2.facing_position is None
+    assert row2.players_in_pot is None
+    assert row2.node_context is None
+
+
+# ------------------------------------------ N5: 3-way multiway e2e persist
+
+
+def _mw_vs_cbet_state(stacks: float = 100.0, seed: int = 39) -> HandState:
+    """3-way: CO opens, BTN cold-calls, hero (BB) calls; flop: hero checks,
+    CO c-bets 0.33, BTN calls — hero closes facing the bet (seed 39 = the
+    dry-board trips hand used by the HU sizing e2e)."""
+    osize = _OPEN_SIZE[Position.CO]
+    state = _state(Position.BB, stacks=stacks, seed=seed)
+    moves = []
+    for p in _SEAT_ORDER:
+        if p in _BLINDS:
+            continue
+        if p is Position.CO:
+            moves.append(_raise_move(p, osize))
+        elif p is Position.BTN:
+            moves.append(_call(p))
+        else:
+            moves.append(_fold(p))
+    moves += [_fold(Position.SB), _call(Position.BB)]
+    state = _play(state, moves)
+    fp = round(3 * osize + 0.5, 2)
+    cbet = round(0.33 * fp, 1)
+    return _play(
+        state,
+        [_check(Position.BB), _bet(Position.CO, cbet), _call(Position.BTN)],
+    )
+
+
+def test_mw_vs_cbet_persists_graded_decision_with_dims(db):
+    from app.domain.table.grade_map import map_decision_point
+
+    state = _mw_vs_cbet_state()
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    legs = [la.min_bb for la in spot.legal_actions if la.action is ActionType.RAISE]
+    assert len(legs) == 2  # two check-raise sizes offered at the 3-way node
+    # displayed == graded: the hero offer reads the mapped spot's legs
+    offered = [
+        la.size_bb
+        for la in _hero_legal_actions(state)
+        if la.action is ActionType.RAISE
+    ]
+    assert offered == legs
+
+    sid = _persist_hand(db, _mw_vs_cbet_state(), sid="n5-mw")
+    asyncio.run(
+        apply_hero_action(db, sid, Decision(action=ActionType.RAISE, size_bb=legs[0]))
+    )
+    row = db.exec(select(SimDecision).where(SimDecision.session_id == sid)).all()[-1]
+    assert row.correctness is not None  # graded, not "no baseline yet"
+    assert row.players_in_pot == 3
+    assert row.node_context == "vs_cbet"
+    assert row.position == "BB"
+    assert row.facing_position == "CO"
+    # dry flop (seed 39) -> the small check-raise leg is the OPTIMAL size
+    assert row.sizing_correctness == "optimal"

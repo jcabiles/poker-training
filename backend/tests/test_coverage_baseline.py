@@ -1,0 +1,102 @@
+"""N5 — fixed-seed graded-decision coverage baseline (the measuring stick).
+
+Runs a fully deterministic simulation (fixed deal seed, fixed persona lineup,
+scripted hero whose choices depend ONLY on the engine's legal actions + a
+seeded rng — never on mapper/display output) and measures what share of hero
+decision points `map_decision_point` can grade. Because nothing in N5 touches
+the engine or the bots, the played hand stream is byte-identical before and
+after mapper/content changes — so `graded` may only go UP against the
+recorded baseline while `total` stays fixed.
+
+Baseline recorded in tests/data/coverage_baseline.json (pre-N5 movers, i.e.
+main @ N4b). Re-record deliberately (see `_measure` docstring) only when the
+slice notes say so — never to make a regression pass.
+"""
+
+from __future__ import annotations
+
+import json
+import random
+from pathlib import Path
+
+from app.domain.action import Decision
+from app.domain.personas import load_persona_packs
+from app.domain.spot import ActionType, Street
+from app.domain.table.deck import deal_hand
+from app.domain.table.engine import apply, legal_actions, start_hand
+from app.domain.table.grade_map import map_decision_point
+from app.domain.table.play import advance_to_hero, assign_lineup
+
+HERO_SEAT = 0
+SEED = 20260718
+HANDS = 400
+
+_FIXTURE = Path(__file__).parent / "data" / "coverage_baseline.json"
+
+
+def _hero_decision(state, rng: random.Random) -> Decision:
+    """Deterministic scripted hero. Reads ONLY engine legal_actions (never
+    mapper/display helpers) so the hand stream is invariant to N5 changes.
+    Mixed policy to exercise raiser/caller/defender roles."""
+    legal = legal_actions(state)
+    kinds = {la.action for la in legal}
+    roll = rng.random()
+    if state.street is Street.PREFLOP:
+        raise_la = next((la for la in legal if la.action is ActionType.RAISE), None)
+        if raise_la is not None and raise_la.min_bb is not None and roll < 0.25:
+            return Decision(action=ActionType.RAISE, size_bb=raise_la.min_bb)
+        if ActionType.CALL in kinds and roll < 0.70:
+            return Decision(action=ActionType.CALL)
+        if ActionType.CHECK in kinds:
+            return Decision(action=ActionType.CHECK)
+        return Decision(action=ActionType.FOLD)
+    bet_la = next((la for la in legal if la.action is ActionType.BET), None)
+    if bet_la is not None and bet_la.min_bb is not None and roll < 0.30:
+        return Decision(action=ActionType.BET, size_bb=bet_la.min_bb)
+    if ActionType.CHECK in kinds:
+        return Decision(action=ActionType.CHECK)
+    if ActionType.CALL in kinds and roll < 0.80:
+        return Decision(action=ActionType.CALL)
+    return Decision(action=ActionType.FOLD)
+
+
+def _measure() -> dict:
+    """Deterministic coverage sweep. To re-record the baseline (ONLY when a
+    slice deliberately moves it): run
+    `python -c "from tests.test_coverage_baseline import _record; _record()"`
+    from backend/ and commit the fixture with the slice."""
+    rng = random.Random(SEED)
+    packs = load_persona_packs()
+    lineup_types = assign_lineup(rng)
+    lineup = {s: packs[t.value] for s, t in lineup_types.items() if s != HERO_SEAT}
+    hero_rng = random.Random(SEED + 1)
+    total = 0
+    graded = 0
+    for hand_no in range(HANDS):
+        dealt = deal_hand(rng)
+        state = start_hand(dealt, button_seat=hand_no % 9, stacks_bb=[100.0] * 9)
+        for _ in range(60):
+            state, _ev = advance_to_hero(state, lineup, HERO_SEAT, rng)
+            if state.hand_over or state.to_act_seat != HERO_SEAT:
+                break
+            total += 1
+            if map_decision_point(state, HERO_SEAT) is not None:
+                graded += 1
+            state = apply(state, _hero_decision(state, hero_rng))
+    return {"seed": SEED, "hands": HANDS, "total": total, "graded": graded}
+
+
+def _record() -> None:
+    _FIXTURE.parent.mkdir(exist_ok=True)
+    _FIXTURE.write_text(json.dumps(_measure(), indent=2) + "\n")
+
+
+def test_coverage_never_regresses():
+    baseline = json.loads(_FIXTURE.read_text())
+    current = _measure()
+    # Same seed/hands => the played stream is identical; totals must match
+    # exactly (a drift means the harness stopped being engine-only).
+    assert current["total"] == baseline["total"], "hand stream drifted — harness invariant broken"
+    assert current["graded"] >= baseline["graded"], (
+        f"graded-decision coverage regressed: {current['graded']} < baseline {baseline['graded']}"
+    )

@@ -204,22 +204,34 @@ def test_off_size_cbet_gates_vs_cbet():
     assert map_decision_point(state, HERO_SEAT) is None
 
 
-def test_multiway_gates_vs_cbet():
-    # A second preflop caller makes the pot multiway → every flop mapper is None.
+def test_three_way_bb_defense_now_maps_multiway():
+    # N4b pinned this exact shape as None; N5's 3-way BB-defense mapper turns
+    # it ON: opener + cold-caller + BB(hero), opener c-bets canonical, caller
+    # responds, hero closes — maps as a 3-live multiway VS_CBET spot.
+    from app.domain.spot import players_in_pot
+
     state = _state(Position.BB)
     opener = Position.CO
     moves = [_fold(p) for p in _before(opener) if p not in _BLINDS]
     moves.append(_raise(opener, _OPEN_SIZE[opener]))
-    moves.append(_call(Position.BTN))  # extra cold-caller
+    moves.append(_call(Position.BTN))  # cold-caller
     moves += [_fold(Position.SB), _call(Position.BB)]
     state = _play(state, moves)
-    fp = round(2 * _OPEN_SIZE[opener] + _OPEN_SIZE[opener] + 0.5, 2)
+    fp = round(3 * _OPEN_SIZE[opener] + 0.5, 2)
     cbet = round(0.33 * fp, 1)
     state = _play(
         state, [_check(Position.BB), _bet(opener, cbet), _call(Position.BTN)]
     )
     assert state.to_act_seat == HERO_SEAT
-    assert map_decision_point(state, HERO_SEAT) is None
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.node_context == [NodeContext.VS_CBET]
+    assert players_in_pot(spot) == 3
+    assert spot.facing == opener
+    assert spot.pot_bb == round(fp + 2 * cbet, 2)  # bet + caller's call included
+    # hero's raise legs: flop check-raise mults on the c-bet
+    legs = [la.min_bb for la in spot.legal_actions if la.action is ActionType.RAISE]
+    assert legs == [round(2.5 * cbet, 1), round(3.5 * cbet, 1)]
 
 
 def test_short_stack_collapses_to_one_raise_leg():
@@ -286,3 +298,30 @@ def test_bot_rounded_cbet_maps():
         spot = map_decision_point(state, HERO_SEAT)
         assert spot is not None, f"bot-style c-bet {bot_cbet} must map"
         assert spot.node_context == [NodeContext.VS_CBET]
+
+
+# --------------------------------- N5: flop c-bet gate band alignment (A1)
+
+
+def test_noncanonical_inband_open_maps_flop_cbet_with_actual_pot():
+    # N5 refuter HIGH: a 2.5bb open from UTG (canonical 3.0) is in the same
+    # standard band the turn/river mappers accept — the flop c-bet node must
+    # now map too, with pot/bet math keyed on the ACTUAL 2.5 open.
+    state = _state(Position.UTG)
+    state = _play(state, _srp_preflop_moves(Position.UTG, 2.5))
+    state = _play(state, [_check(Position.BB)])
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.node_context == [NodeContext.CBET]
+    pot = round(2 * 2.5 + 0.5, 2)  # actual open, NOT the canonical 3.0
+    assert spot.pot_bb == pot
+    bets = [la.min_bb for la in spot.legal_actions if la.action is ActionType.BET]
+    assert bets == [round(0.33 * pot, 1), round(0.75 * pot, 1)]
+
+
+def test_out_of_band_open_still_gates_flop_cbet():
+    # Oversized opens (e.g. 4.0bb persona opens) stay unmapped — band cap holds.
+    state = _state(Position.UTG)
+    state = _play(state, _srp_preflop_moves(Position.UTG, 4.0))
+    state = _play(state, [_check(Position.BB)])
+    assert map_decision_point(state, HERO_SEAT) is None

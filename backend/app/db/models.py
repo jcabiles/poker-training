@@ -114,6 +114,14 @@ class SimDecision(SQLModel, table=True):
     # Coverage.value ('full'/'partial'/'not_found') or 'unmappable' (the spot
     # mapper returned None — no canonical Spot could be built at all).
     coverage: str
+    # N5 spot dims (migration 0012) for the by-spot dashboard drill-down.
+    # `position` is ALWAYS populated (hero's seat position, known even when the
+    # spot is unmappable); the other three come from the mapped Spot and stay
+    # NULL on unmappable decisions.
+    position: str | None = Field(default=None)
+    facing_position: str | None = Field(default=None)
+    players_in_pot: int | None = Field(default=None)
+    node_context: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=_utcnow)
 
 
