@@ -49,6 +49,8 @@ function personaLabel(persona: string): string {
 
 export default function SimTable({
   hand,
+  board,
+  street,
   stagedIndex,
   revealAt,
   lastGrade,
@@ -57,6 +59,11 @@ export default function SimTable({
   revealedBySeat,
 }: {
   hand: SimulateHandView;
+  // Playback-scoped public board/street. The server snapshot may already be at
+  // showdown after a hero fold; SimulateView projects that final state back to
+  // the narrated action prefix so the felt does not lead the Action panel.
+  board: string[];
+  street: string;
   // How many of the current events batch have been narrated (shared with the
   // event log — SimulateView owns it). Drives the LOCKSTEP reveal below.
   stagedIndex: number;
@@ -85,7 +92,7 @@ export default function SimTable({
   // holds no villain cards until the reveal endpoint returns them.
   revealedBySeat: Map<number, readonly [string, string]>;
 }) {
-  const { seats, board, pot_bb, hero, to_act_seat, button_seat } = hand;
+  const { seats, pot_bb, hero, to_act_seat, button_seat } = hand;
   const showdownBySeat = new Map<number, ShowdownSeatView>(
     hand.showdown.map((s) => [s.seat_index, s]),
   );
@@ -110,7 +117,7 @@ export default function SimTable({
       <div className="felt felt-staged">
         <div className="ctx">
           Simulate · 0.5/1 · 9-max · hand{" "}
-          <span className="sim-ctx-no">{hand.hand_no}</span> · {hand.street}
+          <span className="sim-ctx-no">{hand.hand_no}</span> · {street}
         </div>
         <div
           className={"tablering" + (hand.hand_over ? " sim-ring-over" : "")}

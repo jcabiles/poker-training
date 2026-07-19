@@ -29,6 +29,7 @@ import SimWatchToggle from "./simulate/SimWatchToggle";
 import SimStreetReport from "./simulate/SimStreetReport";
 import SimTable from "./simulate/SimTable";
 import SimVillainRange from "./simulate/SimVillainRange";
+import { stagedTableState } from "./simulate/simPlayback";
 
 // Simulate S9 — the playable, persistent table. Hero acts via predetermined
 // -sizing buttons; bots resolve instantly (server-side, within each request),
@@ -536,6 +537,19 @@ export default function SimulateView() {
   }, [clearStored, startSession]);
 
   const hand = view?.hand ?? null;
+  const tableState = useMemo(
+    () =>
+      hand
+        ? stagedTableState({
+            startStreet: hand.last_grade?.street,
+            finalStreet: hand.street,
+            finalBoard: hand.board,
+            events: hand.events,
+            stagedIndex,
+          })
+        : null,
+    [hand, stagedIndex],
+  );
 
   // Merge the finished hand's persisted recap with the live tiers we accumulated
   // this hand (persisted rows lack verdict/reasoning text; the live grades carry
@@ -694,6 +708,8 @@ export default function SimulateView() {
           <div className="sim-main">
             <SimTable
               hand={hand}
+              board={tableState?.board ?? hand.board}
+              street={tableState?.street ?? hand.street}
               stagedIndex={stagedIndex}
               revealAt={revealAt}
               lastGrade={coachMode ? heroBadge : null}

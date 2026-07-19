@@ -503,19 +503,29 @@ def _write_terminal(db, session_id: str, state: HandState):
     db.commit()
 
 
-def test_hero_fold_villain_showdown_stays_facedown_no_leak(db):
+def test_hero_fold_villain_showdown_autoreveals_compared_hands(db):
     # Hero folded; villains 1 & 2 ran a genuine showdown among themselves.
     state = _terminal_state(hero="fold", in_seats=(1, 2))
     view = create_session(db)
     _write_terminal(db, view.session_id, state)
     restored = restore_session(db, view.session_id)
-    # Face-down: no auto-reveal for a hero-folded hand.
-    assert restored.hand.showdown == []
-    # Privacy sweep: NO non-hero hole card appears anywhere on the wire.
-    wire = restored.model_dump_json()
+
+    seats = {sd.seat_index for sd in restored.hand.showdown}
+    assert seats == {1, 2}
+    shown_cards = {
+        card
+        for sd in restored.hand.showdown
+        for card in sd.hole_cards
+    }
     for i in (1, 2):
+        assert set(state.seats[i].hole_cards).issubset(shown_cards)
+    assert all(sd.seat_index != 0 for sd in restored.hand.showdown)
+
+    # Privacy sweep: folded villains that did not reach showdown still do not
+    # leak through the normal hand view's only villain-card field.
+    for i in range(3, 9):
         for card in state.seats[i].hole_cards:
-            assert card not in wire, f"seat {i} card {card} leaked to the wire"
+            assert card not in shown_cards, f"seat {i} card {card} leaked to showdown"
     # Hero's own cards still ship (allowed).
     assert restored.hand.hero.hole_cards == state.seats[0].hole_cards
 

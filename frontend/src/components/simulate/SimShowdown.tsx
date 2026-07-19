@@ -9,11 +9,11 @@ import Card from "../Card";
 // folded to one seat), `showdown` is empty and we show the fold-out line
 // instead. Position labels come from the seat roster.
 //
-// R1: when the HERO folded, the villains played out face-down (so the hero can
-// guess ranges). Two buttons let the hero reveal them on demand — "Reveal
-// Last-In" (seats still live at hand end) and "Reveal All" (every dealt seat).
-// The reveal flips cards on the FELT (SimTable), not here; these buttons only
-// trigger the fetch and reflect which scope is active.
+// R1: when the HERO folded and the remaining villains did not reach showdown,
+// they stayed face-down. Two buttons let the hero reveal them on demand —
+// "Reveal Last-In" (seats still live at hand end) and "Reveal All" (every dealt
+// seat). If villains did reach showdown, their compared cards arrive through
+// `showdown` and auto-reveal like any other public showdown.
 
 function fmtDelta(delta: number): string {
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
@@ -42,6 +42,7 @@ export default function SimShowdown({
   onReveal: (scope: "last-in" | "all") => void;
 }) {
   const posBySeat = new Map<number, string>(seats.map((s) => [s.seat_index, s.position]));
+  const canManualReveal = heroFolded && showdown.length === 0;
 
   return (
     <section className="sim-showdown panel" aria-label="Hand result">
@@ -74,7 +75,7 @@ export default function SimShowdown({
             : "The pot was taken down before showdown — no cards revealed."}
         </p>
       )}
-      {heroFolded && (
+      {canManualReveal && (
         <div className="sim-reveal-actions" role="group" aria-label="Reveal villain hands">
           {(["last-in", "all"] as const).map((scope) => (
             <button

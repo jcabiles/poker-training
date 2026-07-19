@@ -647,11 +647,11 @@ def _view(
     hero_state = state.seats[HERO_SEAT]
     is_hero_turn = not state.hand_over and state.to_act_seat == HERO_SEAT
     showdown: list[ShowdownSeatView] = []
-    # R1: when the hero folded this hand, villains stay FACE-DOWN — no auto-reveal,
-    # even if the villains ran a genuine showdown among themselves. The hero reveals
-    # them on demand via the reveal endpoint. A hero-in showdown (hero IN/ALLIN)
-    # auto-reveals exactly as before; `settle()` is untouched.
-    if state.hand_over and hero_state.status is not PlayerStatus.FOLDED:
+    # Showdown reveals the hands that were actually compared. If the hero folded
+    # and villains still reached showdown, those villain hands are public too.
+    # Pure fold-outs still reveal nobody here; the hero can inspect them with
+    # the on-demand reveal endpoint.
+    if state.hand_over:
         settlement = settle(state)
         showdown = [
             ShowdownSeatView(
