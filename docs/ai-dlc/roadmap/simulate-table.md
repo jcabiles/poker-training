@@ -756,11 +756,13 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   the **solver-grade baseline** (LATER bet below) — heuristics get "simplified-but-winning,"
   never GTO-exact; EVs stay labeled approximate throughout.
   **Two concrete gate-coverage followups surfaced by W1 (2026-07-16, R5 combined-refuter):**
-  (a) `map_flop_cbet` still uses an EXACT per-seat open gate while the turn/river mappers were
-  widened to the `[2.0, 3.0]` band — so on a standard 3.0 open the turn barrel maps but the
-  flop c-bet on the same line stays "no baseline yet." Align `map_flop_cbet`'s open gate to the
-  same band for street-consistency (small, but shifts existing flop-cbet coverage → re-verify
-  the S10 grade_map tests). (b) `map_vs_turn_bet`/`map_vs_river_bet` almost never fire
+  (a) ~~`map_flop_cbet` still uses an EXACT per-seat open gate…~~ **DONE 2026-07-19 → PR #53 + #54.**
+  #53 widened the preflop facing-open band to the oversize cap 4.5bb (`_OVERSIZE_OPEN_CAP`) so
+  oversized persona opens (station/fish/maniac 3.5–4.5) grade preflop; #54 aligned all three
+  postflop open gates (`map_flop_cbet`, HU-SRP, 3-way-MW) to the same 4.5bb cap so an oversized
+  open now grades preflop AND flop/turn/river on one line — no more graded-preflop-but-blank-flop
+  split. S10 grade_map tests re-verified (692 green). EVs stay ≈approximate (grading a 4.5bb open
+  against the 3.0-open chart is coarser). (b) `map_vs_turn_bet`/`map_vs_river_bet` almost never fire
   organically: bots bet `round(frac*pot, 2)` (`personas_postflop.py:350`) but the mapper's
   `_is_canonical_bet` demands the 1-dp bucket within 1e-6 — so hero-as-BB turn/river charts are
   near-empty in live play. Fix = either snap bot postflop bets to the 1-dp bucket, or widen the
