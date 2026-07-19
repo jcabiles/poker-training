@@ -4465,6 +4465,21 @@ kbd {
   .sim-recap-coach {
     margin-left: 0;
   }
+  /* Leak rows stack at mobile so the drill action lands in the SAME place on
+     every row (design-review low) and reaches a comfortable 44px touch target. */
+  .dash-leak {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-leak-stats {
+    align-items: flex-start;
+  }
+  .dash-leak-drill {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* ═══ Slim side-panel headline (N1 sibling — parallel agent emits the markup) ══

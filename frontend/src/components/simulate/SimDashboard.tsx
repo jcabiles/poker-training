@@ -223,6 +223,14 @@ export default function SimDashboard() {
                       <span className="dash-leak-label">{row.node_label}</span>
                       <span className="dash-leak-street">{streetLabel(row.street)}</span>
                     </div>
+                    {/* Screen readers get the full severity sentence; the
+                        numerals below are visual-only (aria-hidden) so AT hears
+                        it once, cleanly (design-review high — 1.3.1/1.1.1). */}
+                    <span className="sim-sr-only">
+                      {row.node_label} on the {streetLabel(row.street).toLowerCase()}:{" "}
+                      {Math.round(row.good_rate * 100)}% good over {row.graded} graded
+                      decision{row.graded === 1 ? "" : "s"}, {fmtEvLoss(row.ev_loss_bb)} lost.
+                    </span>
                     <div className="dash-leak-stats" aria-hidden="true">
                       <span className="dash-leak-rate">
                         {Math.round(row.good_rate * 100)}% good
@@ -232,7 +240,11 @@ export default function SimDashboard() {
                       </span>
                     </div>
                     {row.drill_mode ? (
-                      <a className="dash-leak-drill" href={`#/drill/${row.drill_mode}`}>
+                      <a
+                        className="dash-leak-drill"
+                        href={`#/drill/${row.drill_mode}`}
+                        aria-label={`Drill ${row.node_label}`}
+                      >
                         Drill this
                       </a>
                     ) : (
