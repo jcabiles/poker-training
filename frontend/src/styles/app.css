@@ -2886,6 +2886,54 @@ kbd {
   background: var(--act-raise);
   vertical-align: middle;
 }
+/* Street sheet — the call sheet is ruled off by street, each street's board
+   dealt in its header. One group per contiguous run of street. */
+.sim-log-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.sim-log-street {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid color-mix(in srgb, var(--gold-bright) 40%, transparent);
+}
+.sim-log-street-name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.sim-log-street-cards {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+/* Board card, log-sized — the felt's ivory stock in miniature. */
+.sim-log-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 18px;
+  height: 20px;
+  padding: 0 3px;
+  background: var(--card-bg);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--suit-black) 14%, transparent);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--suit-black);
+  font-variant-numeric: tabular-nums;
+}
+.sim-log-card.red {
+  color: var(--suit-red);
+}
 
 /* ── Rail sheet (ledger) ──────────────────────────────────────────────────
    The club's ruled P&L book: one row per seat, hero pinned first and gilt

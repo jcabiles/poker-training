@@ -842,7 +842,7 @@ export default function SimulateView() {
           </div>
 
           <aside className="sim-side">
-            <SimEventLog events={hand.events} stagedIndex={stagedIndex} />
+            <SimEventLog events={hand.events} stagedIndex={stagedIndex} board={hand.board} />
             <SimStreetReport refreshKey={reportKey} />
             <SimLedger seats={hand.seats} />
           </aside>

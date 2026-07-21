@@ -12,7 +12,7 @@ export interface StagedTableState {
   board: string[];
 }
 
-function boardCountForStreet(street: string): number {
+export function boardCountForStreet(street: string): number {
   return STREET_BOARD_COUNT[street] ?? 0;
 }
 
