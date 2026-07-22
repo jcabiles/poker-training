@@ -854,16 +854,29 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 
 ### Build slices (ICE = Impact·Confidence·Ease, 1–10)
 
-- [ ] **F1 — Price-aware bot defense (fixes the price-blind-defense bug).** Bots' fold/call
-      decision keys on the **faced bet size** via pot-odds + the α **fold-ceiling** (RES-D bands), not
-      merit alone. Touch `personas_postflop.py` (`sample_postflop_decision`, `_FOLD_BASE`/`_CALL_BASE`
-      merit tables) + the persona `stickiness` lever wiring. Preserve frequency mixing. **Pass/fail:**
-      a bot facing ⅓-pot folds **measurably less** than the same bot facing a pot-sized bet in the
-      same spot (monotone size→fold response, test-asserted); fold frequency respects α as a *ceiling*
-      (never folds more than α vs a balanced bettor) but is **not** clamped to a fold≈MDF floor on
-      flop/turn (A1 guardrail); existing S4 tests re-pass against RES-D's re-derived bands.
-      **Appetite:** ~1 slice. **No-gos:** no argmax; no solver tables; strength→size untouched.
-      ICE 9·8·5.
+- [x] **F1 — Price-aware bot defense (fixes the price-blind-defense bug).** *(done 2026-07-22:
+      multiplicative price factor on the fold merit only — faced_frac = to_call/(pot −
+      max(current_bet_to, to_call)) → RES-E bucket → α anchor, factor = 0.35·(α_b/α_MED)^(2.2·
+      stickiness^−0.15), constants fitted numerically against min(RES-D §2 band top, α−0.01);
+      call/raise merits, sizing choice, SPR-commit, `rng.choices` mixing all untouched. Tests:
+      monotone SMALL→OVERBET all 6 personas (pot vs ⅓-pot gap 0.17–0.26 ≥ mandated 0.10); α
+      ceiling ≤ f/(1+f)+0.03 (nit exempt, documented); ordering station<fish≈maniac<lag<tag<nit;
+      NO fold floor from α/MDF anywhere (A1). **Refuter cycle:** initial FAIL — faced_frac
+      denominator wrong for raise-over-bet/check-raise (engine repro: 5/15 SMALL vs true 5/12
+      MEDIUM) + tests only covered simple bets; fixed via existing `current_bet_to` (no signature
+      change), 3 regression tests on the exact repros (stash-verified non-tautological), re-refute
+      PASS-w-issues. **Documented deviations:** (1) WTSD re-anchored UP (station→(0.66,0.83) etc.)
+      — RES-D §4 predicted a fall assuming under-folding; measurement showed the engine OVER-folded
+      the α ceiling at every size, so the ceiling-respecting fix folds less → more showdowns;
+      ceiling kept as the hard contract per A1 (RES-D §7 flagged this tension). (2) nit measures
+      under-α (tightest folder, ordering intact) — §2's over-α leak unreachable with shared
+      constants. (3) tag/lag OVERBET ~0.53–0.54 — §2 assumed 2×-pot α=0.667, engine overbet is
+      1.5× (α=0.60). (4) nit ftc band (0.10,0.90) documented-unmeasurable at this N — re-measure
+      follow-up. **Known limitation (refuter MED, in-code comment):** same-street 3-bet+ lines
+      understate faced_frac (aggressor's own earlier street chips in current_bet_to; exact fix
+      needs per-action pot history the engine doesn't keep; error conservative — under-folding).
+      coverage_baseline re-recorded 1220/225→1260/237 per its documented procedure (refuter
+      reproduced byte-for-byte). 711 backend tests + ruff green.)* ICE 9·8·5.
 
 - [ ] **F2 — Size-linked bot bluffing (fixes flat `bluff_freq`).** Replace the flat per-persona
       `bluff_freq` with a **chosen-size-dependent** bluff fraction (polar `f/(1+2f)` from RES-D,

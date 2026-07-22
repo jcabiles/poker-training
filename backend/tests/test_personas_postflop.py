@@ -306,6 +306,207 @@ def personas_postflop_legal_call(amount):
     return LegalAction(action=ActionType.CALL, min_bb=amount)
 
 
+def personas_postflop_legal_raise(lo, hi):
+    from app.domain.spot import LegalAction
+
+    return LegalAction(action=ActionType.RAISE, min_bb=lo, max_bb=hi)
+
+
+ALL_PERSONAS = sorted(v.value for v in VillainType)
+
+
+# =====================================================================
+# F1 — price-aware defense (RES-D §2 invariants, RES-E size buckets)
+# =====================================================================
+#
+# Fold-to-bet is measured over a UNIFORM random range (random hole cards +
+# random flop): the defender arrives with any two cards, the widest range the
+# α fold-ceiling applies to (folding more than α of the arrival range makes an
+# any-two-cards bluff profitable — the "balanced bettor" worst case). The four
+# fracs cover one representative size per RES-E bucket; 1.0 (pot) sits in
+# LARGE and doubles as the spec's mandated "⅓-pot vs pot-size" comparison.
+# Comparisons below are seed-pinned (deterministic), so tight cross-persona
+# gaps (lag vs tag ~1.5pp) are stable pass/fail, not flaky.
+
+PRICE_FRACS = (0.33, 0.5, 1.0, 1.5)  # SMALL / MEDIUM / LARGE(pot) / OVERBET
+_PRICE_N = 1250
+
+
+@pytest.fixture(scope="module")
+def fold_by_size():
+    """persona -> {frac: measured fold-to-bet} facing FOLD/CALL/RAISE with a
+    bet of `frac * pot-before-the-bet`, same pre-dealt spot list for every
+    persona x size (paired comparison, variance from range composition
+    cancels across cells)."""
+    from app.domain.equity import RANKS
+
+    packs = load_persona_packs()
+    if set(VillainType) - set(packs):
+        pytest.skip("not all persona packs authored yet")
+    deal_rng = random.Random(20260721)
+    deck0 = [r + s for r in RANKS for s in "shdc"]
+    spots = []
+    for _ in range(_PRICE_N):
+        deck = deck0[:]
+        deal_rng.shuffle(deck)
+        spots.append(((deck[0], deck[1]), deck[2:5]))
+
+    rates: dict[str, dict[float, float]] = {}
+    pot_pre = 6.0
+    for pi, persona in enumerate(ALL_PERSONAS):
+        pack = packs[VillainType(persona)]
+        rates[persona] = {}
+        for fi, frac in enumerate(PRICE_FRACS):
+            to_call = round(frac * pot_pre, 2)
+            pot = pot_pre + to_call
+            legal = [
+                personas_postflop_legal_fold(),
+                personas_postflop_legal_call(to_call),
+                personas_postflop_legal_raise(2 * to_call, 100.0),
+            ]
+            rng = random.Random(20260721 + 100 * pi + fi)  # stable per-cell seed
+            folds = 0
+            for hole, board in spots:
+                d = sample_postflop_decision(
+                    pack, hole, board, legal, pot, 100.0, 1, rng, current_bet_to=to_call
+                )
+                folds += d.action is ActionType.FOLD
+            rates[persona][frac] = folds / _PRICE_N
+    return rates
+
+
+@pytest.mark.parametrize("persona", ALL_PERSONAS)
+def test_fold_to_bet_monotone_in_faced_size(persona, fold_by_size):
+    """RES-D §2 invariant 1 (the price-blind-defense bug): fold-to-bet is
+    non-decreasing across SMALL -> MEDIUM -> LARGE -> OVERBET, and a bot
+    facing ⅓-pot folds MEASURABLY less than the same bot facing pot-size."""
+    r = fold_by_size[persona]
+    seq = [r[f] for f in PRICE_FRACS]
+    assert seq == sorted(seq), f"{persona} fold-to-bet not monotone in size: {seq}"
+    assert r[1.0] - r[0.33] >= 0.10, (
+        f"{persona} pot-size fold {r[1.0]:.3f} not measurably above "
+        f"⅓-pot fold {r[0.33]:.3f}"
+    )
+
+
+@pytest.mark.parametrize("persona", [p for p in ALL_PERSONAS if p != "nit"])
+def test_fold_to_bet_respects_alpha_ceiling(persona, fold_by_size):
+    """RES-D §1c/§2 invariant 3 (A1 guardrail): α = f/(1+f) is a fold CEILING
+    vs a balanced bettor — never exceeded because of the price logic — and is
+    NOT a floor (no lower-bound assertion exists anywhere: personas may fold
+    far below α/MDF, e.g. calling_station ~0.10 vs ⅓-pot where α is 0.25).
+    nit is exempt (its deliberate over-fold leak is a persona choice, RES-D §2
+    invariant 3), though post-fit it too measures under α at every bucket."""
+    r = fold_by_size[persona]
+    for frac in PRICE_FRACS:
+        alpha = frac / (1 + frac)
+        assert r[frac] <= alpha + 0.03, (  # +0.03 ~= 3σ binomial noise at n=1250
+            f"{persona} fold-to-bet {r[frac]:.3f} vs {frac}-pot exceeds α ceiling {alpha:.3f}"
+        )
+
+
+def test_fold_to_bet_persona_ordering_at_fixed_size(fold_by_size):
+    """RES-D §2 invariant 2 at MEDIUM (½-pot): calling_station < passive_fish
+    ≈ maniac < lag < tag < nit. The fish/maniac pair is an ≈ in RES-D — both
+    must sit strictly between station and lag, within 6pp of each other."""
+    r = {p: fold_by_size[p][0.5] for p in ALL_PERSONAS}
+    assert r["calling_station"] < min(r["passive_fish"], r["maniac"]), r
+    assert abs(r["passive_fish"] - r["maniac"]) < 0.06, r
+    assert max(r["passive_fish"], r["maniac"]) < r["lag"], r
+    assert r["lag"] < r["tag"], r
+    assert r["tag"] < r["nit"], r
+
+
+# ---------------------------------------------------------------------
+# Faced-frac denominator: raise-over-bet and check-raise spots, where the
+# facing seat has NONZERO street chips and to_call is only the increment.
+# Pre-aggression pot must be pot_bb − current_bet_to (the aggressor's full
+# bet-TO), never pot_bb − to_call.
+# ---------------------------------------------------------------------
+
+
+def test_size_bucket_res_e_cutoffs_direct():
+    """RES-E cutoffs on the two refuter repro fracs (and the buggy values)."""
+    sb = personas_postflop.size_bucket
+    SizeBucket = personas_postflop.SizeBucket
+    assert sb(5.0 / 12.0) is SizeBucket.MEDIUM  # 0.4167 — raise-over-bet repro
+    assert sb(15.0 / 14.0) is SizeBucket.LARGE  # ≈1.07 — check-raise repro
+    assert sb(5.0 / 15.0) is SizeBucket.SMALL  # what pot−to_call wrongly gave
+    assert sb(0.40) is SizeBucket.SMALL
+    assert sb(0.70) is SizeBucket.MEDIUM
+    assert sb(1.10) is SizeBucket.LARGE
+    assert sb(1.11) is SizeBucket.OVERBET
+
+
+class _CaptureWeights:
+    """Duck-typed rng capturing the sampler's first choices() distribution."""
+
+    def __init__(self):
+        self.dist = None
+
+    def choices(self, population, weights, k=1):
+        if self.dist is None:
+            self.dist = dict(zip(population, weights, strict=True))
+        return [population[0]]
+
+
+def _faced_fold_weight(pot_bb, to_call, current_bet_to):
+    """Normalized FOLD weight in a FOLD/CALL/RAISE spot (fixed tag + middle
+    pair, no draw, SPR well above commit) — only the price factor varies."""
+    pack = _pack("tag")
+    legal = [
+        personas_postflop_legal_fold(),
+        personas_postflop_legal_call(to_call),
+        personas_postflop_legal_raise(current_bet_to + 2 * to_call, 200.0),
+    ]
+    cap = _CaptureWeights()
+    sample_postflop_decision(
+        pack,
+        ("9h", "2d"),
+        ["Ac", "9s", "3h"],
+        legal,
+        pot_bb,
+        100.0,
+        1,
+        cap,  # type: ignore[arg-type] — duck-typed capture rng
+        current_bet_to=current_bet_to,
+    )
+    return cap.dist[ActionType.FOLD]
+
+
+def test_faced_frac_raise_over_bet_lands_medium_not_small():
+    """Refuter repro 1: hero bets 3 into 9, villain raises to 8 → hero faces
+    to_call 5, live pot 20, current_bet_to 8. Faced frac = 5/(20−8) = 0.4167
+    → MEDIUM. The pot−to_call bug computed 5/15 = 0.333 → SMALL (hero's own
+    3bb street chips left in the denominator)."""
+    raised = _faced_fold_weight(pot_bb=20.0, to_call=5.0, current_bet_to=8.0)
+    # Control: genuine simple MEDIUM bet at the same frac (5 into 12).
+    medium = _faced_fold_weight(pot_bb=17.0, to_call=5.0, current_bet_to=5.0)
+    # Counter-control: genuine SMALL bet, the bucket the bug assigned (5 into 15).
+    small = _faced_fold_weight(pot_bb=20.0, to_call=5.0, current_bet_to=5.0)
+    assert raised == pytest.approx(medium)
+    assert raised > small  # MEDIUM α 0.375 > SMALL α 0.25 → more fold mass
+
+
+def test_faced_frac_check_raise_lands_large():
+    """Refuter repro 2: hero bets 5 into 9, villain check-raises to 20 → hero
+    faces to_call 15, live pot 34, current_bet_to 20. Faced frac = 15/(34−20)
+    = 15/14 ≈ 1.07 → LARGE per RES-E (≤1.10); the bug computed 15/19 ≈ 0.79,
+    a 36% magnitude error."""
+    check_raised = _faced_fold_weight(pot_bb=34.0, to_call=15.0, current_bet_to=20.0)
+    # Control: genuine simple bet at the same frac (15 into 14).
+    large = _faced_fold_weight(pot_bb=29.0, to_call=15.0, current_bet_to=15.0)
+    assert check_raised == pytest.approx(large)
+    # Bucket-flipping variant (0.79 above also lands LARGE, so distinguish
+    # here): hero bets 6 into 6, villain check-raises to 16 → to_call 10,
+    # live pot 28, current_bet_to 16. True frac 10/12 = 0.83 → LARGE; the
+    # pot−to_call bug gave 10/18 = 0.556 → MEDIUM, indistinguishable from a
+    # genuine simple 10-into-18 bet (the counter-control below).
+    flipped = _faced_fold_weight(pot_bb=28.0, to_call=10.0, current_bet_to=16.0)
+    medium = _faced_fold_weight(pot_bb=28.0, to_call=10.0, current_bet_to=10.0)
+    assert flipped > medium  # LARGE α 0.47 > MEDIUM α 0.375 → more fold mass
+
+
 # =====================================================================
 # Closed-loop harness: full-hand playouts through the S2 engine
 # =====================================================================
@@ -451,8 +652,6 @@ def _play_hand(rng, hand_seed, button_seat, persona_by_seat, packs):
     return state, settlement, log, saw_flop, had_limper, had_3bet_plus
 
 
-ALL_PERSONAS = sorted(v.value for v in VillainType)
-
 # ---------------------------------------------------------------------
 # Budget measurement: probe throughput with the real sampler, then derive N.
 # ---------------------------------------------------------------------
@@ -560,14 +759,54 @@ def budget():
 # stat bands are meaningful; the raw lever magnitudes are calibration
 # artifacts of this specific merit-table implementation.
 
+# F1 RE-ANCHOR (RES-D §4 measure-then-anchor, 2026-07-21): price-aware
+# defense (personas_postflop._price_factor) re-levels fold-to-bet under the
+# α fold-CEILING (RES-D §1a/§1c) — the pre-F1 merit tables folded ABOVE α at
+# every size (e.g. tag ~0.39 vs a ⅓-pot bet where α = 0.25), so honoring the
+# ceiling means every persona now folds LESS overall, calls absorb the freed
+# mass, and therefore:
+#   - AF falls for the aggressive personas (more calls in the denominator):
+#     lag/maniac/tag/nit AF bands re-anchored to measured +/- 3-sigma at
+#     N=399 and N=670 runs (union of CIs, rounded outward). Theory-consistent:
+#     a price-aware defender flats SMALL/MEDIUM bets it price-blindly folded.
+#   - WTSD RISES (not falls): RES-D §4 predicted WTSD would drop toward the
+#     PRD population bands, but that prediction assumed the engine under-
+#     folded; measurement showed it OVER-folded the α ceiling, so the
+#     theory-correct fix keeps MORE pots alive. PRD WTSD overlap is
+#     unreachable without breaching the ceiling invariant (the harder
+#     contract) — WTSD bands stay ENGINE-ANCHORED (measured +/- 3-sigma,
+#     union of the N=399/N=670 CIs), incl. maniac (previously an honest PRD
+#     band). Documented deviation from RES-D §4's post-F1 WTSD targets.
+#   - fold-to-cbet bands (mixed 0.33/0.75 flop c-bets) still contain the
+#     measured values for station/fish/lag/maniac/tag and are KEPT; the
+#     per-size slope regression lives in the fold_to_bet tests above.
+#     nit's ftc is unmeasurable at this machine's N (<30 opportunities);
+#     band widened downward (0.10) because SMALL c-bets are now folded far
+#     less, in case a faster machine's larger N makes it measurable.
+#     Follow-up: re-measure nit's ftc at larger N (faster machine or a
+#     dedicated long run) and tighten the (0.10, 0.90) band to measured
+#     ± 3σ once ≥30 opportunities accrue.
+#
+# Measured (N=399 / N=670, seed 20260710):
+#   AF:   station .317/.330  fish .471/.487  nit 1.100/1.053
+#         tag 2.478/2.224    lag 2.281/2.503 maniac 3.429/3.325
+#   ftc:  station .168/.173  fish .244/.253  lag .282/.250
+#         maniac .359/.344   tag n/a /.275   nit n/a / n/a
+#   wtsd: station .756/.728  fish .741/.736  nit .651/.644
+#         tag .655/.646      lag .654/.674   maniac .560/.571
+
 # persona -> (AF band or None, fold_to_cbet band, WTSD band), all fractions.
 BANDS = {
-    "passive_fish": ((0.0, 1.560), (0.0, 0.549), (0.450, 0.564)),  # WTSD engine-anchored
-    "calling_station": ((0.0, 1.056), (0.0, 0.424), (0.476, 0.573)),  # WTSD engine-anchored
-    "nit": ((0.975, 2.025), (0.289, 0.961), (0.422, 0.661)),  # WTSD engine-anchored
-    "tag": ((2.469, 3.531), (0.203, 0.797), (0.332, 0.521)),  # WTSD engine-anchored
-    "lag": ((2.975, 4.525), (0.163, 0.637), (0.315, 0.474)),  # WTSD engine-anchored
-    "maniac": ((3.79, 999.0), (0.0, 0.430), (0.228, 0.402)),  # WTSD honest PRD band (passes)
+    "passive_fish": ((0.0, 1.560), (0.0, 0.549), (0.65, 0.83)),  # WTSD re-anchored (F1)
+    "calling_station": ((0.0, 1.056), (0.0, 0.424), (0.66, 0.83)),  # WTSD re-anchored (F1)
+    "nit": ((0.6, 2.025), (0.10, 0.90), (0.50, 0.80)),  # AF/ftc/WTSD re-anchored (F1)
+    # tag ftc floor re-anchored (F1, RES-D §4): price-aware defense folds small
+    # c-bets far less, pulling the aggregate to ~0.21 — ON the old 0.203 floor
+    # (measured 0.195-0.26 across machines; n scales with machine speed and can
+    # be as low as ~40 ⇒ 3σ ≈ ±0.19, so the floor must sit well below center).
+    "tag": ((1.4, 3.6), (0.05, 0.55), (0.52, 0.79)),  # AF/ftc/WTSD re-anchored (F1)
+    "lag": ((1.5, 3.2), (0.163, 0.637), (0.54, 0.77)),  # AF/WTSD re-anchored (F1)
+    "maniac": ((2.4, 999.0), (0.0, 0.430), (0.47, 0.65)),  # AF/WTSD re-anchored (F1)
 }
 
 

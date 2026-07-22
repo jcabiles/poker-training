@@ -49,6 +49,28 @@ class DrawCategory(StrEnum):
     STRONG = "strong"  # flush draw / OESD / combo
 
 
+class SizeBucket(StrEnum):
+    """RES-E size taxonomy on live pot-fraction (faced_bb / pot-before-the-bet).
+    Shared vocabulary for F1 (faced defense) and F2 (chosen-size bluffing)."""
+
+    SMALL = "small"  # <= 0.40 pot
+    MEDIUM = "medium"  # 0.41 - 0.70
+    LARGE = "large"  # 0.71 - 1.10
+    OVERBET = "overbet"  # > 1.10
+
+
+def size_bucket(pot_fraction: float) -> SizeBucket:
+    """RES-E §2 cutoffs, locked: computed on the LIVE pot-fraction at decision
+    time, never on the discrete authored sizing keys."""
+    if pot_fraction <= 0.40:
+        return SizeBucket.SMALL
+    if pot_fraction <= 0.70:
+        return SizeBucket.MEDIUM
+    if pot_fraction <= 1.10:
+        return SizeBucket.LARGE
+    return SizeBucket.OVERBET
+
+
 _RUNG = {
     StrengthBucket.AIR: 0,
     StrengthBucket.ACE_HIGH: 1,
@@ -234,6 +256,43 @@ _DRAW_CALL_BONUS = {DrawCategory.NONE: 0.0, DrawCategory.WEAK: 0.20, DrawCategor
 _BLUFF_RAISE_FACTOR = 0.3  # bluff-raising is structurally rarer than bluff-betting
 _COMMIT_AGG_BOOST = 3.0  # SPR-commit shift toward call/jam
 
+# F1 price-aware defense (RES-D §1a/§2 + RES-E buckets). α = B/(P+B) is the
+# fold-CEILING for the bucket's representative size — an anchor the fold merit
+# scales AGAINST, never a floor the engine clamps folds up to (A1 guardrail:
+# no code path may assert fold >= anything derived from α/MDF).
+_BUCKET_ALPHA = {
+    SizeBucket.SMALL: 0.25,  # ~⅓ pot
+    SizeBucket.MEDIUM: 0.375,  # ½–⅔ pot
+    SizeBucket.LARGE: 0.47,  # ¾–pot
+    SizeBucket.OVERBET: 0.60,  # 1.5× pot (the engine's only overbet size)
+}
+# Reference size for the price ratio (MEDIUM ≈ the ½–⅔-pot c-bet the merit
+# tables were originally calibrated against).
+_ALPHA_REF = _BUCKET_ALPHA[SizeBucket.MEDIUM]
+# The three shared price constants, fitted numerically (F1 tuning harness:
+# uniform-random hole + flop range, analytic fold-rate per candidate) against
+# min(RES-D §2 band top, α − 0.01) per persona × bucket:
+# - LEVEL: global fold-merit level at the MEDIUM reference. The pre-F1 tables
+#   over-folded the α ceiling at every size (a tag folded ~0.39 to a ⅓-pot bet
+#   vs α 0.25); 0.35 re-levels the whole curve under the ceiling.
+# - SENSITIVITY: exponent on the α ratio — how fast fold merit grows with size.
+# - STICKINESS_DAMP: the `stickiness` lever wiring — the effective exponent is
+#   SENSITIVITY * stickiness**(-DAMP), so stickier personas (station 1.8,
+#   fish 1.4) respond LESS to price than the disciplined low-stickiness ones
+#   (nit/tag 0.6), on top of stickiness's existing call-merit scaling.
+_PRICE_LEVEL = 0.35
+_PRICE_SENSITIVITY = 2.2
+_PRICE_STICKINESS_DAMP = 0.15
+
+
+def _price_factor(faced_fraction: float, stickiness: float) -> float:
+    """Multiplier on the fold merit for a faced bet at `faced_fraction` of the
+    pot: LEVEL * (α_bucket/α_ref) ** (SENSITIVITY * stickiness**-DAMP).
+    Monotone non-decreasing across SMALL→OVERBET because _BUCKET_ALPHA is."""
+    alpha = _BUCKET_ALPHA[size_bucket(faced_fraction)]
+    exponent = _PRICE_SENSITIVITY * stickiness ** (-_PRICE_STICKINESS_DAMP)
+    return _PRICE_LEVEL * (alpha / _ALPHA_REF) ** exponent
+
 
 def sample_postflop_decision(
     pack: PersonaPack,
@@ -286,7 +345,33 @@ def sample_postflop_decision(
 
     entries: list[tuple[ActionType, float]] = []
     if ActionType.FOLD in by_kind:  # facing chips
-        entries.append((ActionType.FOLD, _FOLD_BASE[bucket]))
+        # F1 price-aware defense: faced pot-fraction = to_call over the pot
+        # the aggressor's bet/raise was made INTO, mapped to the RES-E bucket;
+        # the fold merit scales with the bucket's α relative to the MEDIUM
+        # reference, damped by stickiness. Call/raise merits are untouched —
+        # they absorb the complement through normalization.
+        #
+        # Pre-aggression pot = pot_bb − current_bet_to (the aggressor's full
+        # bet-TO this street), NOT pot_bb − to_call: facing a raise or
+        # check-raise, to_call is only the increment over our own street
+        # chips, and those chips belong in the denominator (e.g. bet 3 into 9,
+        # raised to 8 → to_call 5, live pot 20; frac is 5/12 ≈ 0.42 MEDIUM,
+        # not 5/15 = 0.33 SMALL). The inner max() covers callers that leave
+        # current_bet_to at its 0.0 default (harness/estimator simple-bet
+        # spots where the facing seat has zero street chips, so
+        # current_bet_to == to_call).
+        #
+        # Known limitation: when the aggressor re-raises their OWN earlier
+        # bet this street (same-street 3-bet+), current_bet_to includes
+        # their pre-raise street chips, so this over-subtracts and
+        # understates faced_frac by up to one bucket. Exact recovery needs
+        # per-action pot history the engine doesn't keep; the error is
+        # conservative (under-folding vs re-raises) and confined to
+        # same-street 3-bet+ lines. Tracked as an Epic-4 follow-up.
+        to_call_bb = by_kind[ActionType.CALL].min_bb or 0.0
+        faced_frac = to_call_bb / max(pot_bb - max(current_bet_to, to_call_bb), 0.01)
+        fold_merit = _FOLD_BASE[bucket] * _price_factor(faced_frac, pf.stickiness)
+        entries.append((ActionType.FOLD, fold_merit))
         entries.append(
             (ActionType.CALL, (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * pf.stickiness)
         )
