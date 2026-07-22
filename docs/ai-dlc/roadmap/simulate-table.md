@@ -811,7 +811,13 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       tagged SOLVED/SOURCED/DERIVED; no app code touched. **Appetite:** ~1 large spike. **No-gos:** no
       solver tables; no code; approximate labels mandatory.
 
-- [ ] **RES-E — "Optimal bet sizes per spot" (residual only — RES-B pre-answered the bulk).**
+- [x] **RES-E — "Optimal bet sizes per spot" (residual only — RES-B pre-answered the bulk).**
+      *(done 2026-07-21, `docs/ai-dlc/research/RES-E-size-buckets.md`. Confirmed the engine's size
+      vocabulary is `{0.33, 0.5, 0.75, 1.0, 1.5}` + per-street `POSTFLOP_BET_FRACS` (sizing.py) and
+      mapped it onto RES-D's 4 buckets: SMALL ≤0.40 / MEDIUM 0.41–0.70 / LARGE 0.71–1.10 / OVERBET
+      >1.10. Locked rulings: cutoffs are on live **pot-fraction = bet_bb/pot_bb** computed at decision
+      time (not the discrete authored keys — so F1 responds to ANY faced size); 1.0=pot lives in LARGE;
+      maniac 1.5 is the sole OVERBET. Cites RES-B for the values — invents NO new sizing numbers. No code.)*
       **Problem:** the user asked for a bet-sizing spike; Epic-2's RES-B (`docs/ai-dlc/research/
       RES-B-bet-sizing.md`) already found the persona sizes correct/defensible — the open residual is
       *which discrete size buckets* F1's defense and F2's bluffing should key on (e.g. small ≤⅓ /
@@ -824,7 +830,17 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       values; no code. **Appetite:** ~½ spike (mostly reconciliation). **No-gos:** no new sizing
       numbers beyond RES-B unless a gap is found; no bet-size sliders; sizes stay FIXED.
 
-- [ ] **RES-F — Min-bet legality root-cause ("20BB pot but hero can only bet 1BB").** **Problem:**
+- [x] **RES-F — Min-bet legality root-cause ("20BB pot but hero can only bet 1BB").** *(done
+      2026-07-21, `docs/ai-dlc/research/RES-F-min-bet-legality.md`. Root cause = a degenerate OFFER, not
+      an illegality: `sim_session.py::_hero_postflop_size_bb` (:354-362) reads `HERO_NODE_SIZE.get(node)`
+      which has only 6 aggressor-node keys → any unmapped/non-aggressor node (donk/lead/probe/delayed-cbet)
+      misses → returns None → FE falls back to the engine min BET (`engine.py:187-192` = `min_raise_to_bb`
+      = 1BB, which is the CORRECT legal min). So a 1BB bet into a 20BB pot is legal but is the ONLY thing
+      offered. Recommended fix (F6) = **offer-layer default**: when the node is unmapped, offer the street's
+      small `POSTFLOP_BET_FRACS` fraction × pot (clamped), so hero gets a pot-proportional size that the
+      canonical-bet grader still maps (or honest "no baseline yet"); reject touching `engine.legal_actions`
+      (high blast radius — bots/range-estimate/grading read it; 1BB IS the real min). No code.)*
+      **Problem:**
       in some spots hero's legal bet options are degenerate — a tiny min-bet into a large pot — which
       is unrealistic and distorts both play and grading. **Outcome-link:** hero always faces sensible,
       realistic sizing choices. **Solution:** trace the legal-action / sizing path (`sizing.py`,
