@@ -41,12 +41,18 @@ def test_rfi_nesting_utg_through_lj_is_monotonic():
 
 
 def test_utg1_utg2_non_spots_stay_unmapped():
-    """RES-A §7: vs_4bet / blind_defense / vs_limpers are non-spots for
-    UTG1/UTG2 -- no content entry exists so `_find_entry` returns None."""
+    """RES-A §7: vs_4bet / blind_defense are non-spots for UTG1/UTG2 -- no
+    content entry exists so `_find_entry` returns None. vs_limpers is a
+    SUPERSESSION as of M2 (RES-G Slice A): UTG2 now has a vs_limpers x1 entry
+    (RES-G §1d measured the EP faces-1-limper shape at UTG2, not UTG -- UTG
+    itself has no seats before it and can never face a limper, so the entry
+    was authored at UTG2 to stay both organically reachable and coherent in
+    `build_spot`). UTG1 remains a genuine vs_limpers non-spot."""
     for pos in (Position.UTG1, Position.UTG2):
         assert _find_entry(NodeContext.VS_4BET, pos, Position.BTN) is None
         assert _find_entry(NodeContext.BLIND_DEFENSE, pos, Position.BTN) is None
-        assert _find_entry(NodeContext.VS_LIMPERS, pos, None) is None
+    assert _find_entry(NodeContext.VS_LIMPERS, Position.UTG1, None) is None
+    assert _find_entry(NodeContext.VS_LIMPERS, Position.UTG2, None) is not None
 
 
 def test_sample_is_deterministic_with_seed():
