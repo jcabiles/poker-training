@@ -878,13 +878,30 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       coverage_baseline re-recorded 1220/225→1260/237 per its documented procedure (refuter
       reproduced byte-for-byte). 711 backend tests + ruff green.)* ICE 9·8·5.
 
-- [ ] **F2 — Size-linked bot bluffing (fixes flat `bluff_freq`).** Replace the flat per-persona
-      `bluff_freq` with a **chosen-size-dependent** bluff fraction (polar `f/(1+2f)` from RES-D,
-      persona-skewed), wired through `_BLUFF_RAISE_FACTOR` / the bluff path in
-      `sample_postflop_decision`. **Pass/fail:** a persona's bluff frequency **moves with its chosen
-      bet size** (bigger size → lower bluff-to-value ratio, per theory), test-asserted across ≥3 sizes;
-      the chosen size still does NOT reveal hand strength (anti-sizing-tell regression test holds).
-      **Appetite:** ~1 slice. **No-gos:** no size→strength leak; frequency-sampled. ICE 8·7·5.
+- [x] **F2 — Size-linked bot bluffing (fixes flat `bluff_freq`).** *(done 2026-07-22: joint
+      (action,size) law via two-stage factorization — (1) bluff_mass × E_w[bucket_factor] over the
+      persona's AUTHORED sizing dist before the action draw, (2) bluff-cell (AIR/ACE_HIGH no-draw)
+      size-draw weights tilted by factor(s) = share(bucket)/0.27; mathematically identical to
+      "pre-draw size, condition bluff on it" (refuter confirmed algebraically + 200k-sample sim,
+      exact to noise, no double-counting) but keeps the action draw as the FIRST rng.choices call
+      so range_estimate's _CaptureRng stays sound. Bluff-share targets per RES-D §3 polar curve:
+      SMALL 0.20 / MEDIUM 0.27 / LARGE 0.32 / OVERBET 0.375 (f/(1+2f) at bucket-representative
+      sizes mirroring _BUCKET_ALPHA). **Direction note:** roadmap wording "lower bluff-to-value
+      ratio" was a slip — RES-D §3 (authoritative) has bluff SHARE rising with size, i.e.
+      value:bluff falling toward 1:1; tests assert bluff freq strictly INCREASING SMALL→OVERBET.
+      Anti-sizing-tell: value-hand size draw stays authored byte-for-byte (regression test
+      unmodified; refuter measured 0.4998 vs authored 0.5 at n=486k); the air-range big-size lean
+      (P(1.5×|air,bet)≈0.65 maniac) is the intended Bayes consequence of RES-D §1b, not a leak.
+      Bot raises draw from authored sizing (FACING_RAISE_MULTS is hero-only — spec's
+      _BLUFF_RAISE_FACTOR mention was off; tilt applies to the raise-size draw consistently).
+      **Documented side effect (refuter LOW):** stage-1 E_w[factor] shifts overall per-persona
+      bluff mass (station/fish −13.7%, nit +11.1%, tag +0.9%, lag +6.3%, maniac +23.6%; up to
+      +26.7% on maniac's raise node) — intentional-by-construction; BANDS absorbed it unmodified
+      (5× stable). coverage_baseline re-recorded 1260/237→1275/228 per its documented procedure
+      (refuter isolated: revert-personas-only reproduces old fixture exactly; new-ungraded
+      decisions spread broadly across streets/shapes — stream drift, no mapper regression;
+      graded ratchet now guards from 228). 4 new tests incl. a scale-then-redraw killer. 720
+      backend tests + ruff + verify.sh green; refuter PASS.)* ICE 8·7·5.
 
 - [ ] **F3 — Bounded maniac aggression (fixes saturation → near-argmax).** Cap / renormalize the
       aggression multiplier (`content/personas/maniac.json` `aggression`=15 + `_COMMIT_AGG_BOOST`
