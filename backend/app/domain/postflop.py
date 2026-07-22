@@ -263,7 +263,15 @@ def _hand_category(hole: tuple[str, str], board: list[str]) -> str:
         if len(matches) >= 2:
             made = 3  # two pair
         elif len(matches) == 1:
-            made = 2 if _RIDX[matches[0]] == board_top else 1  # top pair vs weak pair
+            if branks.count(matches[0]) >= 2:
+                # F7 bug 2: one-hole-card trips on a paired board (A8 on 883,
+                # ~0.94 equity). Was falling to the top-pair/weak-pair rule →
+                # "weak_made", so the F5 catcher clamp pinned its fold share at
+                # α and FOLD graded ACCEPTABLE while the lower-equity 33 boat
+                # graded FOLD a mistake. Trips slot with two-pair/sets/boats:
+                made = 3  # trips (hole card + board pair)
+            else:
+                made = 2 if _RIDX[matches[0]] == board_top else 1  # top pair vs weak pair
 
     # flush_draw/oesd only need to distinguish "not yet made" from "made" for the
     # exactly-4-of-a-suit / exactly-4-consecutive-ranks case: any 5-of-a-suit or

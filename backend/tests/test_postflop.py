@@ -1042,3 +1042,59 @@ def test_f5_degenerate_huge_overbet_ceiling_capped():
     assert all(math.isfinite(f) for f in freqs)
     assert sum(freqs) == pytest.approx(1.0, abs=1e-6)
     assert _freq(res, ActionType.FOLD) == pytest.approx(1.0)  # clamp bypassed
+
+
+# --- F7 bug 2: one-hole-card trips on a paired board are "strong" ---
+# Pre-fix, A8/98 on 8s8h3d (~0.94 equity) fell to the top-pair/weak-pair rule
+# ("weak_made"), so the F5 catcher clamp pinned their FOLD share at α, FOLD
+# graded ACCEPTABLE and raise freq was 0.000 — while the LOWER-equity 33 boat
+# ("strong") graded FOLD a mistake. Trips now slot with two-pair/sets/boats.
+
+
+def test_f7_hand_category_trips_on_paired_board_is_strong():
+    board = ["8s", "8h", "3d"]
+    assert _hand_category(("Ac", "8c"), board) == "strong"  # trips, top kicker
+    assert _hand_category(("9c", "8c"), board) == "strong"  # trips, weak kicker
+    assert _hand_category(("3h", "3c"), board) == "strong"  # boat — unchanged
+    # Paired-board non-trips catchers stay weak_made (clamp scope unchanged).
+    assert _hand_category(("Ac", "3c"), board) == "weak_made"
+    assert _hand_category(("2c", "2d"), board) == "weak_made"
+
+
+def test_f7_trips_fold_grades_worse_than_acceptable_and_raise_mixes():
+    board = ["8s", "8h", "3d"]
+    faced = FLOP_POT / 2  # ½-pot c-bet
+    trips = _vscbet_spot(("Ac", "8c"), board, faced)
+    base = grade_vs_cbet(trips, trips.hero_range, trips.villain_range, None)
+    assert _freq(base, ActionType.RAISE) > 0  # was 0.000
+    fold_trips = grade_vs_cbet(
+        trips, trips.hero_range, trips.villain_range, Decision(action=ActionType.FOLD)
+    )
+    assert fold_trips.correctness in (Correctness.MISTAKE, Correctness.BLUNDER)
+
+
+def test_f7_boat_vs_trips_fold_grade_inversion_gone():
+    # The measured inversion: 33-boat FOLD graded MISTAKE while higher-equity
+    # A8-trips FOLD graded ACCEPTABLE. Both are "strong" now — both FOLDs
+    # grade worse than a genuine catcher's ACCEPTABLE fold on the same board.
+    board = ["8s", "8h", "3d"]
+    faced = FLOP_POT / 2
+    severity = {
+        Correctness.OPTIMAL: 0,
+        Correctness.ACCEPTABLE: 1,
+        Correctness.MISTAKE: 2,
+        Correctness.BLUNDER: 3,
+    }
+
+    def fold_grade(hole):
+        spot = _vscbet_spot(hole, board, faced)
+        return grade_vs_cbet(
+            spot, spot.hero_range, spot.villain_range, Decision(action=ActionType.FOLD)
+        ).correctness
+
+    boat, trips, catcher = fold_grade(("3h", "3c")), fold_grade(("Ac", "8c")), fold_grade(
+        ("Ac", "3c")
+    )
+    assert severity[trips] >= severity[boat]  # inversion gone
+    assert severity[boat] > severity[catcher]  # strong folds punished, catcher fold OK
+    assert catcher == Correctness.ACCEPTABLE

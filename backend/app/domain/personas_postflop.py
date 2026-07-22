@@ -121,7 +121,18 @@ def _made_bucket(hole: tuple[Card, Card], board: list[Card]) -> StrengthBucket:
         return StrengthBucket.MONSTER if rank[1] in (r1, r2) else _high_card_bucket(hole_hi)
     if cat == 2:  # two pair
         if pocket:  # pocket pair + board pair (below set strength)
-            return StrengthBucket.TWO_PAIR_PLUS
+            # F7 bug 1: only a real strong two pair when the POCKET is the top
+            # pair of the best five (pocket above the board's paired rank —
+            # TT on 883). An under-pocket-pair also reads "two pair" to _eval5
+            # (22 on 883 = "eights and deuces"), but the board pair plays for
+            # everyone; its true showdown class is the same pocket-underpair
+            # the unpaired-board cat==1 rule maps to MIDDLE_PAIR (22 on 883
+            # == 22 on K72). Pre-fix it classed TWO_PAIR_PLUS and raised a
+            # 3bb-into-6bb bet at .734 with 0.375 equity while AK-high
+            # (0.499 equity, same board) folded .406.
+            if rank[1] == r1:
+                return StrengthBucket.TWO_PAIR_PLUS
+            return StrengthBucket.MIDDLE_PAIR
         if r1 in board_ranks and r2 in board_ranks:  # both hole cards playing
             return StrengthBucket.TWO_PAIR_PLUS
         if r1 in board_ranks or r2 in board_ranks:  # one pair + board pair

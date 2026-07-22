@@ -997,13 +997,34 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 
 > Promoted to its own slice ONLY if a spike shows it's the root cause; otherwise handled inside F1/F3.
 
-- **F7 — Finer hand-strength ladder (coarse-ladder smoothing).** *Evidence:* the 7-rung analytic
+- [x] **F7 — Finer hand-strength ladder (coarse-ladder smoothing).** *Evidence:* the 7-rung analytic
   ladder (`strength_bucket` AIR→…→MONSTER) can create action *cliffs* at bucket edges that F1/F3 may
   only partly mask. *Open questions (spike-gated):* is the coarseness a *root* cause of any residual
   unrealistic decision after F1–F5, or cosmetic; would a finer/interpolated ladder change grades
   enough to matter; does it touch `spot_signature()` (must not). **Do NOT hand to `/ai-dlc` until
   F1–F5 land and a diagnostic shows a real cliff.** *(Ranked lowest in Epic 4; may close as "not
   needed" if F1/F3 resolve the observed behavior.)*
+  *(Resolved 2026-07-22, PR #71. Diagnostic ran post-F1–F5 (deterministic exact-distribution +
+  N=2000 sweeps, 3 boards, 2 personas; hero-grading sweeps; scratchpad-only): **finer ladder =
+  NO-GO** — within-bucket flatness is structural (the ladder is the bot's only hand input) and most
+  boundary jumps align with real strategic thresholds (pair vs no-pair, monster edges); rung count
+  is not the root cause. `spot_signature()` confirmed untouched by either ladder (srs.py hashes
+  texture/SPR/faced-bucket, never hole cards). The diagnostic instead root-caused the two worst
+  unrealistic behaviors (cliff ratios 8–38× the equity jump) to **two paired-board classification
+  rules, both fixed in this slice**: (1) `strength_bucket` classed an under-pocket-pair on a paired
+  board as TWO_PAIR_PLUS — tag raised 22 on 883r at .734 facing MEDIUM (equity .375); now
+  TWO_PAIR_PLUS only when the pocket is the top pair of the best five, else MIDDLE_PAIR — tag
+  raise .199/fold .203, sane vs true middle pairs. (2) `_hand_category` classed one-hole-card trips
+  as `weak_made` — folding 98 on 883r (.94 equity) graded ACCEPTABLE with raise freq 0 (and F5's
+  clamp then pinned its fold at α); trips → `strong`, boat-vs-trips grade inversion gone. Refuter
+  PASS, 0 issues: exhaustive 10,504-combo (bot) + 44,616-combo (grader) pre/post audit — ONLY the
+  claimed transitions occur, no AIR/ACE_HIGH membership changes, unpaired boards byte-stable;
+  bonus: A3-on-8833x boat was also misclassified weak_made pre-fix, now correctly strong. Maniac
+  ftc band top re-anchored 0.430→0.56 per RES-D §4 (post-fix center ~0.40–0.44 clipped the old
+  top; refuter confirmed necessity + all other bands hold). coverage_baseline re-recorded
+  1266/231→1233/242 (refuter isolated: Bug 1 alone drives the delta; graded share rose 18.2%→19.6%
+  — more catcher-class spots mappable). All 5 new tests proven to fail on pre-fix code. 757
+  backend tests + ruff + verify.sh green, 3×/5× stable.)*
 
 ---
 

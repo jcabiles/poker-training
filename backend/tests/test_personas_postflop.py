@@ -109,6 +109,28 @@ def test_strength_bucket_middle_pair_incl_pocket_pair_below_top_board_card():
     assert bucket == StrengthBucket.MIDDLE_PAIR
 
 
+def test_f7_under_pocket_pair_on_paired_board_is_middle_pair():
+    # F7 bug 1: a pocket pair BELOW the board's paired rank reads "two pair"
+    # to the evaluator (22 on 883 = eights and deuces) but the board pair
+    # plays for everyone — it must class like any pocket underpair.
+    board = ["8s", "8h", "3d"]
+    assert strength_bucket(("2c", "2d"), board)[0] == StrengthBucket.MIDDLE_PAIR
+    assert strength_bucket(("5c", "5d"), board)[0] == StrengthBucket.MIDDLE_PAIR
+    # Pocket pair ABOVE the board pair is a genuinely strong two pair: kept.
+    assert strength_bucket(("Tc", "Td"), board)[0] == StrengthBucket.TWO_PAIR_PLUS
+    # One-hole-card trips on the paired board: monster (unchanged).
+    assert strength_bucket(("Ac", "8c"), board)[0] == StrengthBucket.MONSTER
+
+
+def test_f7_unpaired_board_sentinels_unchanged():
+    # The bug-1 fix touches ONLY the paired-board pocket-pair branch; unpaired
+    # boards must be byte-stable.
+    board = ["Ks", "7h", "2d"]
+    assert strength_bucket(("Qc", "Qd"), board)[0] == StrengthBucket.MIDDLE_PAIR
+    assert strength_bucket(("Kd", "7c"), board)[0] == StrengthBucket.TWO_PAIR_PLUS
+    assert strength_bucket(("Ac", "Kc"), board)[0] == StrengthBucket.OVERPAIR_TPTK
+
+
 def test_strength_bucket_ace_high_and_air():
     bucket, _ = strength_bucket(("Ah", "5d"), ["Kc", "9s", "3h"])
     assert bucket == StrengthBucket.ACE_HIGH
@@ -311,6 +333,45 @@ def personas_postflop_legal_raise(lo, hi):
     from app.domain.spot import LegalAction
 
     return LegalAction(action=ActionType.RAISE, min_bb=lo, max_bb=hi)
+
+
+class _FirstChoicesRecorder(random.Random):
+    """Captures the FIRST rng.choices call — the action draw (the F2 two-stage
+    sampling keeps it first; see the sample_postflop_decision docstring) — so
+    a test can assert the EXACT normalized action distribution, no MC noise."""
+
+    def __init__(self):
+        super().__init__(0)
+        self.first_pop = None
+        self.first_weights = None
+
+    def choices(self, population, weights=None, *, cum_weights=None, k=1):
+        if self.first_weights is None:
+            self.first_pop = list(population)
+            self.first_weights = list(weights)
+        return [population[0]]
+
+
+def test_f7_tag_under_pocket_pair_facing_medium_bet_folds_not_raises():
+    # F7 bug 1 behavioral: tag with 22 on 883r facing 3bb into 6bb (MEDIUM)
+    # raised 0.734 / folded 0.013 pre-fix at 0.375 equity — more aggressive
+    # than AK-high (0.499 equity) on the same board. As MIDDLE_PAIR the exact
+    # distribution is now call-dominant with a material fold share.
+    pack = _pack("tag")
+    board = ["8s", "8h", "3d"]
+    legal = [
+        personas_postflop_legal_fold(),
+        personas_postflop_legal_call(3.0),
+        personas_postflop_legal_raise(9.0, 97.0),
+    ]
+    rec = _FirstChoicesRecorder()
+    sample_postflop_decision(
+        pack, ("2c", "2d"), board, legal, 9.0, 97.0, 1, rec, current_bet_to=3.0
+    )
+    dist = dict(zip(rec.first_pop, rec.first_weights, strict=True))
+    total = sum(dist.values())
+    assert dist[ActionType.RAISE] / total < 0.35  # was 0.734
+    assert dist[ActionType.FOLD] / total > 0.15  # was 0.013
 
 
 ALL_PERSONAS = sorted(v.value for v in VillainType)
@@ -1185,7 +1246,16 @@ BANDS = {
     # measured — mid-band, (0.47, 0.65) kept (RES-D §4's PRD maniac WTSD
     # (0.228, 0.402) stays superseded by F1's documented engine-anchored
     # deviation: honoring the α fold-ceiling keeps more pots alive).
-    "maniac": ((2.4, 4.5), (0.0, 0.430), (0.47, 0.65)),  # AF re-anchored (F3), rest F1
+    # maniac ftc top re-anchored (F7, RES-D §4 measure-then-anchor): the paired-
+    # board classification fix (under-pocket-pair TWO_PAIR_PLUS → MIDDLE_PAIR,
+    # personas_postflop._made_bucket) moves those hands from never-fold to the
+    # bluff-catch class, nudging aggregate fold-to-cbet UP for everyone; only
+    # maniac's old 0.430 top clipped it. Measured 0.422 (n=128, N=399) / 0.398
+    # (n=216, N=670), seed 20260710; binomial 3σ at machine-scaled n as low as
+    # ~120 ⇒ tol ~±0.135 → top 0.56. Floor 0.0 kept. All other personas
+    # re-measured inside their existing bands at both N (station .227/.199,
+    # fish .303/.275, nit n/a/.314, tag .400/.391, lag .271/.237) — kept.
+    "maniac": ((2.4, 4.5), (0.0, 0.56), (0.47, 0.65)),  # ftc re-anchored (F7), AF F3, rest F1
 }
 
 
