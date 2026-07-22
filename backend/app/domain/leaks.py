@@ -41,6 +41,7 @@ class LeakCategory(IntEnum):
     VS_TURN_BET = 204  # facing a turn bet after calling flop (S6)
     RIVER_BARREL = 205  # flop+turn aggressor deciding whether to bet the river (S7)
     VS_RIVER_BET = 206  # facing a river bet after calling flop+turn (S7)
+    VS_CALLER_RAISE = 207  # facing a cold-caller's raise of the flop c-bet, as the opener (M4)
     BOARD_TEXTURE = 210  # board-texture classification drill
     EQUITY_EST = 211  # equity-estimation drill
 

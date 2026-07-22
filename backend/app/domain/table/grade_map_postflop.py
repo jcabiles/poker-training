@@ -897,3 +897,165 @@ def map_mw_vs_river_bet(state: HandState, hero_seat: int) -> Spot | None:
         state, hero_seat, opener, pot, rbet,
         Street.RIVER, NodeContext.VS_RIVER_BET, bb_range, opener_range,
     )
+
+
+# --- M4 (RES-H H1): caller-re-raises-c-bet — hero = opener facing the raise --
+# Hero opened an SRP, c-bet the flop at a canonical size, and the NON-BB
+# preflop cold-caller raised the c-bet; hero faces/closes. Two entrant shapes
+# share the family (both rejected by `_hu_srp_preflop`'s strict villain-is-BB
+# 2-live gate, hence the dedicated `_flop_caller_raise_preflop` gate):
+#   * opener + caller + BB (3-way): flop check(BB) → c-bet → raise(caller) →
+#     BB folds (degrade-to-2-live, dead money stays in the pot) or calls
+#     (still 3-live at hero's decision → `_apply_multiway` composes).
+#   * opener + caller only (BB folded preflop): flop c-bet → raise(caller).
+# The caller's VS_RFI call entry is the content gate AND his villain range
+# (he is the aggressor hero faces). The raise size is un-bucketed (personas
+# raise on a continuous grid — same rule as `_check_bet_raise`); the C-BET
+# recognition reuses `_is_canonical_bet`'s RECOGNIZED_BET_FRACS grid, every
+# member of which maps to a defined RES-E bucket. Donk leads, limped pots,
+# delayed c-bets, BB raises and hero-not-opener all return None.
+
+
+def _flop_caller_raise_preflop(state: HandState) -> tuple | None:
+    """Gate: SRP where a non-blind opener at an in-band open was flatted by
+    exactly ONE non-blind cold-caller, plus optionally the BB; SB (and every
+    other seat) folded. Structurally the `_mw_srp_preflop` entrant shape with
+    the BB optional. Returns (opener, caller, bb_or_None, open_to) — bb is
+    None when the BB folded preflop — or None."""
+    pre = _street_actions(state, Street.PREFLOP)
+    if any(
+        h.action not in (ActionType.FOLD, ActionType.RAISE, ActionType.CALL)
+        for h in pre
+    ):
+        return None
+    raises = [h for h in pre if h.action is ActionType.RAISE]
+    calls = [h for h in pre if h.action is ActionType.CALL]
+    if len(raises) != 1 or len(calls) not in (1, 2):
+        return None
+    opener_pos = raises[0].position
+    if opener_pos in _BLIND_POSITIONS:
+        return None
+    non_bb_calls = [c for c in calls if c.position is not Position.BB]
+    if len(non_bb_calls) != 1:
+        return None  # exactly one cold-caller; two calls ⇒ the other is the BB's
+    caller_pos = non_bb_calls[0].position
+    if caller_pos in _BLIND_POSITIONS:
+        return None  # an SB cold-call is off-shape
+    bb_called = len(calls) == 2  # the other call can only be the BB's
+    opener = next((s for s in state.seats if s.position is opener_pos), None)
+    caller = next((s for s in state.seats if s.position is caller_pos), None)
+    bb = (
+        next((s for s in state.seats if s.position is Position.BB), None)
+        if bb_called
+        else None
+    )
+    if opener is None or caller is None or (bb_called and bb is None):
+        return None
+    if opener.status is not PlayerStatus.IN or caller.status is not PlayerStatus.IN:
+        return None  # an all-in anywhere in the line is off-shape
+    if bb is not None and bb.status not in (PlayerStatus.IN, PlayerStatus.FOLDED):
+        return None  # BB may fold to the flop raise, never be all-in
+    entrants = {opener.seat, caller.seat} | ({bb.seat} if bb is not None else set())
+    if any(
+        s.status is not PlayerStatus.FOLDED
+        for s in state.seats
+        if s.seat not in entrants
+    ):
+        return None
+    open_to = raises[0].amount_bb
+    if not (2.0 - _EPS <= open_to <= _OVERSIZE_OPEN_CAP + _EPS):
+        return None
+    return opener, caller, bb, open_to
+
+
+def _flop_cbet_caller_raise(
+    state: HandState,
+    opener_pos: Position,
+    caller_pos: Position,
+    bb_entrant: bool,
+    pot_before: float,
+) -> tuple[float, float, bool] | None:
+    """Gate: the flop went EXACTLY [check(BB) →] bet(opener, canonical) →
+    raise(caller) [→ fold-or-call(BB)], hero (the opener) now facing the
+    caller's raise and CLOSING. Returns (cbet, raise_to, bb_called_raise) or
+    None. The raise size is deliberately un-bucketed (see `_check_bet_raise`);
+    an incomplete raise or a short BB call is off-shape."""
+    acts = _street_actions(state, Street.FLOP)
+    if bb_entrant:
+        if len(acts) != 4:
+            return None
+        chk, bet, cr, resp = acts
+        if chk.action is not ActionType.CHECK or chk.position is not Position.BB:
+            return None
+    else:
+        if len(acts) != 2:
+            return None
+        bet, cr = acts
+        resp = None
+    if bet.action is not ActionType.BET or bet.position is not opener_pos:
+        return None
+    if not _is_canonical_bet(bet.amount_bb, pot_before, Street.FLOP):
+        return None
+    if cr.action is not ActionType.RAISE or cr.position is not caller_pos:
+        return None
+    # The caller had nothing invested this street: the history INCREMENT is
+    # the full raise-TO.
+    raise_to = cr.amount_bb
+    if raise_to <= bet.amount_bb + _EPS:
+        return None  # degenerate: a "raise" no bigger than the bet
+    bb_called_raise = False
+    if resp is not None:
+        if resp.position is not Position.BB:
+            return None
+        if resp.action is ActionType.CALL:
+            if abs(resp.amount_bb - raise_to) > _EPS:
+                return None  # short call = someone is all-in — off-shape
+            bb_called_raise = True
+        elif resp.action is not ActionType.FOLD:
+            return None  # a BB re-raise is a different (unmapped) node
+    return bet.amount_bb, raise_to, bb_called_raise
+
+
+def map_flop_vs_caller_raise(state: HandState, hero_seat: int) -> Spot | None:
+    """Flop caller-re-raises-c-bet (M4): hero opened an SRP at an in-band
+    size, c-bet the flop canonically, and the non-BB preflop cold-caller
+    raised; hero faces/closes. Hero's re-raise legs are the plain facing-bet
+    mults on the raise-to; CALL is the INCREMENTAL amount (raise_to - cbet) —
+    hero already has the c-bet invested this street."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _flop_caller_raise_preflop(state)
+    if gate is None:
+        return None
+    opener, caller, bb, open_to = gate
+    if opener.seat != hero_seat:
+        return None
+    flop_pot = round(
+        (3 * open_to + 0.5) if bb is not None else (2 * open_to + 1.5), 2
+    )
+    faced = _flop_cbet_caller_raise(
+        state, hero.position, caller.position, bb is not None, flop_pot
+    )
+    if faced is None:
+        return None
+    cbet, raise_to, bb_called_raise = faced
+    pot = _live_pot(state)
+    expected = flop_pot + cbet + raise_to + (raise_to if bb_called_raise else 0.0)
+    if abs(pot - expected) > _EPS:
+        return None
+    # Ranges: hero = the opener's RFI raise range; villain = the CALLER's
+    # VS_RFI call range (the same content entry `_mw_ranges` gates on — here
+    # the caller IS the aggressor hero faces, so his range is consumed).
+    rfi_entry = _find_entry(NodeContext.RFI, hero.position, None)
+    caller_entry = _find_entry(NodeContext.VS_RFI, caller.position, hero.position)
+    hero_range = _combos_for(rfi_entry, ActionType.RAISE)
+    caller_range = _combos_for(caller_entry, ActionType.CALL)
+    if not hero_range or not caller_range:
+        return None
+    return _faced_bet_spot(
+        state, hero_seat, caller, pot, raise_to,
+        Street.FLOP, NodeContext.VS_CALLER_RAISE, hero_range, caller_range,
+        mults=FACING_RAISE_MULTS["raise"],
+        call_amt=round(raise_to - cbet, 2),
+    )

@@ -9,10 +9,20 @@ from __future__ import annotations
 
 from app.domain.action import Decision
 from app.domain.evaluation import EvaluationResult
-from app.domain.postflop import grade_cbet, grade_vs_cbet, grade_vs_check_raise
+from app.domain.postflop import (
+    grade_cbet,
+    grade_vs_caller_raise,
+    grade_vs_cbet,
+    grade_vs_check_raise,
+)
 from app.domain.spot import NodeContext, Spot, Street
 
-_POSTFLOP_NODES = (NodeContext.CBET, NodeContext.VS_CBET, NodeContext.VS_CHECK_RAISE)
+_POSTFLOP_NODES = (
+    NodeContext.CBET,
+    NodeContext.VS_CBET,
+    NodeContext.VS_CHECK_RAISE,
+    NodeContext.VS_CALLER_RAISE,
+)
 
 
 class PostflopHeuristicProvider:
@@ -28,6 +38,8 @@ class PostflopHeuristicProvider:
     def _grade(self, spot: Spot, action: Decision | None) -> EvaluationResult:
         if NodeContext.VS_CHECK_RAISE in spot.node_context:
             grader = grade_vs_check_raise
+        elif NodeContext.VS_CALLER_RAISE in spot.node_context:
+            grader = grade_vs_caller_raise
         elif NodeContext.VS_CBET in spot.node_context:
             grader = grade_vs_cbet
         else:

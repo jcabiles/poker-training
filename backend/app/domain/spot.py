@@ -81,6 +81,7 @@ class NodeContext(StrEnum):
     VS_TURN_BET = "vs_turn_bet"  # facing a turn bet after calling flop (S6)
     RIVER_BARREL = "river_barrel"  # aggressor who bet flop+turn deciding the river (S7)
     VS_RIVER_BET = "vs_river_bet"  # caller of flop+turn bets facing a river bet (S7)
+    VS_CALLER_RAISE = "vs_caller_raise"  # facing a cold-caller's raise of the c-bet, as opener (M4)
 
 
 class Stakes(BaseModel):

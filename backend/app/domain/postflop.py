@@ -1807,3 +1807,212 @@ def grade_vs_river_bet(
     if rationale:
         result.authored_rationale = rationale
     return result
+
+
+# --- M4 (RES-H §3 / H1): facing a cold-caller's raise of the flop c-bet ---
+#
+# Hero opened, c-bet the flop, and a NON-BB preflop cold-caller raised the
+# c-bet. Sibling of the check-raise family above, with the §3.2 range
+# asymmetry baked in: a cold-caller's flat is capped and nut-heavy (premiums
+# were 3-bet out preflop), so his flop raise is "value until proven
+# otherwise" — fold baseline higher than the check-raise node's 1.6, the
+# texture bluff-plausibility credit halved, hero's own re-raise-bluff merit
+# lower. Value hands and strong draws still continue.
+#
+# α (RES-H §3.4, RES-D §5): `_calibrate_catcher_fold` is the flat-CALL
+# indifference clamp and "doesn't work with a raise" — it is deliberately
+# NOT called here. A marginal hand may correctly fold ABOVE the α ceiling
+# for the faced size when the raise comes from a capped nut-heavy range.
+
+
+def _merits_vs_caller_raise(
+    value: float, adv: str, price: float, texture: Texture, cat: str
+) -> tuple[float, float, float]:
+    """Return (fold, call, raise) merit scores (proxy EV, ~bb) for hero — the
+    ORIGINAL flop c-bettor — facing a cold-caller's raise of the c-bet.
+
+    Same shape as `_merits_vs_check_raise`; the deltas ARE the range
+    asymmetry (RES-H §3.2):
+      (a) fold baseline 1.9 (> the check-raise node's 1.6) — a cold-caller
+          raise is more value-weighted than a BB check-raise;
+      (b) bluff-plausibility credit halved (0.5x fold relief, 0.25x
+          weak_made bluff-catch bonus vs the check-raise node's 1.0x/0.5x)
+          — cold-caller raises are rarely bluffs on ANY texture;
+      (c) hero's semibluff re-raise bumps halved (draw +0.25, air +0.4 on
+          low/connected/wet vs +0.5/+0.8) — 4-bet-bluffing into a capped
+          nut-heavy range has a lower ceiling.
+    Value re-raises (strong) and draw continues keep the parent's terms.
+    """
+    adv_bonus = {"hero": 0.5, "neutral": 0.0, "villain": -0.5}[adv]
+
+    # texture-conditioned bluff plausibility (same read as the check-raise node)
+    bluffy = 0.0
+    if not texture.high_board:
+        bluffy += 0.3
+    if texture.connectedness == "connected":
+        bluffy += 0.3
+    if texture.wetness == "wet":
+        bluffy += 0.4
+    elif texture.wetness == "dry":
+        bluffy -= 0.4
+    low_connected_wet = (
+        not texture.high_board
+        and texture.connectedness == "connected"
+        and texture.wetness == "wet"
+    )
+
+    # FOLD — baseline above the check-raise node's 1.6 (§3.2a)
+    fold = 1.9
+    if cat == "air":
+        fold += 1.2
+    elif cat == "weak_made":
+        fold += 0.6
+    fold += price * 1.5  # worse price (bigger raise) -> folding better
+    if adv == "villain":
+        fold += 0.3
+    fold -= value * 0.8  # strong made hands / draws fold far less
+    fold -= max(0.0, bluffy) * 0.5  # §3.2b: half the bluffy fold relief
+
+    # CALL — value/draw continue as in the parent; the marginal bluff-catch
+    # credit is halved (§3.2b).
+    call = value
+    if cat in ("strong", "draw"):
+        call += adv_bonus
+    call += (0.4 - price) * 1.5  # cheap raise -> call better
+    if cat == "draw" and texture.wetness == "wet":
+        call += 0.6  # draws still realize equity on wet boards
+    if cat == "air":
+        call -= 1.4
+    elif cat == "weak_made":
+        call += bluffy * 0.25  # halved bluff-catch credit (§3.2b)
+
+    # RAISE (re-raise over the caller's raise) — value keeps the parent's
+    # terms; semibluff bumps are halved (§3.2c).
+    if cat == "strong":
+        raise_ = value + 0.6 + adv_bonus  # value re-raise
+    elif cat == "draw":
+        raise_ = value - 0.4  # kept below call so call stays best on wet boards
+        if low_connected_wet:
+            raise_ += 0.25
+    elif cat == "weak_made":
+        raise_ = -1.0  # never re-raise a marginal made hand into a capped nut range
+    else:  # air
+        raise_ = -1.4
+        if low_connected_wet:
+            raise_ += 0.4
+    return fold, call, raise_
+
+
+def grade_vs_caller_raise(
+    spot: Spot, hero_range: str | None, villain_range: str | None, decision: Decision | None
+) -> EvaluationResult:
+    if spot.street != Street.FLOP:
+        raise ValueError("grade_vs_caller_raise is flop-only")
+    board = spot.board[:3]
+    tex = classify(board)
+    ctx = spot.node_context[0] if spot.node_context else NodeContext.VS_CALLER_RAISE
+    # CRITICAL: the third arg is the CALLER's position (_villain_pos → the
+    # mapper's `facing` = the raiser), NOT hero's own. Hero is still the
+    # preflop+flop aggressor (same refuter-caught rule as grade_vs_check_raise).
+    adv = range_advantage(ctx, spot.hero.position, _villain_pos(spot), tex)
+    cat = _hand_category(spot.hero.hole_cards, board)
+    value = _HAND_VALUE[cat]
+    faced, pot = _faced_call_and_pot(spot)
+    price = faced / pot if pot > 0 else 0.5
+    rationale = _postflop_rationale(
+        NodeContext.VS_CALLER_RAISE, spot.hero.position, _villain_pos(spot)
+    )
+
+    # N4b: the single action-level RAISE eval keys on the BIG leg — max().
+    raise_size = max(
+        (la.min_bb for la in spot.legal_actions if la.action == ActionType.RAISE and la.min_bb),
+        default=None,
+    )
+    m_fold, m_call, m_raise = _merits_vs_caller_raise(value, adv, price, tex, cat)
+    # NOTE: no `_calibrate_catcher_fold` here — α is the flat-call form and
+    # must not clamp a raise-response (RES-H §3.4).
+    if is_multiway(spot):
+        mw = _apply_multiway(
+            {"fold": m_fold, "call": m_call, "raise": m_raise},
+            cat_effective=cat,
+            facing_side=True,
+        )
+        m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
+    specs = [
+        (ActionType.FOLD, None, m_fold),
+        (ActionType.CALL, faced or None, m_call),
+        (ActionType.RAISE, raise_size, m_raise),
+    ]
+    freqs = _frequencies([m for _, _, m in specs])
+    evals = [
+        ActionEval(action=a, size_bb=size, frequency=round(f, 3), ev_bb=round(m, 2))
+        for (a, size, m), f in zip(specs, freqs, strict=True)
+    ]
+    best = max(evals, key=lambda e: e.ev_bb)
+    is_mixed = sum(1 for f in freqs if f > POST_MIX) >= 2
+    leak = int(LeakCategory.VS_CALLER_RAISE)
+
+    base_kwargs = {
+        "per_action": evals,
+        "best_action": best,
+        "provider": ProviderKind.HEURISTIC,
+        "coverage": Coverage.FULL,
+        "leak_category": leak,
+        "is_mixed": is_mixed,
+    }
+
+    if decision is None:
+        result = EvaluationResult(
+            **base_kwargs,
+            rationale_tags=["vs_caller_raise", adv, cat, tex.wetness],
+            explanation=(
+                f"{cat} facing a cold-caller's raise on a {tex.wetness} board "
+                f"({adv} range advantage): {best.action.value} is the play."
+            ),
+        )
+        if rationale:
+            result.authored_rationale = rationale
+        return result
+
+    # RAISE matches by ActionType alone (one raise option), like grade_vs_check_raise.
+    chosen = next((e for e in evals if e.action == decision.action), None)
+    if chosen is None:
+        chosen = ActionEval(
+            action=decision.action, frequency=0.0, ev_bb=min(e.ev_bb for e in evals) - 1.0
+        )
+    ev_loss = max(0.0, round(best.ev_bb - chosen.ev_bb, 2))
+
+    if chosen.action == best.action:
+        correctness = Correctness.OPTIMAL
+    elif chosen.frequency > POST_MIX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_ACCEPTABLE_MAX:
+        correctness = Correctness.ACCEPTABLE
+    elif ev_loss <= POST_MISTAKE_MAX:
+        correctness = Correctness.MISTAKE
+    else:
+        correctness = Correctness.BLUNDER
+
+    if correctness == Correctness.OPTIMAL:
+        why = (
+            f"{cat} vs a cold-caller's raise on a {tex.wetness} board ({adv} edge): "
+            f"{best.action.value} is the play."
+        )
+    else:
+        why = (
+            f"{cat} vs a cold-caller's raise on a {tex.wetness} board ({adv} edge): best is "
+            f"{best.action.value}; you chose {decision.action.value} (-{ev_loss}bb)."
+        )
+
+    result = EvaluationResult(
+        **base_kwargs,
+        chosen_eval=ChosenEval(frequency=chosen.frequency, ev_bb=chosen.ev_bb),
+        ev_loss_bb=ev_loss,
+        correctness=correctness,
+        sizing_correctness=_raise_sizing_verdict(spot, decision, tex.wetness, chosen),
+        rationale_tags=["vs_caller_raise", adv, cat, tex.wetness],
+        explanation=why,
+    )
+    if rationale:
+        result.authored_rationale = rationale
+    return result

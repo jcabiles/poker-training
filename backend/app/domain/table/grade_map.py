@@ -21,6 +21,7 @@ from app.domain.spot import Spot, Street
 from app.domain.table.engine import HandState
 from app.domain.table.grade_map_postflop import (
     map_flop_cbet,
+    map_flop_vs_caller_raise,
     map_flop_vs_cbet,
     map_flop_vs_check_raise,
     map_mw_flop_vs_cbet,
@@ -55,6 +56,7 @@ def map_decision_point(state: HandState, hero_seat: int) -> Spot | None:
             map_flop_cbet(state, hero_seat)
             or map_flop_vs_cbet(state, hero_seat)
             or map_flop_vs_check_raise(state, hero_seat)
+            or map_flop_vs_caller_raise(state, hero_seat)
             or map_mw_flop_vs_cbet(state, hero_seat)
         )
     # R5: turn/river continuation-line shapes, disjoint by hero position
