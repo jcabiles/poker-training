@@ -231,3 +231,31 @@ hero-dependent). If Epic 5 needs the threshold met, L5 must be in scope.
 - **Structural non-decisions.** Hero-BB's own check decision in an MW pot and
   opener-checks-flop hands produce no gradeable facing node by design; funnel
   accounting should not count them as recoverable losses.
+
+## 6. M1 re-measure (post-build, 2026-07-22 — the M7 go/no-go input)
+
+M1 shipped L3 (all 12 `VS_RFI` caller pairs authored, `vs_rfi.json` v2) and L4
+(`_is_canonical_bet` recognition widened to `RECOGNIZED_BET_FRACS` =
+{0.33, 0.5, 0.75, 1.0, **1.5**}×pot, every street — one step past the §1
+counterfactual grid: the maniac's 1.5-pot overbet is also recognized, since it
+maps to the defined RES-E OVERBET bucket and the graders price the live
+pot-fraction). Hero OFFERED sizes stayed 2-button; zero bot-behavior change
+(coverage-baseline hand stream total 1233 unchanged; graded 242 → 267).
+
+**30,000 hands per config, §1 method** (real engine + real bot policy, hero
+seat 0 plays the stated persona proxy, button rotates, stacks reset 100bb,
+lineup shuffled per hand, one seeded Random; fires = non-None real
+`map_mw_*` returns at hero pre-decision states; harness `mw_remeasure.py`,
+scratchpad, not committed):
+
+| Hero proxy | seed 20260722 | seed 7 |
+|---|---|---|
+| tag | **0.27**/1000 (8 fires: 8 flop) | **0.23**/1000 (7: 7 flop) |
+| calling_station | **1.93**/1000 (58: 51 flop / 7 turn) | **2.73**/1000 (82: 70 flop / 12 turn) |
+
+Squarely inside the §3 L3+L4 projection (tag ~0.3, station 1.5–3.2; river
+fires remain ~0 — the 3-street bet-call-call line rarely survives intact).
+**Verdict for M7: graded-MW is far below the ≥5/1000 threshold (§4) under
+BOTH proxies — the go/no-go should be GO on L5 hero-seat widening** (measured
+ceiling 6–11/1000 on top of these numbers) if Epic 5 still wants the
+threshold met.

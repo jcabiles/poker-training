@@ -196,10 +196,24 @@ def test_flop_cbet_node_still_maps_cbet():
 # --------------------------------------------------- gate matrix → None
 
 
-def test_off_size_cbet_gates_vs_cbet():
-    # 0.5-pot is not a canonical flop c-bet bucket (0.33/0.75) → no baseline.
+def test_grid_size_cbet_now_maps_off_grid_still_gates():
+    # M1-L4: a 0.5-pot flop c-bet is on the persona grid (RECOGNIZED_BET_FRACS),
+    # so it now MAPS — with the TRUE bet in the CALL leg and pot math (never
+    # collapsed into the 0.33 bucket). Pre-M1 this exact shape pinned None.
     fp = _flop_pot(Position.BTN)
-    state = _vs_cbet_state(Position.BTN, cbet_override=round(0.5 * fp, 1))
+    cbet = round(0.5 * fp, 1)
+    state = _vs_cbet_state(Position.BTN, cbet_override=cbet)
+    assert state.to_act_seat == HERO_SEAT
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.node_context == [NodeContext.VS_CBET]
+    assert spot.pot_bb == round(fp + cbet, 2)
+    call = next(la for la in spot.legal_actions if la.action is ActionType.CALL)
+    assert call.min_bb == cbet  # the ACTUAL 0.5-pot bet, true price preserved
+    # An off-grid size (0.42-pot sits between the 0.33 and 0.5 fractions,
+    # outside the 0.06bb tolerance of both) still returns None.
+    off = round(0.42 * fp, 2)
+    state = _vs_cbet_state(Position.BTN, cbet_override=off)
     assert state.to_act_seat == HERO_SEAT
     assert map_decision_point(state, HERO_SEAT) is None
 

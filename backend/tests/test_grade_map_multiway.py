@@ -165,6 +165,76 @@ def test_mw_signature_distinct_from_hu_and_stable():
     assert spot_signature(hu_like) != sig  # "mw" is the differentiator
 
 
+# --------------------------------------------------- M1 funnel levers (L3+L4)
+
+
+def test_mw_ranges_all_caller_pairs_present():
+    # L3: every ordered non-blind (opener, caller) pair — all 21 — resolves
+    # `_mw_ranges` (RFI + BB-defense + the VS_RFI caller entry). Pre-M1, 12
+    # pairs returned None (RES-I §3 L3: the content gate that killed 100% of
+    # the baseline's fully-canonical 3-way arrivals).
+    from app.domain.table.grade_map_postflop import _mw_ranges
+
+    order = [
+        Position.UTG, Position.UTG1, Position.UTG2, Position.LJ,
+        Position.HJ, Position.CO, Position.BTN,
+    ]
+    for i, opener in enumerate(order[:-1]):
+        for caller in order[i + 1 :]:
+            assert _mw_ranges(opener, caller) is not None, (opener, caller)
+
+
+def test_recognized_fracs_map_to_res_e_buckets():
+    # L4 pass/fail (c): every recognized faced fraction maps to a DEFINED
+    # RES-E bucket (never a silent collapse into a neighboring bucket), and
+    # hero's offered fractions stay a subset of the recognition grid.
+    from app.domain.personas_postflop import SizeBucket, size_bucket
+    from app.domain.table.sizing import POSTFLOP_BET_FRACS, RECOGNIZED_BET_FRACS
+
+    expected = {
+        0.33: SizeBucket.SMALL,
+        0.5: SizeBucket.MEDIUM,
+        0.75: SizeBucket.LARGE,
+        1.0: SizeBucket.LARGE,
+        1.5: SizeBucket.OVERBET,
+    }
+    assert set(RECOGNIZED_BET_FRACS) == set(expected)  # the full persona grid
+    for frac, bucket in expected.items():
+        assert size_bucket(frac) is bucket
+    for pair in POSTFLOP_BET_FRACS.values():
+        assert set(pair) <= set(RECOGNIZED_BET_FRACS)
+
+
+@pytest.mark.parametrize(
+    "frac,bucket_name", [(0.5, "medium"), (1.0, "large"), (1.5, "overbet")]
+)
+def test_mw_grid_size_cbet_maps_with_true_price(frac, bucket_name):
+    # L4: persona-grid c-bet sizes beyond the hero pair (0.33/0.75) now map,
+    # and the built spot carries the TRUE bet in its CALL leg + pot math — the
+    # graders' price (faced/pot) and `faced_bet_bucket` see the live
+    # pot-fraction, never a 0.33-collapsed one (RES-I §5 HIGH flag).
+    from app.domain.personas_postflop import size_bucket
+
+    state, cbet = _mw_flop_facing(frac=frac)
+    assert state.to_act_seat == HERO_SEAT
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.node_context == [NodeContext.VS_CBET]
+    fp = _flop_pot(Position.CO)
+    call = next(la for la in spot.legal_actions if la.action is ActionType.CALL)
+    assert call.min_bb == cbet  # the ACTUAL bet, true price preserved
+    assert spot.pot_bb == round(fp + 2 * cbet, 2)
+    assert size_bucket(cbet / fp).value == bucket_name  # defined RES-E bucket
+
+
+def test_off_grid_size_still_gates():
+    # A bet off the whole recognition grid (0.42-pot sits between 0.33 and 0.5,
+    # outside the 0.06bb tolerance of both at this pot) still returns None.
+    state, _cbet = _mw_flop_facing(frac=0.42)
+    assert state.to_act_seat == HERO_SEAT
+    assert map_decision_point(state, HERO_SEAT) is None
+
+
 # ------------------------------------------------------- still-None matrix
 
 

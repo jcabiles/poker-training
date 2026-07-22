@@ -500,11 +500,17 @@ def test_utg1_rfi_now_maps_to_a_spot():
     assert spot.hero.position == Position.UTG1
 
 
-def test_off_pack_vs_rfi_pairing_returns_none():
-    # HJ facing an LJ open (canonical size): no vs_RFI HJ-vs-LJ entry exists.
-    assert _find_entry(NodeContext.VS_RFI, Position.HJ, Position.LJ) is None
+def test_hj_vs_lj_now_maps_to_a_spot():
+    # M1-L3: the vs_RFI HJ-vs-LJ caller pair now exists (one of the 12 RES-I §3
+    # gap-fills), so HJ facing an LJ open maps to a real Spot (this was the
+    # canonical "off-pack pairing -> None" witness before M1; the structural
+    # off-pack None-witness lives on in
+    # test_limp_raise_line_returns_none_via_full_mapper, content-independent).
+    assert _find_entry(NodeContext.VS_RFI, Position.HJ, Position.LJ) is not None
     state = _facing_open(Position.HJ, Position.LJ, _OPEN_SIZE[Position.LJ])
-    assert map_decision_point(state, HERO_SEAT) is None
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.hero.position == Position.HJ
 
 
 def test_limp_raise_line_returns_none_via_full_mapper():

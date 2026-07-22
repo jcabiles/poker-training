@@ -342,6 +342,44 @@ def test_short_stack_facing_raise_parity():
     assert len(raises) == 1
 
 
+def test_grid_size_cbet_display_grade_parity():
+    # M1-L4 (S10/S11 re-verify): a bot's 0.5-pot flop c-bet — newly recognized
+    # by `_is_canonical_bet` — both MAPS and drives the two-size RAISE offer
+    # from the SAME mapped spot legs (display == grade at the widened size).
+    # Pre-M1 this shape was unmapped: single engine RAISE, no graded spot.
+    from app.domain.table.grade_map import map_decision_point
+
+    opener = Position.CO
+    osize = _OPEN_SIZE[opener]
+    state = _state(Position.BB, seed=39)
+    moves = [_fold(p) for p in _before(opener) if p not in _BLINDS]
+    moves.append((opener, Decision(action=ActionType.RAISE, size_bb=osize)))
+    moves += [
+        _fold(p)
+        for p in _SEAT_ORDER[_SEAT_ORDER.index(opener) + 1 :]
+        if p not in _BLINDS
+    ]
+    moves += [_fold(Position.SB), _call(Position.BB)]
+    state = _play(state, moves)
+    fp = round(2 * osize + 0.5, 2)
+    cbet = round(0.5 * fp, 1)  # persona-grid size, NOT a hero-offered flop size
+    state = _play(state, [_check(Position.BB), _bet(opener, cbet)])
+    assert state.to_act_seat == HERO_SEAT
+
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    call = next(la for la in spot.legal_actions if la.action is ActionType.CALL)
+    assert call.min_bb == cbet  # TRUE faced size — never collapsed to 0.33-pot
+    legs = [la.min_bb for la in spot.legal_actions if la.action is ActionType.RAISE]
+    assert legs == [round(2.5 * cbet, 1), round(3.5 * cbet, 1)]
+    offered = [
+        la.size_bb
+        for la in _hero_legal_actions(state)
+        if la.action is ActionType.RAISE
+    ]
+    assert offered == legs  # displayed sizes ARE the graded legs
+
+
 # ------------------------------------------------- N5: spot-dims persistence
 
 

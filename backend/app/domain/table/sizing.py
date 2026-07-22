@@ -28,16 +28,31 @@ HERO_NODE_SIZE: dict[str, float] = {
     "raise": 1.0,
 }
 
-# N4a — the two graded/offered BET pot-fractions per postflop street (RES-B
-# §5.1). SINGLE source of truth for the offered sizes, the graded `_barrel_spot`
-# sizes, AND the canonical-bet recognition gate in `grade_map_postflop`. Flop
-# stays 0.33/0.75 (the R3 flop c-bet pair is unchanged); only turn/river get the
-# RES-B fix (previously all three were graded against the flop's 0.33/0.75).
+# N4a — the two OFFERED/graded hero BET pot-fractions per postflop street
+# (RES-B §5.1). SINGLE source of truth for hero's two-button offered sizes and
+# the graded `_barrel_spot` sizes. Flop stays 0.33/0.75 (the R3 flop c-bet pair
+# is unchanged); only turn/river get the RES-B fix (previously all three were
+# graded against the flop's 0.33/0.75). Hero's OFFERED sizes stay 2-button
+# (M1-L4 widened faced-size RECOGNITION only — see RECOGNIZED_BET_FRACS).
 POSTFLOP_BET_FRACS: dict[str, tuple[float, float]] = {
     "flop": (0.33, 0.75),
     "turn": (0.5, 0.75),
     "river": (0.5, 1.0),
 }
+
+# M1-L4 (RES-I §3 L4) — the faced-size RECOGNITION grid for the line gates in
+# `grade_map_postflop._is_canonical_bet`: every pot-fraction the bot personas
+# bet from (`postflop.sizing` keys across content/personas/*.json — 0.33 / 0.5
+# / 0.75 / 1.0 plus the maniac's 1.5 overbet), on EVERY street. Before M1 the
+# gate accepted only the street's POSTFLOP_BET_FRACS pair, so a bot's 0.5-pot
+# or 1.0-pot flop c-bet silently un-mapped the whole line (RES-I §2: the
+# dominant postflop line kill). RECOGNITION only — hero's offered sizes stay
+# the POSTFLOP_BET_FRACS pairs. Every member maps to a defined RES-E bucket
+# (`personas_postflop.size_bucket`: 0.33→SMALL, 0.5→MEDIUM, 0.75/1.0→LARGE,
+# 1.5→OVERBET) and the graders always price the TRUE live pot-fraction
+# (faced/pot), never a bucket-collapsed size (RES-I §5 HIGH flag; pinned by
+# tests/test_grade_map_multiway.py::test_recognized_fracs_map_to_res_e_buckets).
+RECOGNIZED_BET_FRACS: tuple[float, ...] = (0.33, 0.5, 0.75, 1.0, 1.5)
 
 # N4b — the two graded/offered RAISE multipliers (on the faced bet/raise-to
 # amount) when hero faces a postflop bet or check-raise (RES-B §5.1 :148-149).

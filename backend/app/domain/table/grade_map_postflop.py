@@ -14,8 +14,9 @@ Canonical-shape parity: each mapper mirrors its `scenarios.py` builder
 live board / cards / stacks / pot substituted in and the ranges resolved
 through the same content entries — so a mapped Spot is always one the existing
 graders were built for. The turn/river mappers gate 2–3 SEQUENTIAL streets of
-exact bet sizing (in-band open, 0.33/0.75-pot c-bet AND called, 0.33/0.75-pot
-turn barrel AND called for river) and return None on ANY doubt.
+recognized bet sizing (in-band open, recognized-fraction c-bet AND called,
+recognized-fraction turn barrel AND called for river — see
+`RECOGNIZED_BET_FRACS`) and return None on ANY doubt.
 """
 
 from __future__ import annotations
@@ -37,7 +38,11 @@ from app.domain.spot import (
 from app.domain.table.engine import HandState
 from app.domain.table.grade_map_common import _BLIND_POSITIONS, _EPS, _street_actions
 from app.domain.table.grade_map_preflop import _OVERSIZE_OPEN_CAP
-from app.domain.table.sizing import FACING_RAISE_MULTS, POSTFLOP_BET_FRACS
+from app.domain.table.sizing import (
+    FACING_RAISE_MULTS,
+    POSTFLOP_BET_FRACS,
+    RECOGNIZED_BET_FRACS,
+)
 
 
 def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
@@ -143,13 +148,15 @@ def map_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
 
 
 # --- R5: turn/river mappers (HU SRP continuation line only) -----------------
-# Each mapper re-verifies the FULL prior line street by street. The canonical
-# bet buckets are the RES-B per-street pot-fractions (`POSTFLOP_BET_FRACS`)
-# rounded to 1dp — any other size (or an uncalled bet, a raise, a lead, a
-# check-back) ⇒ None. STREET-AWARE (N4a): a canonical FLOP bet is 0.33/0.75 pot,
-# a TURN bet 0.5/0.75, a RIVER bet 0.5/1.0. Without this, re-verifying a prior
-# 0.5-pot turn barrel against the flop-only 0.33/0.75 would orphan the river
-# mapper (refuter HIGH).
+# Each mapper re-verifies the FULL prior line street by street. A recognized
+# bet is any `RECOGNIZED_BET_FRACS` pot-fraction (M1-L4: the whole persona bet
+# grid 0.33/0.5/0.75/1.0/1.5, every street — RES-I §3 L4 widened this from the
+# street's two `POSTFLOP_BET_FRACS` hero sizes, which silently un-mapped every
+# bot 0.5/1.0-pot flop c-bet). Any other size (or an uncalled bet, a raise, a
+# lead, a check-back) ⇒ None. The ACTUAL bet amount always flows into the pot
+# math and the built spot's CALL leg, so the graders price the TRUE live
+# pot-fraction — recognition never collapses a size into another bucket
+# (RES-I §5 HIGH flag).
 
 
 # Fraction-recognition tolerance. Hero's offered sizes are `round(f*pot, 1)`
@@ -164,9 +171,14 @@ _CANON_BET_TOL = 0.06
 
 
 def _is_canonical_bet(amount_bb: float, pot_before: float, street: Street) -> bool:
+    """M1-L4: recognition runs against the full persona grid on every street
+    (`street` is kept for call-site documentation; the grid is street-uniform).
+    Adjacent grid fractions are ≥0.17·pot apart, so at any postflop pot
+    (≥4.5bb) the 0.06bb tolerance can never match two fractions at once."""
+    del street
     return any(
         abs(amount_bb - f * pot_before) <= _CANON_BET_TOL
-        for f in POSTFLOP_BET_FRACS[street.value]
+        for f in RECOGNIZED_BET_FRACS
     )
 
 
