@@ -726,6 +726,173 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 
 ---
 
+## NOW — Epic 4: Bot-math correctness — price-aware defense, size-linked bluffing, bounded aggression, theory-calibrated grading (added 2026-07-21)
+
+> Fourth epic on the shipped Simulate table. Same north-star (become a winning $2/$3 player).
+> Where Epics 1–3 built the table, coverage, and grading *pipeline*, Epic 4 fixes the **decision
+> math inside it** — two confirmed-wrong behaviors plus the calibration that makes bots feel like
+> players and makes grades trustworthy. **Grounded on a vetted yardstick:** the three poker-math
+> docs (Obsidian vault: *Comprehensive Reference*, *Calibration & Numbers (Spec)*, *Persona &
+> Multiway Modeling*) were adversarially reviewed by **two independent reviewers (Sol + Opus,
+> 2026-07-21)** who found **zero arithmetic errors** and confirmed the docs give the RIGHT targets
+> for this fix. Review synthesis + findings: `docs/ai-dlc/research/poker-math-review/`
+> (`SYNTHESIS.md`, `sol-findings-raw.md`, `opus-findings.md`).
+>
+> **Interview decisions (locked):** fix **properly** (re-derive the S4 postflop calibration bands to
+> theory, don't paper over) · fix **BOTH** opponent behavior **AND** hero grading · **one large
+> epic** · **spikes front-loaded** (each seeds a build slice) · stays **heuristic + interim EV**, no
+> solver tables, EVs labeled *approximate* · results stay **freq + EV, never boolean** · strength→
+> action and strength→size stay **frequency-sampled** (anti-sizing-tell no-go holds).
+>
+> **Scope (locked):** (1) **price-blind defense** — bots fold/call ignoring bet size, pot odds, and
+> the α fold-ceiling [CONFIRMED WRONG]; (2) **bluff frequency decoupled from bet size** — a flat
+> per-persona `bluff_freq` instead of a size-linked one [CONFIRMED WRONG]; (3) **maniac aggression
+> saturation** — an unbounded aggression multiplier drives near-argmax play; (4) **multiway
+> mis-calibration** — the n-th-root/dampening applied as if a per-opponent constant; (5)
+> **theory-calibrated hero grading** + re-derived S4 bands; (6) **min-bet legality bug** ("20BB pot
+> but hero can only bet 1BB"); coarse hand-ladder handled as a sub-concern of (1)/(3), promoted to
+> its own slice only if a spike shows it's the root cause.
+>
+> **⭐ The #1 cross-cutting guardrail (from the Sol+Opus review — inject into every defense/grading
+> slice brief): MDF/α is a FOLD-CEILING sanity check, NOT a "fold ≈ MDF" defend-floor.** `P/(P+B)`
+> is the flat-call form (it "doesn't work with a raise" — GTO Wizard), and real solver defense often
+> sits *below* raw MDF pre-river. Use α to catch the price-blind bug (a bot/hero that folds the same
+> regardless of size is unambiguously wrong); do **NOT** grade a fold as too tight merely because it
+> beat MDF on the flop/turn or vs a capped/polar bettor — use pot-odds-vs-*actual* value:bluff
+> there. This is exactly what keeps the price-blind FIX from over-correcting into a new bug.
+>
+> **Cross-cutting hazards to inject into every Epic-4 slice brief:**
+> - **Domain purity (test-enforced):** all decision math stays in `app/domain/` — no web/DB imports.
+> - **`spot_signature()` frozen:** re-calibration tunes *constants/frequencies*, not signature dims;
+>   changing the signature orphans SRS history. Postflop signature dims append conditionally only.
+> - **Grading behind the one async `StrategyProvider`:** hero-grading changes flow through that seam
+>   (swappable heuristic→solver later); don't fork a second grading path.
+> - **Frequency-mixed, never argmax:** every fix must preserve `rng.choices` mixing — the maniac cap
+>   (F3) must *lower* saturation, not replace the mix with a threshold.
+> - **Anti-sizing-tell:** strength→size stays decoupled; F2 links bluff *frequency* to size, it must
+>   NOT leak hand strength into the chosen size.
+> - **Multiway = direction, not constant:** the n-th-root is a symmetric-independent idealization
+>   (both reviewers) — F4 encodes "bluff less / value-lean multiway," never a per-opponent MDF number.
+> - **RES-B already answered "realistic sizes":** Epic-2's RES-B found the persona sizing levers are
+>   already correct/defensible for $2/$3 (the issue was flat distribution + missing nodes, not wrong
+>   numbers). So the user's "optimal bet sizes" spike is **largely pre-answered** — RES-E only
+>   resolves the residual (which size buckets the corrected defense/bluff logic keys on).
+
+### Research spikes (front-loaded, parallel — output = decision doc + numbers, no app code)
+
+- [ ] **RES-D — Theory→engine calibration: price-aware defense + size-linked bluff bands + re-derived
+      S4.** **Problem:** the postflop merit tables (`_FOLD_BASE`/`_CALL_BASE`/`_RAISE_BASE`/`_AGG_BASE`
+      in `personas_postflop.py`) and the S4 WTSD bands (`test_personas_postflop.py`) were tuned to
+      *engine-anchored* targets, not to first-principles price theory — so bots don't move with bet
+      size and grading can't cite a theory bar. **Outcome-link:** every defense decision and every
+      grade rests on a defensible number. **Solution:** from the vetted docs (Spec §1/§3/§9, Reference
+      §2–§3), produce, for each persona × node family, the **target fold/call/raise frequency as a
+      function of FACED bet size** (pot-odds break-even + α fold-ceiling, tempered by realization) and
+      the **target bluff fraction as a function of hero's CHOSEN bet size** (polar `f/(1+2f)`, persona-
+      skewed). Re-derive the S4 bands to these. **Bake in the A1 guardrail explicitly** (α = ceiling,
+      not floor; pot-odds-vs-actual on flop/turn). **Pass/fail:** a decision doc under
+      `docs/ai-dlc/research/` gives (a) a faced-size→{fold/call/raise} band per persona×node, (b) a
+      chosen-size→bluff-fraction curve per persona, (c) the re-derived S4 band targets with their
+      theory citation, (d) a written statement of the A1 guardrail as a grading rule; every number
+      tagged SOLVED/SOURCED/DERIVED; no app code touched. **Appetite:** ~1 large spike. **No-gos:** no
+      solver tables; no code; approximate labels mandatory.
+
+- [ ] **RES-E — "Optimal bet sizes per spot" (residual only — RES-B pre-answered the bulk).**
+      **Problem:** the user asked for a bet-sizing spike; Epic-2's RES-B (`docs/ai-dlc/research/
+      RES-B-bet-sizing.md`) already found the persona sizes correct/defensible — the open residual is
+      *which discrete size buckets* F1's defense and F2's bluffing should key on (e.g. small ≤⅓ /
+      medium ½–⅔ / large ≥pot / overbet), so the size→frequency logic has stable inputs.
+      **Outcome-link:** F1/F2 need a fixed size-bucket vocabulary to be testable. **Solution:** confirm
+      (or minimally extend) RES-B's node×persona size table into a small **size-bucket taxonomy** the
+      corrected logic maps faced/chosen sizes onto, reconciled with `sizing.py` and the existing
+      postflop sampling buckets. **Pass/fail:** a short decision doc names the size buckets + their pot-
+      fraction cutoffs and maps each existing node's sizes onto them; explicitly cites RES-B for the
+      values; no code. **Appetite:** ~½ spike (mostly reconciliation). **No-gos:** no new sizing
+      numbers beyond RES-B unless a gap is found; no bet-size sliders; sizes stay FIXED.
+
+- [ ] **RES-F — Min-bet legality root-cause ("20BB pot but hero can only bet 1BB").** **Problem:**
+      in some spots hero's legal bet options are degenerate — a tiny min-bet into a large pot — which
+      is unrealistic and distorts both play and grading. **Outcome-link:** hero always faces sensible,
+      realistic sizing choices. **Solution:** trace the legal-action / sizing path (`sizing.py`,
+      `table/play.py`, the `LegalAction`/`Decision` sizing shape) to root-cause: is it a min-bet floor,
+      chip rounding, a short-SPR/stack-cap interaction, or a pot-fraction option that collapses when
+      stack≪pot. Enumerate fix options (e.g. snap to nearest legal size bucket; clamp min-bet to a
+      pot-fraction floor; suppress degenerate options) with their blast radius on grading + the
+      canonical-bet mapper. **Pass/fail:** a decision doc identifies the exact code path + the trigger
+      condition (with a reproducing spot) and recommends a fix with trade-offs; no app code. **Appetite:**
+      ~½ spike. **No-gos:** no code in the spike; no change to `spot_signature()`.
+
+### Build slices (ICE = Impact·Confidence·Ease, 1–10)
+
+- [ ] **F1 — Price-aware bot defense (fixes the price-blind-defense bug).** Bots' fold/call
+      decision keys on the **faced bet size** via pot-odds + the α **fold-ceiling** (RES-D bands), not
+      merit alone. Touch `personas_postflop.py` (`sample_postflop_decision`, `_FOLD_BASE`/`_CALL_BASE`
+      merit tables) + the persona `stickiness` lever wiring. Preserve frequency mixing. **Pass/fail:**
+      a bot facing ⅓-pot folds **measurably less** than the same bot facing a pot-sized bet in the
+      same spot (monotone size→fold response, test-asserted); fold frequency respects α as a *ceiling*
+      (never folds more than α vs a balanced bettor) but is **not** clamped to a fold≈MDF floor on
+      flop/turn (A1 guardrail); existing S4 tests re-pass against RES-D's re-derived bands.
+      **Appetite:** ~1 slice. **No-gos:** no argmax; no solver tables; strength→size untouched.
+      ICE 9·8·5.
+
+- [ ] **F2 — Size-linked bot bluffing (fixes flat `bluff_freq`).** Replace the flat per-persona
+      `bluff_freq` with a **chosen-size-dependent** bluff fraction (polar `f/(1+2f)` from RES-D,
+      persona-skewed), wired through `_BLUFF_RAISE_FACTOR` / the bluff path in
+      `sample_postflop_decision`. **Pass/fail:** a persona's bluff frequency **moves with its chosen
+      bet size** (bigger size → lower bluff-to-value ratio, per theory), test-asserted across ≥3 sizes;
+      the chosen size still does NOT reveal hand strength (anti-sizing-tell regression test holds).
+      **Appetite:** ~1 slice. **No-gos:** no size→strength leak; frequency-sampled. ICE 8·7·5.
+
+- [ ] **F3 — Bounded maniac aggression (fixes saturation → near-argmax).** Cap / renormalize the
+      aggression multiplier (`content/personas/maniac.json` `aggression`=15 + `_COMMIT_AGG_BOOST`
+      interaction in `personas_postflop.py`) so it stops collapsing the action mix toward a single
+      choice, while keeping the maniac clearly the most aggressive persona. **Pass/fail:** maniac
+      action **entropy** in a fixed spot stays above a floor (still mixes — not deterministic), AND its
+      AFq/WTSD land inside the maniac band from RES-D/the modeling doc; other personas' behavior
+      byte-unchanged where their levers didn't move. **Appetite:** ~1 slice. **No-gos:** don't replace
+      the `rng.choices` mix with a threshold; don't retune non-maniac personas. ICE 7·8·6.
+
+- [ ] **F4 — Multiway calibration correction (direction, not constant).** Ensure the multiway path
+      (`_apply_multiway` / `multiway_bluff_damp`) encodes "**bluff less + value-lean** with each added
+      opponent" as a **direction**, never a per-opponent MDF/defense constant (both reviewers: the
+      n-th-root is a symmetric-independent idealization). **Pass/fail:** multiway c-bet/bluff frequency
+      is **lower** than the HU baseline for the same spot (test-asserted), no per-opponent MDF number
+      is asserted anywhere, and value-hand continuation is at least as tight as HU. **Appetite:** ~1
+      slice. **No-gos:** no second multiway model; no n-th-root constant baked as a target. ICE 6·6·5.
+
+- [ ] **F5 — Theory-calibrated hero grading + re-derived S4 bands (fixes hero grading; bakes the A1
+      guardrail).** Route the re-derived RES-D bands through the async `StrategyProvider`/`grade_map`
+      so hero grading is **price-aware** and uses α as a **fold-ceiling sanity check** — explicitly NOT
+      a fold≈MDF assertion on flop/turn or vs capped/polar bettors. Re-anchor the S4 bands in
+      `test_personas_postflop.py` to theory. **Pass/fail:** the grader no longer marks a
+      theoretically-correct **below-MDF fold** as wrong on the flop/turn (A1 regression test); a hero
+      call/fold facing different sizes grades against pot-odds + the fold-ceiling (not merit alone);
+      grades stay freq+EV with EV labeled *approximate*; all `grade_map`/S10 tests green. **Appetite:**
+      ~1 slice. **No-gos:** grading stays behind the one provider seam; no boolean verdicts; no
+      exploit/persona-aware grading (that's L1). ICE 9·7·5.
+
+- [ ] **F6 — Min-bet legality fix (from RES-F).** Apply RES-F's recommended fix so hero's legal bet
+      options are sensible in large-pot / short-SPR spots (no lone 1BB-into-20BB option). Touch only
+      the path RES-F names (`sizing.py` / `table/play.py`). **Pass/fail:** RES-F's reproducing spot now
+      offers realistic sizing options; the canonical-bet mapper still grades those sizes (no new
+      "no baseline yet" holes introduced); fold-path playout regression (the 3× recurring FE fold bug)
+      re-verified. **Appetite:** ~1 slice. **No-gos:** no `spot_signature()` change; no bet-size
+      sliders. ICE 7·6·6.
+
+### After the Build slices — sequenced, NOT yet spec-ready
+
+> Promoted to its own slice ONLY if a spike shows it's the root cause; otherwise handled inside F1/F3.
+
+- **F7 — Finer hand-strength ladder (coarse-ladder smoothing).** *Evidence:* the 7-rung analytic
+  ladder (`strength_bucket` AIR→…→MONSTER) can create action *cliffs* at bucket edges that F1/F3 may
+  only partly mask. *Open questions (spike-gated):* is the coarseness a *root* cause of any residual
+  unrealistic decision after F1–F5, or cosmetic; would a finer/interpolated ladder change grades
+  enough to matter; does it touch `spot_signature()` (must not). **Do NOT hand to `/ai-dlc` until
+  F1–F5 land and a diagnostic shows a real cliff.** *(Ranked lowest in Epic 4; may close as "not
+  needed" if F1/F3 resolve the observed behavior.)*
+
+---
+
 ## NEXT — validated problems / opportunities (not yet spec'd)
 
 - **Exploit-aware grading layer.** *(gate-mandated follow-on; → promoted to Epic 3 **L1**)* *Evidence:* personas are
