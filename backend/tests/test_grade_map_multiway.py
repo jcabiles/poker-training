@@ -181,7 +181,8 @@ def test_mw_ranges_all_caller_pairs_present():
     ]
     for i, opener in enumerate(order[:-1]):
         for caller in order[i + 1 :]:
-            assert _mw_ranges(opener, caller) is not None, (opener, caller)
+            # M6: _mw_ranges takes the caller POSITIONS as an iterable.
+            assert _mw_ranges(opener, [caller]) is not None, (opener, caller)
 
 
 def test_recognized_fracs_map_to_res_e_buckets():
@@ -270,7 +271,11 @@ def test_donk_lead_stays_none():
     assert map_decision_point(state, HERO_SEAT) is None
 
 
-def test_four_way_stays_none():
+def test_four_way_hero_closes_now_maps():
+    # N5 pinned 4-way as None; M6 (RES-H H2) widened the gate — this exact
+    # hero-closes 4-way shape now maps through the dispatcher. The remaining
+    # None boundaries (5+-way, live player behind hero) are pinned in
+    # tests/domain/test_apply_multiway_opp.py.
     state = _state(Position.BB)
     entrants = (Position.HJ, Position.CO, Position.BTN)
     opener = Position.HJ
@@ -292,7 +297,8 @@ def test_four_way_stays_none():
         _check(Position.BB), _bet(opener, cbet), _call(Position.CO), _call(Position.BTN),
     ])
     assert state.to_act_seat == HERO_SEAT
-    assert map_decision_point(state, HERO_SEAT) is None
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None and spot.node_context == [NodeContext.VS_CBET]
 
 
 def test_caller_raise_stays_none():

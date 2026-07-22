@@ -34,6 +34,7 @@ from app.domain.spot import (
     Spot,
     Street,
     is_multiway,
+    opponent_count,
 )
 from app.domain.texture import Texture, classify, river_card_class, turn_card_class
 
@@ -406,11 +407,17 @@ def _merits(
     return check, small, big
 
 
-# --- S8: multiway merit adjustment (binary bucket — heads-up vs 3+) ---
+# --- S8/M6: multiway merit adjustment (opponent-count-scaled, RES-H §2.3) ---
 # Applied by EVERY grader after its base merits are computed and BEFORE
 # _frequencies(), and ONLY when is_multiway(spot) — heads-up output stays
 # byte-identical. Directions (spec-frozen): fewer acceptable bluffs, slight
-# value-lean, tighter bluff-catching. Values are tuning knobs.
+# value-lean, tighter bluff-catching. M6 made the push GEOMETRIC per added
+# opponent (`base ** max(opp-1, 0)`, the F4 catch-tighten shape): each
+# `_MW_*` below is the BASE, pinned to the pre-M6 flat constant so 3-way
+# (`opp=2` ⇒ `base**1`) stays byte-identical and only 4-way+ diverges.
+# DIRECTION-only law (RES-D §6 / RES-H §2.2): never an MDF, n-th-root defense
+# frequency, or per-opponent pot-odds constant — only scaled existing merits.
+# 5+-way is the same directional bucket, never claimed calibrated (§2.4).
 _MW_BLUFF_DAMPEN = 0.6  # in (0,1): scales DOWN aggressive merit for bluff candidates
 _MW_VALUE_LEAN = 1.15  # >= 1.0: scales UP value-category aggressive merit
 _MW_CATCH_TIGHTEN = 1.3  # >= 1.0: scales UP fold merit for the air bluff-catch
@@ -421,10 +428,20 @@ _MW_CATCH_TIGHTEN = 1.3  # >= 1.0: scales UP fold merit for the air bluff-catch
 _MW_THIN_VALUE_DAMPEN = 0.7
 
 
-def _apply_multiway(merits: dict, *, cat_effective: str, facing_side: bool) -> dict:
+def _apply_multiway(
+    merits: dict, *, cat_effective: str, facing_side: bool, opp: int
+) -> dict:
     """Multiway (3+) merit adjustment — reads NOTHING but the merit dict, the
-    already-computed hand category (post busted-draw demotion on the river) and
-    which side hero is on. Never persona data (graders-never-read-persona).
+    already-computed hand category (post busted-draw demotion on the river),
+    which side hero is on, and the live-opponent count `opp`
+    (`opponent_count(spot)` — villains only, HU ⇒ 1). Never persona data
+    (graders-never-read-persona).
+
+    M6: every scalar is geometric in the added opponents beyond the first —
+    `base ** max(opp - 1, 0)` — so `opp=1` (HU, unreachable through the
+    `is_multiway` gate anyway) yields 1.0 everywhere, `opp=2` (3-way) yields
+    exactly the pre-M6 flat constants, and 4-way pushes strictly harder along
+    the identical axis. Direction-only: no MDF / pot-odds constant.
 
     Aggressor side (keys check/small/big): dampen aggressive merit for
     bluff-candidate categories — "air", and "draw" (semibluffs; river draws
@@ -436,28 +453,33 @@ def _apply_multiway(merits: dict, *, cat_effective: str, facing_side: bool) -> d
     call/raise-bluff merits. Scaling only applies to POSITIVE merits (scaling
     a negative merit toward zero would perversely INCREASE it).
     """
+    n = max(opp - 1, 0)
+    bluff_dampen = _MW_BLUFF_DAMPEN**n
+    value_lean = _MW_VALUE_LEAN**n
+    catch_tighten = _MW_CATCH_TIGHTEN**n
+    thin_value_dampen = _MW_THIN_VALUE_DAMPEN**n
     out = dict(merits)
     if facing_side:
         if cat_effective in ("air", "weak_made"):
-            out["fold"] = out["fold"] * _MW_CATCH_TIGHTEN
+            out["fold"] = out["fold"] * catch_tighten
             for k in ("call", "raise"):
                 if out[k] > 0:
-                    out[k] = out[k] * _MW_BLUFF_DAMPEN
+                    out[k] = out[k] * bluff_dampen
         return out
     if cat_effective in ("air", "draw"):
         for k in ("small", "big"):
             if out[k] > 0:
-                out[k] = out[k] * _MW_BLUFF_DAMPEN
+                out[k] = out[k] * bluff_dampen
     elif cat_effective == "weak_made":
         # N5: thin value stops betting multiway (research: value thresholds
         # rise as equity dilutes — marginal made hands check, they don't bet).
         for k in ("small", "big"):
             if out[k] > 0:
-                out[k] = out[k] * _MW_THIN_VALUE_DAMPEN
+                out[k] = out[k] * thin_value_dampen
     elif cat_effective == "strong":
         for k in ("small", "big"):
             if out[k] > 0:
-                out[k] = out[k] * _MW_VALUE_LEAN
+                out[k] = out[k] * value_lean
     return out
 
 
@@ -500,6 +522,7 @@ def grade_cbet(
             {"check": m_check, "small": m_small, "big": m_big},
             cat_effective=cat,
             facing_side=False,
+            opp=opponent_count(spot),
         )
         m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     merits = [m_check, m_small, m_big]
@@ -861,6 +884,7 @@ def grade_vs_cbet(
             {"fold": m_fold, "call": m_call, "raise": m_raise},
             cat_effective=cat,
             facing_side=True,
+            opp=opponent_count(spot),
         )
         m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
@@ -1054,6 +1078,7 @@ def grade_vs_check_raise(
             {"fold": m_fold, "call": m_call, "raise": m_raise},
             cat_effective=cat,
             facing_side=True,
+            opp=opponent_count(spot),
         )
         m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
@@ -1265,6 +1290,7 @@ def grade_turn_barrel(
             {"check": m_check, "small": m_small, "big": m_big},
             cat_effective=cat,
             facing_side=False,
+            opp=opponent_count(spot),
         )
         m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     merits = [m_check, m_small, m_big]
@@ -1389,6 +1415,7 @@ def grade_vs_turn_bet(
             {"fold": m_fold, "call": m_call, "raise": m_raise},
             cat_effective=cat,
             facing_side=True,
+            opp=opponent_count(spot),
         )
         m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
@@ -1604,6 +1631,7 @@ def grade_river_barrel(
             {"check": m_check, "small": m_small, "big": m_big},
             cat_effective=cat_effective,
             facing_side=False,
+            opp=opponent_count(spot),
         )
         m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     merits = [m_check, m_small, m_big]
@@ -1730,6 +1758,7 @@ def grade_vs_river_bet(
             {"fold": m_fold, "call": m_call, "raise": m_raise},
             cat_effective=cat_effective,
             facing_side=True,
+            opp=opponent_count(spot),
         )
         m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
@@ -1945,6 +1974,7 @@ def grade_vs_caller_raise(
             {"fold": m_fold, "call": m_call, "raise": m_raise},
             cat_effective=cat,
             facing_side=True,
+            opp=opponent_count(spot),
         )
         m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
@@ -2178,6 +2208,7 @@ def grade_limped_lead(
             {"check": m_check, "small": m_small, "big": m_big},
             cat_effective=cat,
             facing_side=False,
+            opp=opponent_count(spot),
         )
         m_check, m_small, m_big = mw["check"], mw["small"], mw["big"]
     freqs = _frequencies([m_check, m_small, m_big])
@@ -2290,6 +2321,7 @@ def grade_limped_vs_lead(
             {"fold": m_fold, "call": m_call, "raise": m_raise},
             cat_effective=cat,
             facing_side=True,
+            opp=opponent_count(spot),
         )
         m_fold, m_call, m_raise = mw["fold"], mw["call"], mw["raise"]
     specs = [
