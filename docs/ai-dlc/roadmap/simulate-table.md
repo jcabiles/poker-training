@@ -1028,6 +1028,132 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 
 ---
 
+## NOW — Epic 5: Multiway coverage — limped pots, activated 3-way grading, 4+-way directions, caller re-raises (added 2026-07-22)
+
+> Fifth epic on the shipped Simulate table. Same north-star. Epics 1–4 built the table, the
+> grading pipeline, and correct decision math — but the N5 census shows the biggest remaining
+> ungraded pile is **multiway**: limped pots (~45% of MW volume, zero reference material),
+> N5's 3-way mappers firing ~0 live, 4+ player fields, and the caller-raises-your-c-bet node.
+> **Grounded on three fresh research spikes (all done 2026-07-22, all sim-measured):**
+> `docs/ai-dlc/research/RES-G-limped-pots.md`, `RES-H-mw-extension.md`, `RES-I-mw-funnel.md`.
+> Spike docs are LAW — build slices copy from them; refuters verify against them.
+>
+> **Interview decisions (locked 2026-07-22):** scope = ALL FOUR shapes (limped pots · activate
+> 3-way graders · 4+ fields · caller re-raises) · **research first** (spike docs become law) ·
+> **fully autonomous** run (worker→refuter→stacked PRs, user merges at end).
+>
+> **Cross-cutting law (carried from RES-D/Epic 4 — inject into every slice brief):**
+> - Multiway = **DIRECTION only** — never per-opponent MDF / n-th-root constants. F4 precedent:
+>   geometric `base ** max(opp-1, 0)` multipliers.
+> - α is a fold-**CEILING** (flat-call form). **α does NOT apply to responding to a raise**
+>   (RES-H §3.4) — a capped value-heavy raising range is graded on pot-odds-vs-actual value:bluff.
+> - "No baseline yet" (`None`) is a first-class answer — never silently HU-grade a multiway pot
+>   or fabricate a 4-way frequency.
+> - Domain purity · `spot_signature()` frozen · freq+EV never boolean · EVs approximate ·
+>   `StrategyProvider` seam · frequency-mixed never argmax · anti-sizing-tell.
+> - **RES-E is live law:** any newly recognized faced size (M1-L4) must map to a defined
+>   RES-E bucket/price — never silently collapse into the 0.33 bucket (RES-I §5, HIGH flag).
+> - S4 band stats: M1/M2 levers change ZERO bot behavior (content + recognition only) —
+>   lineup and open-band levers were measured zero-effect and are **rejected** (RES-I §4).
+
+### Research spikes (front-loaded, parallel — output = decision doc + numbers, no app code)
+
+- [x] **RES-G — Limped-pot baselines ($2/$3).** *(done 2026-07-22,
+      `docs/ai-dlc/research/RES-G-limped-pots.md`. Measured (3 seeds × 3000 hands): limped pots =
+      **41.8% of all flops** (~274/1000 hands), **69% multiway** (modal 3-way 47%, HU 31%); ~90% of
+      limps from passive_fish + calling_station (persona limp levers already well-authored — no bug).
+      Headline: limped pots are **already partly built** — `limp` is a first-class engine action and a
+      `vs_limpers` content pack + working `_map_vs_limpers` iso/over-limp grader exist, but content
+      only covers CO×1, BTN×1, BTN×2. Postflop is a hard "no baseline yet" everywhere (hero must be
+      sole preflop raiser; HU-only). Delivered copy-ready, schema-validated `vs_limpers` JSON for the
+      missing seats (§3), BB-check direction (§3d), HU limped-flop postflop directions (§4b),
+      feasibility map (§5), slice cut A→B→C→defer-D (§6). Sources: Upswing 4bb+1/limper, GTO Wizard.)*
+
+- [x] **RES-H — 4+-way directions + caller-re-raise grader design.** *(done 2026-07-22,
+      `docs/ai-dlc/research/RES-H-mw-extension.md`. Measured (N=6000 seeded): 4+-way flops = 11.8% of
+      hands (10.0% four-way, thin 5/6-way tail). **N5's "BB closes" rule is NOT general** — BB is last
+      responder to a MW c-bet only ~17% overall, ~53% in the SRP cold-caller shape → any 4-way
+      extension must gate on the ACTUAL closing seat (verified by sims per the N5 lesson).
+      **Caller-raises-c-bet = 16.8 decision points/1000 hands** — the most reachable uncovered
+      postflop node (~5× BB check-raise, ~9× the N5 3-way mapper). Web-confirmed NO published 4-way
+      baseline exists → extend F4-style geometric multipliers inside `_apply_multiway`, direction-only,
+      HU/3-way byte-identical (§2). Caller-re-raise grader design (§3): sibling of
+      `grade_vs_check_raise`, value-skewed prior (cold-caller range capped → raise ≈ sets/two-pair,
+      sourced), **α explicitly NOT applied** (§3.4). Slice cut: H1 caller-re-raise first (high
+      confidence, high reach), H2 4-way second (§5).)*
+
+- [x] **RES-I — 3-way mapper funnel diagnostic (fresh, post-Epic-4/#53/#54).** *(done 2026-07-22,
+      `docs/ai-dlc/research/RES-I-mw-funnel.md`. ~180k hands, 18 seeded configs, instrumenting the
+      REAL `map_decision_point` path with in-process monkeypatch counterfactuals; hero proxied
+      tag (tight bound) / calling_station (loose bound). **Refutes the N5-refuter MED hypothesis:**
+      persona mix and open band are ~zero-effect post-Epic-4 (0 band kills; fires flat across
+      lineups) — both levers REJECTED. Real chokes: hero-seat scope (BB-only → 0.7–3.7 MW pots/1000),
+      strict line/size gates, and **12 missing `VS_RFI` caller pairs** (killed 100% of baseline
+      canonical arrivals). Even with every in-scope gate relaxed, BB-only fires cap at ~1.5–3.2/1000.
+      Threshold set at **≥5 graded MW decisions/1000 hands** (≈1 rep per session; N7-rankable at
+      2–3k hands); reachable only via hero-seat widening (measured ceiling 6–11/1000, not built).
+      Recommends: M1 = L3 (content pairs) + L4 (size-grid recognition) with a **≥30k-hand re-measure
+      gate**; L5 hero-seat widening = separate go/no-go slice decided on that measurement (§4).
+      HIGH flag: L4 must extend RES-E faced-size buckets, and `_is_canonical_bet` blast radius hits
+      HU turn/river mappers + S10/S11 display==grade gates (§5).)*
+
+### Build slices (ICE = Impact·Confidence·Ease, 1–10)
+
+- [ ] **M1 — MW funnel levers: `VS_RFI` content pairs + size-grid recognition (RES-I L3+L4).**
+      (I8·C8·E7) **Scope:** author the 12 missing `VS_RFI` caller pairs (RES-A-grade ranges, not
+      filler — they're grading baselines + Practice content); widen `_is_canonical_bet` size
+      recognition to the persona grid, extending RES-E bucket/price treatment to newly recognized
+      0.5/1.0-pot faced bets (never collapse into 0.33). Hero OFFERED sizes (`POSTFLOP_BET_FRACS`)
+      stay 2-button. **Pass/fail:** (a) 3-way mapper fires move ~0 → measurable (RES-I §3 bands);
+      (b) **≥30k-hand seeded re-measure** with the RES-I harness reports the fresh rate + which hero
+      proxy it assumes; (c) every newly recognized faced size maps to a defined RES-E bucket (test);
+      (d) S10/S11 display==grade invariant re-verified; (e) zero bot-behavior change (S4 bands
+      byte-stable); verify.sh + build green; refuter PASS.
+- [ ] **M2 — Limper iso/over-limp coverage fill (RES-G Slice A, content-only).** (I8·C9·E9)
+      **Scope:** add the missing `vs_limpers` entries from RES-G §3 (UTG/LJ/HJ/SB ×1; CO/SB ×2);
+      bump pack version 1→2; zero code. **Pass/fail:** RES-G §6-A verbatim — named (position,count)
+      pairs map where they returned `None`; coverage graded count UP, total UNCHANGED; schema-valid;
+      `spot_signature()` + `TAXONOMY_VERSION` untouched.
+- [ ] **M3 — BB-check node vs limpers (RES-G Slice B, small new grader).** (I6·C7·E6) **Scope:**
+      BB `vs_limpers` entries with `{iso, check}` (NO fold leg — checking is free), `build_spot`
+      branch seating hero=BB behind limpers, lift the blind-seat `None` gate for BB-check only.
+      **Pass/fail:** RES-G §6-B verbatim — BB facing 1–3 limpers grades iso vs check freq+EV; fold
+      never offered; all non-BB limped shapes byte-unchanged.
+- [ ] **M4 — Caller-re-raises-c-bet grader (RES-H H1).** (I8·C8·E5) **Scope:**
+      `_merits_vs_caller_raise` + `grade_vs_caller_raise` (sibling of `grade_vs_check_raise`) with
+      the §3.2 value-skewed prior; `map_flop_vs_caller_raise` mapper (SRP, hero=opener, canonical
+      c-bet, non-BB caller raised, hero faces/closes); `_calibrate_catcher_fold` NOT called.
+      **Pass/fail:** RES-H §5-H1 verbatim — incl. fires ≥~5/1000 in-band (measured 16.8);
+      range-asymmetry direction test (fold freq ≥ check-raise grader's for fixed marginal hand);
+      α-not-applied assertion; off-shape lines return `None`; HU/3-way hash-pins unchanged.
+- [ ] **M5 — HU limped-pot flop grader (RES-G Slice C, new node family).** (I7·C6·E4) **Scope:**
+      first limped-pot postflop grader, **HU only** (the tractable 31%); `map_limped_flop_lead` /
+      `map_limped_flop_vs_lead` per RES-G §4b directions. **Pass/fail:** RES-G §6-C verbatim —
+      0-raise HU flop grades freq+EV; **any 3+ limped flop still returns `None`** (explicit
+      `len(live) != 2 → None`); raised-pot graders byte-unchanged; flop only (no turn/river v1).
+- [ ] **M6 — 4-way merit extension (RES-H H2, direction-only).** (I5·C5·E6) **Scope:**
+      `_apply_multiway` scalars become opponent-count-aware via geometric `base ** max(opp-1, 0)`
+      (F4 shape); extend `map_mw_*` to fire when hero closes a **4-way** SRP shape, gated on the
+      ACTUAL closing seat (never "BB closes"); 5+ stays binary bucket / "no baseline yet."
+      **Pass/fail:** RES-H §5-H2 verbatim — HU byte-identical (opp=1 ⇒ scalar 1.0) AND 3-way
+      byte-identical (base pinned); monotone-in-opponents invariant; direction-only (no MDF
+      constants); 4-way with live player behind hero returns `None`.
+- [ ] **M7 — Hero-seat widening go/no-go (RES-I L5) — gated on M1's 30k re-measure.** (I7·C4·E3)
+      **Scope:** decision slice: if M1's re-measure leaves graded-MW below the ≥5/1000 threshold
+      (expected: L3+L4 alone cap ~0.3–3/1000), build opener + caller MW mappers (measured ceiling
+      6–11/1000); else close as not-needed. **Pass/fail:** the go/no-go is decided FROM the M1
+      measurement (documented in the done-note); if built: threshold met at ≥30k hands with stated
+      hero proxy; existing BB-path outputs byte-unchanged; refuter PASS.
+
+### After the Build slices — sequenced, NOT yet spec-ready
+
+- **Multiway limped-pot postflop (RES-G Slice D) — DEFER.** The app's first multiway postflop
+  grader (69% of limped pots). Deepest lift in the app; natural trigger to revisit the
+  solver-baseline no-go; stays honest "no baseline yet" until M1–M5 land and real usage justifies
+  it. Probably its own epic (RES-G §6-D).
+
+---
+
 ## NEXT — validated problems / opportunities (not yet spec'd)
 
 - **Exploit-aware grading layer.** *(gate-mandated follow-on; → promoted to Epic 3 **L1**)* *Evidence:* personas are
