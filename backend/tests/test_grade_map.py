@@ -324,14 +324,15 @@ def test_multiway_flop_returns_none():
 
 
 def test_limped_pot_off_count_returns_none():
-    # C0 SUPERSESSION of the old test_limped_pot_returns_none: single-limper
-    # pots to CO/BTN now map (vs_limpers content). Off-pack COUNTS still
-    # return None — three limpers to the BTN has no entry.
+    # C0/M2 SUPERSESSION of the old test_limped_pot_returns_none: single-limper
+    # pots to CO/BTN now map (vs_limpers content), and M2 (RES-G Slice A) added
+    # CO/SB x2 entries too. Off-pack COUNTS still return None — three limpers
+    # to the BTN has no entry.
     state = _limped_to(Position.BTN, [Position.UTG, Position.LJ, Position.HJ])
     assert state.to_act_seat == HERO_SEAT
     assert map_decision_point(state, HERO_SEAT) is None
-    # CO facing TWO limpers: only a 1-limper CO entry exists.
-    state = _limped_to(Position.CO, [Position.UTG, Position.LJ])
+    # HJ facing TWO limpers: no HJ x2 entry exists (only CO/SB/BTN x2).
+    state = _limped_to(Position.HJ, [Position.UTG, Position.LJ])
     assert map_decision_point(state, HERO_SEAT) is None
 
 

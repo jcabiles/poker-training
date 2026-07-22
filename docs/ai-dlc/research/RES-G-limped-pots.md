@@ -174,6 +174,13 @@ are **[DERIVED-ASSUMPTION]** — anchored to the existing CO/BTN entries (value-
 over-limp), positionally interpolated off the RFI ladder in `content/preflop/rfi.json`, and
 consistent with the Upswing/PokerNews direction. Treat as design targets.
 
+> **M2 correction** (post-implementation refuter finding): §1d measures the EP faces-1-limper shape
+> as **UTG2**, not UTG — UTG acts first preflop and has no seats before it, so a UTG×1 entry breaks
+> `scenarios.build_spot`'s VS_LIMPERS branch (`_before(UTG) == []`, the limper-seating loop never
+> runs, producing an incoherent Spot). The entry below is authored as EP-tight per this section's
+> intent; **M2 corrected its `position` to `UTG2`** so it is both organically reachable via
+> `map_preflop` and coherent in `build_spot` (Practice mode). The range itself is unchanged.
+
 ```json
 {
   "node_context": "vs_limpers", "position": "UTG", "limper_count": 1,
