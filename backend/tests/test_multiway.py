@@ -322,7 +322,8 @@ def test_apply_multiway_weak_made_thin_value_dampen_unit():
     from app.domain.postflop import _MW_THIN_VALUE_DAMPEN, _apply_multiway
 
     merits = {"check": 1.0, "small": 2.0, "big": -0.5}
-    out = _apply_multiway(merits, cat_effective="weak_made", facing_side=False)
+    # M6: opp=2 (3-way) is the byte-identical pre-M6 flat-constant tier.
+    out = _apply_multiway(merits, cat_effective="weak_made", facing_side=False, opp=2)
     assert out["small"] == 2.0 * _MW_THIN_VALUE_DAMPEN
     assert out["big"] == -0.5  # negatives never scaled (would perversely rise)
     assert out["check"] == 1.0  # only the aggressive keys dampen

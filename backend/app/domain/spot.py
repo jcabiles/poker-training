@@ -173,6 +173,17 @@ def players_in_pot(spot: Spot) -> int:
     return sum(1 for p in spot.players if p.status in (PlayerStatus.IN, PlayerStatus.ALLIN))
 
 
+def opponent_count(spot: Spot) -> int:
+    """Live OPPONENT count (villains only) — `players_in_pot(spot) - 1`.
+
+    M6 off-by-one pin: `players_in_pot` counts hero + live villains, so
+    HU ⇒ `players_in_pot == 2` ⇒ `opp == 1` (exponent `max(opp-1,0) == 0` ⇒
+    every multiway scalar is 1.0). Passing `players_in_pot(spot)` directly as
+    `opp` would silently break the HU-byte-identical invariant.
+    """
+    return players_in_pot(spot) - 1
+
+
 def is_multiway(spot: Spot) -> bool:
     """True for 3+ live players (binary bucket: heads-up vs multiway, S8)."""
     return players_in_pot(spot) > 2

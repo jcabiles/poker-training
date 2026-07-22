@@ -1192,7 +1192,19 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       `map_limped_flop_vs_lead` per RES-G §4b directions. **Pass/fail:** RES-G §6-C verbatim —
       0-raise HU flop grades freq+EV; **any 3+ limped flop still returns `None`** (explicit
       `len(live) != 2 → None`); raised-pot graders byte-unchanged; flop only (no turn/river v1).
-- [ ] **M6 — 4-way merit extension (RES-H H2, direction-only).** (I5·C5·E6) **Scope:**
+- [x] **M6 — 4-way merit extension (RES-H H2, direction-only).** *(done 2026-07-22, W2 PR —
+      `feat/epic5-m6`, stacked on W1. `_apply_multiway` gains a required `opp` kw; each `_MW_*`
+      scalar → `base ** max(opp-1,0)` with `base` = the exact pre-M6 flat constant (so opp=2/3-way
+      ⇒ `base**1` bit-identical, opp=1/HU never enters the gate) — new `opponent_count(spot) =
+      players_in_pot-1` threaded through all **10** call sites. `_mw_srp_preflop` generalized from
+      1 to 1–2 cold-callers (3+ → None), `_mw_check_bet_*` require a response from EVERY caller
+      between the opener's bet and hero (action-order closing gate — never "BB closes"); `map_mw_*`
+      pot math n-way. 4-way-hero-closes now maps+grades; 4-way with a live player behind hero → None;
+      5+ → binary bucket. Reverses the N5 "4-way stays None" pin (intended). **Refuter PASS** (0
+      HIGH/MED; 2 LOW doc-staleness fixed) — independently confirmed byte-identity via `float.hex()`
+      in a second worktree, proved BB structurally always closes inside `_mw_srp_preflop`'s gate
+      (no §1.2 leak), monotone 2→6-way. 822 tests 3× stable.)*
+      (I5·C5·E6) **Scope:**
       `_apply_multiway` scalars become opponent-count-aware via geometric `base ** max(opp-1, 0)`
       (F4 shape); extend `map_mw_*` to fire when hero closes a **4-way** SRP shape, gated on the
       ACTUAL closing seat (never "BB closes"); 5+ stays binary bucket / "no baseline yet."

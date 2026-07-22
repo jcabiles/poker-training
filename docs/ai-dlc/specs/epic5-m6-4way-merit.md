@@ -22,9 +22,10 @@ fire when hero closes a **4-way** SRP shape. Direction-only — **no published 4
     so `opp=2` (3-way) ⇒ `base**1` == current value ⇒ 3-way byte-identical; HU never enters the gate
     (and `opp=1` ⇒ `base**0`=1.0 anyway). Each `_MW_*` is used in exactly ONE positive-merit multiply
     (verified: 7 existing call sites), so `base**1 == base` is arithmetically exact for 3-way.
-  - **Thread `opp` through EVERY call site** of `_apply_multiway` (refuter-enumerated 7 + M4's new
-    one): `grade_cbet`, `grade_vs_cbet`, `grade_vs_check_raise`, the turn/river barrels, AND M4's
-    `grade_vs_caller_raise`. Each passes `opp=opponent_count(spot)`.
+  - **Thread `opp` through EVERY call site** of `_apply_multiway` — **10 total on this stacked
+    branch**: `grade_cbet`, `grade_vs_cbet`, `grade_vs_check_raise`, `grade_turn_barrel`,
+    `grade_vs_turn_bet`, `grade_river_barrel`, `grade_vs_river_bet`, M4's `grade_vs_caller_raise`,
+    and M5's `grade_limped_lead`/`grade_limped_vs_lead`. Each passes `opp=opponent_count(spot)`.
 - `backend/app/domain/table/grade_map_postflop.py` — **MODIFY** `_mw_srp_preflop` / `map_mw_*` to
   fire on a **4-way** SRP shape **only when hero closes** (all players behind hero have acted —
   verify from ACTION ORDER per RES-H §1.2 / the N5 closing-seat lesson; never "BB closes"). A 4-way
