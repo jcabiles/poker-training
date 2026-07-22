@@ -284,6 +284,43 @@ _PRICE_LEVEL = 0.35
 _PRICE_SENSITIVITY = 2.2
 _PRICE_STICKINESS_DAMP = 0.15
 
+# F2 size-linked bluffing (RES-D §1b/§3 + RES-E §2-§3). Polar bluff SHARE of
+# the betting range at each bucket's representative chosen size, f/(1+2f)
+# with value:bluff = (1+f):f — the share RISES with size (bigger bets carry
+# proportionally more bluffs; value:bluff tightens toward 1:1):
+#   SMALL  ⅓-pot        → 0.20
+#   MEDIUM ½–⅔          → 0.25–0.286, rep 0.27
+#   LARGE  ¾–pot        → 0.30–0.333, rep 0.32
+#   OVERBET 1.5× (α .60) → 0.375
+# Consumed as a RATIO vs the MEDIUM reference (the ½–⅔-pot class the flat
+# bluff_freq levers were calibrated against, mirroring _ALPHA_REF): theory
+# sets the SHAPE across sizes, the persona's bluff_freq keeps setting the
+# LEVEL — so the RES-D §3 ordering station < nit < fish < tag < lag < maniac
+# is preserved at every size.
+_BUCKET_BLUFF_SHARE = {
+    SizeBucket.SMALL: 0.20,
+    SizeBucket.MEDIUM: 0.27,
+    SizeBucket.LARGE: 0.32,
+    SizeBucket.OVERBET: 0.375,
+}
+_BLUFF_SHARE_REF = _BUCKET_BLUFF_SHARE[SizeBucket.MEDIUM]
+
+
+def _bluff_size_factor(frac: float) -> float:
+    """Multiplier on the bluff mass for a chosen pot-fraction: the bucket's
+    polar bluff share relative to the MEDIUM reference. Bucketed on the
+    authored pot-fraction key (RES-E §3's chosen-size mapping)."""
+    return _BUCKET_BLUFF_SHARE[size_bucket(frac)] / _BLUFF_SHARE_REF
+
+
+def _sizing_dist(pf, board: list[Card], legal: list[LegalAction], is_aggressor: bool):
+    """The sizing distribution this decision draws from (R2 node-aware
+    override when authored + aggressor context supplied; else flat)."""
+    if pf.sizing_by_node and is_aggressor:
+        node = postflop_node_key(board, legal, is_aggressor=is_aggressor)
+        return pf.sizing_by_node.get(node, pf.sizing)
+    return pf.sizing
+
 
 def _price_factor(faced_fraction: float, stickiness: float) -> float:
     """Multiplier on the fold merit for a faced bet at `faced_fraction` of the
@@ -322,7 +359,10 @@ def sample_postflop_decision(
     FOLD), then ALWAYS `rng.choices` — mixed, never argmax.
 
     Sizing (spec-pinned): pot-fraction `f` sampled from pack sizing weights,
-    independent of bucket. BET: `f * pot_bb`. RAISE:
+    independent of bucket (F2: a pure-air bluff's frequency is linked to the
+    chosen size via the joint two-stage sampling documented inline; the
+    authored distribution itself never varies with strength). BET:
+    `f * pot_bb`. RAISE:
     `raise_to = current_bet_to + f * (pot_bb + to_call)` where `to_call` is
     the CALL entry's min_bb and `current_bet_to` is the caller-supplied
     street current bet-TO amount (HandState.current_bet_bb; 0.0 = unopened —
@@ -342,6 +382,23 @@ def sample_postflop_decision(
     )
     bluff_mass = pf.bluff_freq * noise * pf.multiway_bluff_damp ** max(opponents - 1, 0)
     agg_scale = pf.aggression * noise
+
+    # F2 size-linked bluffing: the joint (action, size) law for a pure-air
+    # bluff candidate is  w(s) · bluff_mass · factor(s)  — sampled in two
+    # stages so the ACTION draw stays the first rng.choices call (capture
+    # rngs in range_estimate and the tests key on that): (1) here, scale
+    # bluff_mass by E_s[factor] over the sizing distribution; (2) below, tilt
+    # the size-draw weights by factor(s). Equivalent to pre-drawing the size
+    # and conditioning the bluff decision on it. Strength never steers the
+    # size draw (value hands keep the authored distribution byte-for-byte —
+    # the anti-sizing-tell no-go); the resulting big-size lean WITHIN the
+    # bluff-bet range is the Bayes face of "bigger bets carry proportionally
+    # more bluffs" (RES-D §1b), not a strength→size map.
+    sizing_dist = _sizing_dist(pf, board, legal, is_aggressor)
+    if bluff_cell and (ActionType.BET in by_kind or ActionType.RAISE in by_kind):
+        bluff_mass *= sum(
+            w * _bluff_size_factor(float(k)) for k, w in sizing_dist.items()
+        ) / sum(sizing_dist.values())
 
     entries: list[tuple[ActionType, float]] = []
     if ActionType.FOLD in by_kind:  # facing chips
@@ -419,13 +476,13 @@ def sample_postflop_decision(
     if action not in (ActionType.BET, ActionType.RAISE):
         return Decision(action=action)
 
-    # Sizing draw — independent of bucket (rule 3). R2: node-aware override when
-    # authored + aggressor context supplied; else the flat distribution.
-    dist = pf.sizing
-    if pf.sizing_by_node and is_aggressor:
-        node = postflop_node_key(board, legal, is_aggressor=is_aggressor)
-        dist = pf.sizing_by_node.get(node, pf.sizing)
-    fracs = [(float(k), w) for k, w in dist.items()]
+    # Sizing draw — independent of bucket (rule 3): the distribution is the
+    # persona-authored one for every strength class. F2 stage 2 (see the
+    # bluff_mass comment above): a pure-air bluff bet tilts the weights by
+    # the bucket factor, completing the joint law w(s)·bluff_mass·factor(s).
+    fracs = [(float(k), w) for k, w in sizing_dist.items()]
+    if bluff_cell:
+        fracs = [(fr, w * _bluff_size_factor(fr)) for fr, w in fracs]
     f = rng.choices([fr for fr, _ in fracs], weights=[w for _, w in fracs], k=1)[0]
     to_call = by_kind[ActionType.CALL].min_bb or 0.0 if ActionType.CALL in by_kind else 0.0
     size = pot_fraction_to_bb(

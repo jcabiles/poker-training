@@ -508,6 +508,139 @@ def test_faced_frac_check_raise_lands_large():
 
 
 # =====================================================================
+# F2 — size-linked bluffing (RES-D §3 polar curve, RES-E §3 mapping)
+# =====================================================================
+#
+# Direction (RES-D §1b/§3, authoritative over the roadmap's shorthand): the
+# polar bluff SHARE f/(1+2f) RISES with the chosen size — SMALL ~0.20,
+# MEDIUM ~0.27, LARGE ~0.32, OVERBET 0.375 — i.e. value:bluff TIGHTENS
+# toward 1:1 (4:1 → 1.5:1). So bluff frequency at a chosen size must be
+# monotone INCREASING across SMALL → OVERBET.
+#
+# Technique: force the persona's sizing distribution to a single authored
+# size, then read the EXACT normalized action weights via a capture rng
+# (deterministic — no sampling noise, no band flake).
+
+BLUFF_SIZE_FRACS = (0.33, 0.5, 1.0, 1.5)  # SMALL / MEDIUM / LARGE(pot) / OVERBET
+
+
+def _forced_size_pack(persona: str, frac: float):
+    pack = _pack(persona).model_copy(deep=True)
+    pack.postflop = pack.postflop.model_copy(
+        update={"sizing": {str(frac): 1.0}, "sizing_by_node": None}
+    )
+    return pack
+
+
+def _air_bet_weight(persona: str, frac: float) -> float:
+    """Exact normalized BET weight for a pure-air hand (7h5d on Kc9s3h — no
+    draw, bluff cell) in an unopened node, sizing forced to `frac`."""
+    cap = _CaptureWeights()
+    sample_postflop_decision(
+        _forced_size_pack(persona, frac),
+        ("7h", "5d"),
+        ["Kc", "9s", "3h"],
+        [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 60.0)],
+        4.0,
+        100.0,
+        1,
+        cap,  # type: ignore[arg-type] — duck-typed capture rng
+    )
+    return cap.dist[ActionType.BET]
+
+
+@pytest.mark.parametrize("persona", ALL_PERSONAS)
+def test_bluff_freq_rises_with_chosen_size(persona):
+    """RES-D §3 invariant 1 (the flat-bluff_freq bug): bluff frequency moves
+    with the chosen size, strictly increasing SMALL → MEDIUM → LARGE →
+    OVERBET, with a measurable gap (share curve 0.20→0.375 ⇒ overbet bluff
+    frequency ≥ 1.5× the ⅓-pot one)."""
+    ws = [_air_bet_weight(persona, f) for f in BLUFF_SIZE_FRACS]
+    assert all(a < b for a, b in zip(ws, ws[1:], strict=False)), (
+        f"{persona} bluff freq not strictly increasing in chosen size: {ws}"
+    )
+    assert ws[-1] >= 1.5 * ws[0], f"{persona} overbet/small bluff gap too small: {ws}"
+
+
+def test_bluff_ordering_across_personas_at_fixed_size():
+    """RES-D §3 invariant 2: at a fixed chosen size (MEDIUM ½-pot), bluff
+    share ordering station < nit < fish < tag < lag < maniac — F2 sets the
+    shape, bluff_freq still sets the persona level."""
+    order = ("calling_station", "nit", "passive_fish", "tag", "lag", "maniac")
+    ws = [_air_bet_weight(p, 0.5) for p in order]
+    assert all(a < b for a, b in zip(ws, ws[1:], strict=False)), dict(
+        zip(order, ws, strict=True)
+    )
+
+
+def test_bluff_raise_path_scales_with_chosen_size():
+    """The _BLUFF_RAISE_FACTOR path (air facing a bet, RAISE legal) is wired
+    through the same size factor: forced-overbet raise weight strictly above
+    forced-⅓-pot (fold/call merits identical, so normalization preserves the
+    direction)."""
+
+    def raise_weight(frac: float) -> float:
+        cap = _CaptureWeights()
+        sample_postflop_decision(
+            _forced_size_pack("lag", frac),
+            ("7h", "5d"),
+            ["Kc", "9s", "3h"],
+            [
+                personas_postflop_legal_fold(),
+                personas_postflop_legal_call(2.0),
+                personas_postflop_legal_raise(6.0, 100.0),
+            ],
+            6.0,
+            100.0,
+            1,
+            cap,  # type: ignore[arg-type]
+            current_bet_to=2.0,
+        )
+        return cap.dist[ActionType.RAISE]
+
+    assert raise_weight(1.5) > raise_weight(0.33)
+
+
+def test_bluff_bet_sizes_tilt_big_but_value_sizes_stay_authored():
+    """Joint-law check (catches a scale-then-REDRAW bug that would flatten
+    the per-size bluff share back to constant): with a 50/50 {⅓, 1.5×} mix,
+    - AIR bets lean big: P(1.5× | air, bet) = 0.5·f₁.₅/(0.5·f₀.₃₃+0.5·f₁.₅)
+      ≈ 1.389/(0.741+1.389) ≈ 0.65 — the Bayes face of "bigger bets carry
+      more bluffs", NOT a strength→size map;
+    - VALUE bets keep the authored 50/50 byte-for-byte (anti-sizing-tell:
+      the draw itself never conditions on strength — the regression test
+      `test_sizing_spread_no_deterministic_strength_to_size` also holds).
+    Seed-pinned; bounds sit >3σ from both the expected values and the
+    no-tilt/false-tilt failure modes."""
+    pack = _pack("maniac").model_copy(deep=True)
+    pack.postflop = pack.postflop.model_copy(
+        update={"sizing": {"0.33": 0.5, "1.5": 0.5}, "sizing_by_node": None}
+    )
+    legal = [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 60.0)]
+    board = ["Kc", "9s", "3h"]
+    pot = 4.0  # ⅓-pot → 1.32bb, 1.5× → 6.0bb (well inside the bracket)
+
+    def big_share(hole, seed, n):
+        rng = random.Random(seed)
+        big = small = 0
+        for _ in range(n):
+            d = sample_postflop_decision(pack, hole, board, legal, pot, 100.0, 1, rng)
+            if d.action is ActionType.BET:
+                if d.size_bb == pytest.approx(6.0):
+                    big += 1
+                else:
+                    small += 1
+        assert big + small >= 300, "too few bets to measure the size mix"
+        return big / (big + small)
+
+    air = big_share(("7h", "5d"), seed=20260722, n=2500)  # bluff cell
+    value = big_share(("Ah", "Ad"), seed=20260722, n=1500)  # overpair (value)
+    assert air > 0.55, f"air bets not tilted big: {air:.3f} (expected ~0.65)"
+    assert air < 0.75, f"air big-size tilt implausibly large: {air:.3f}"
+    assert 0.44 <= value <= 0.56, f"value size mix drifted off authored 50/50: {value:.3f}"
+
+
+# =====================================================================
 # Closed-loop harness: full-hand playouts through the S2 engine
 # =====================================================================
 
