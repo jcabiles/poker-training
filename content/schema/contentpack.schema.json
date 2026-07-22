@@ -134,7 +134,9 @@
         "turn_barrel",
         "vs_turn_bet",
         "river_barrel",
-        "vs_river_bet"
+        "vs_river_bet",
+        "limped_lead",
+        "limped_vs_lead"
       ],
       "title": "NodeContext",
       "type": "string"

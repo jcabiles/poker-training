@@ -81,6 +81,8 @@ class NodeContext(StrEnum):
     VS_TURN_BET = "vs_turn_bet"  # facing a turn bet after calling flop (S6)
     RIVER_BARREL = "river_barrel"  # aggressor who bet flop+turn deciding the river (S7)
     VS_RIVER_BET = "vs_river_bet"  # caller of flop+turn bets facing a river bet (S7)
+    LIMPED_LEAD = "limped_lead"  # HU limped pot: hero can lead the flop (M5, RES-G Slice C)
+    LIMPED_VS_LEAD = "limped_vs_lead"  # HU limped pot: hero faces a flop lead (M5)
 
 
 class Stakes(BaseModel):
