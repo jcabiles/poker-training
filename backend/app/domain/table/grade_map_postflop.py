@@ -1059,3 +1059,160 @@ def map_flop_vs_caller_raise(state: HandState, hero_seat: int) -> Spot | None:
         mults=FACING_RAISE_MULTS["raise"],
         call_amt=round(raise_to - cbet, 2),
     )
+
+
+# --- M5 (Epic 5, RES-G Slice C): HU limped-pot flop mappers -----------------
+# The FIRST limped-pot postflop node family, HU only (the tractable 31% of
+# limped flops). The gate derives the ENTRANT COUNT from the PREFLOP actions —
+# never from current flop statuses — so a 3+-entrant limped pot stays None
+# even after it degrades to 2-live postflop (multiway limped is deferred
+# Slice D "no baseline yet"; deliberately NOT M4's degrade-to-2-live
+# pattern). Flop only; turn/river of a limped pot stays None (v1).
+
+
+def _limped_flop_hu_preflop(state: HandState) -> tuple | None:
+    """Gate: HU limped pot (ZERO preflop raises). Entrants = every preflop
+    CALLer (open-limp, or the SB completing) + the BB (posted; its option
+    close is the lone legal preflop CHECK). Exactly 2 entrants, hero-agnostic;
+    both must still be IN (an all-in anywhere is off-shape) and every other
+    seat FOLDED. Returns (entrant_a, entrant_b, preflop_pot) — the preflop pot
+    is 2.0 (SB completed) or 2.5 (one limper + the folded SB's dead 0.5) — or
+    None."""
+    pre = _street_actions(state, Street.PREFLOP)
+    if any(
+        h.action not in (ActionType.FOLD, ActionType.CALL, ActionType.CHECK)
+        for h in pre
+    ):
+        return None  # any raise/bet: not a limped pot
+    if any(
+        h.action is ActionType.CHECK and h.position is not Position.BB for h in pre
+    ):
+        return None  # only the BB holds a free preflop option
+    calls = [h for h in pre if h.action is ActionType.CALL]
+    entrant_pos = {c.position for c in calls} | {Position.BB}
+    if len(entrant_pos) != 2:
+        return None  # 3+ preflop entrants (even if since degraded to 2-live)
+    entrants = [s for s in state.seats if s.position in entrant_pos]
+    if len(entrants) != 2:
+        return None
+    if any(s.status is not PlayerStatus.IN for s in entrants):
+        return None  # an all-in (or an entrant already folded) is off-shape
+    if any(
+        s.status is not PlayerStatus.FOLDED
+        for s in state.seats
+        if s.position not in entrant_pos
+    ):
+        return None
+    sb_dead = 0.0 if Position.SB in entrant_pos else 0.5
+    pre_pot = round(2.0 + sb_dead, 2)
+    return entrants[0], entrants[1], pre_pot
+
+
+def _limped_lead_spot(
+    state: HandState, hero_seat: int, villain, pot: float
+) -> Spot | None:
+    """Hero can lead the limped flop: check / bet small / bet big (mirrors
+    `_barrel_spot`'s legal-action shape, but `facing` is the LIVE villain —
+    hero may itself be the BB here). The small leg clamps up to the engine's
+    1BB legal minimum (limped pots are small enough that 0.33·pot can fall
+    under it)."""
+    hero = state.seats[hero_seat]
+    small_frac, big_frac = POSTFLOP_BET_FRACS["flop"]
+    small = max(round(small_frac * pot, 1), 1.0)
+    big = max(round(big_frac * pot, 1), 1.0)
+    if big <= small:
+        return None  # degenerate: both canonical sizes collapse onto the min bet
+    hero_remaining = hero.stack_bb
+    villain_remaining = villain.stack_bb
+    if hero_remaining < big or villain_remaining <= 0:
+        return None  # too shallow for the canonical small/big bet buckets
+    effective = round(min(hero_remaining, villain_remaining), 2)
+    return Spot(
+        game=GameConfig(stakes=Stakes(sb=1.0, bb=2.0), table_size=9, max_buyin_bb=200.0),
+        street=Street.FLOP,
+        board=list(state.board),
+        pot_bb=pot,
+        hero=Hero(
+            position=hero.position, hole_cards=hero.hole_cards, stack_bb=hero_remaining
+        ),
+        players=_players(state, hero_seat),
+        effective_stack_bb=effective,
+        spr=round(effective / pot, 1),
+        action_history=list(state.action_history),
+        to_act=hero.position,
+        legal_actions=[
+            LegalAction(action=ActionType.CHECK),
+            LegalAction(action=ActionType.BET, min_bb=small, max_bb=hero_remaining),
+            LegalAction(action=ActionType.BET, min_bb=big, max_bb=hero_remaining),
+        ],
+        node_context=[NodeContext.LIMPED_LEAD],
+        facing=villain.position,
+        hero_range=None,
+        villain_range=None,
+    )
+
+
+def map_limped_flop_lead(state: HandState, hero_seat: int) -> Spot | None:
+    """HU limped flop, hero can lead: zero preflop raises, exactly 2 preflop
+    entrants incl. hero, and no flop bet yet (hero first to act, or the OOP
+    villain checked to hero)."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3:
+        return None
+    gate = _limped_flop_hu_preflop(state)
+    if gate is None:
+        return None
+    a, b, pre_pot = gate
+    if hero.seat not in (a.seat, b.seat):
+        return None
+    villain = b if hero.seat == a.seat else a
+    acts = _street_actions(state, Street.FLOP)
+    if acts and not (
+        len(acts) == 1
+        and acts[0].action is ActionType.CHECK
+        and acts[0].position is villain.position
+    ):
+        return None
+    pot = _live_pot(state)
+    if abs(pot - pre_pot) > _EPS:
+        return None
+    return _limped_lead_spot(state, hero_seat, villain, pot)
+
+
+def map_limped_flop_vs_lead(state: HandState, hero_seat: int) -> Spot | None:
+    """HU limped flop, hero faces a villain lead at a recognized size: either
+    the OOP villain led outright, or hero checked and the villain stabbed
+    (hero's RAISE is then a check-raise, sized with the check_raise mults)."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3:
+        return None
+    gate = _limped_flop_hu_preflop(state)
+    if gate is None:
+        return None
+    a, b, pre_pot = gate
+    if hero.seat not in (a.seat, b.seat):
+        return None
+    villain = b if hero.seat == a.seat else a
+    acts = _street_actions(state, Street.FLOP)
+    hero_checked = False
+    if len(acts) == 2:
+        if acts[0].action is not ActionType.CHECK or acts[0].position is not hero.position:
+            return None
+        hero_checked = True
+        lead = acts[1]
+    elif len(acts) == 1:
+        lead = acts[0]
+    else:
+        return None
+    if lead.action is not ActionType.BET or lead.position is not villain.position:
+        return None
+    if not _is_canonical_bet(lead.amount_bb, pre_pot, Street.FLOP):
+        return None
+    pot = _live_pot(state)
+    if abs(pot - (pre_pot + lead.amount_bb)) > _EPS:
+        return None
+    return _faced_bet_spot(
+        state, hero_seat, villain, pot, lead.amount_bb,
+        Street.FLOP, NodeContext.LIMPED_VS_LEAD, None, None,
+        mults=FACING_RAISE_MULTS["check_raise" if hero_checked else "raise"],
+    )

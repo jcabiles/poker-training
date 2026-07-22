@@ -11,6 +11,8 @@ from app.domain.action import Decision
 from app.domain.evaluation import EvaluationResult
 from app.domain.postflop import (
     grade_cbet,
+    grade_limped_lead,
+    grade_limped_vs_lead,
     grade_vs_caller_raise,
     grade_vs_cbet,
     grade_vs_check_raise,
@@ -21,7 +23,9 @@ _POSTFLOP_NODES = (
     NodeContext.CBET,
     NodeContext.VS_CBET,
     NodeContext.VS_CHECK_RAISE,
-    NodeContext.VS_CALLER_RAISE,
+    NodeContext.VS_CALLER_RAISE,  # M4: facing a cold-caller's raise of the c-bet
+    NodeContext.LIMPED_LEAD,  # M5: HU limped-pot flop lead
+    NodeContext.LIMPED_VS_LEAD,  # M5: HU limped-pot flop, facing a lead
 )
 
 
@@ -42,6 +46,10 @@ class PostflopHeuristicProvider:
             grader = grade_vs_caller_raise
         elif NodeContext.VS_CBET in spot.node_context:
             grader = grade_vs_cbet
+        elif NodeContext.LIMPED_LEAD in spot.node_context:
+            grader = grade_limped_lead
+        elif NodeContext.LIMPED_VS_LEAD in spot.node_context:
+            grader = grade_limped_vs_lead
         else:
             grader = grade_cbet
         return grader(spot, spot.hero_range, spot.villain_range, action)

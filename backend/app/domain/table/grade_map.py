@@ -24,6 +24,8 @@ from app.domain.table.grade_map_postflop import (
     map_flop_vs_caller_raise,
     map_flop_vs_cbet,
     map_flop_vs_check_raise,
+    map_limped_flop_lead,
+    map_limped_flop_vs_lead,
     map_mw_flop_vs_cbet,
     map_mw_vs_river_bet,
     map_mw_vs_turn_bet,
@@ -51,13 +53,17 @@ def map_decision_point(state: HandState, hero_seat: int) -> Spot | None:
         # N4b: three HU flop shapes, disjoint by hero role + street action
         # shape; N5 adds the 3-way BB-defense shape, disjoint from all HU
         # mappers by preflop entrant count (two callers vs one) — so `or`
-        # never masks one with the other.
+        # never masks one with the other. M5 adds the two HU LIMPED-pot
+        # shapes, disjoint from every raised-pot mapper by preflop raise
+        # count (zero vs one+) and from each other by flop action shape.
         return (
             map_flop_cbet(state, hero_seat)
             or map_flop_vs_cbet(state, hero_seat)
             or map_flop_vs_check_raise(state, hero_seat)
             or map_flop_vs_caller_raise(state, hero_seat)
             or map_mw_flop_vs_cbet(state, hero_seat)
+            or map_limped_flop_lead(state, hero_seat)
+            or map_limped_flop_vs_lead(state, hero_seat)
         )
     # R5: turn/river continuation-line shapes, disjoint by hero position
     # (opener barrels vs BB defends) + entrant count (N5 3-way). Everything

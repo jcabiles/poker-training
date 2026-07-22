@@ -42,6 +42,8 @@ class LeakCategory(IntEnum):
     RIVER_BARREL = 205  # flop+turn aggressor deciding whether to bet the river (S7)
     VS_RIVER_BET = 206  # facing a river bet after calling flop+turn (S7)
     VS_CALLER_RAISE = 207  # facing a cold-caller's raise of the flop c-bet, as the opener (M4)
+    LIMPED_LEAD = 208  # HU limped pot: leading the flop (M5, RES-G Slice C)
+    LIMPED_VS_LEAD = 209  # HU limped pot: facing a flop lead (M5)
     BOARD_TEXTURE = 210  # board-texture classification drill
     EQUITY_EST = 211  # equity-estimation drill
 

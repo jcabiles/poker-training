@@ -1,0 +1,71 @@
+{
+  "id": "postflop-limped",
+  "version": 1,
+  "domain": "postflop",
+  "description": "M5 (Epic 5, RES-G Slice C): HU limped-pot flop thresholds + authored rationale. The RES-G §4b directions live in sizing_rules as DATA (small polar lead; mostly-check OOP; big limped-pot bets are over-repped by value; texture decides the edge from a score=0 no-baseline start) — the graders (backend/app/domain/postflop.py::grade_limped_lead / grade_limped_vs_lead) read every direction-shaping number from here, never hardcode it. All values are [DERIVED-ASSUMPTION] design targets per RES-G; EVs stay approximate (heuristic, no solver).",
+  "entries": [
+    {
+      "node_context": "limped_lead",
+      "position": "BB",
+      "facing": "BTN",
+      "actions": [],
+      "rationale": "Nobody raised preflop, so neither range is condensed: there is no aggressor edge to lean on and the board texture decides who this flop favors. When you do lead a limped pot, bet small and polar — real strength plus some air — and check the medium made hands, especially out of position, since a big bet into a limped field only gets action from the hands that beat you."
+    },
+    {
+      "node_context": "limped_lead",
+      "position": "SB",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "After completing the small blind you play the whole hand out of position with a capped range against a capped range: mostly check, and when you lead, keep it small and polar — strong hands and some air — because medium strength bloating a limped pot out of position is the classic way to lose a big pot with a small hand."
+    },
+    {
+      "node_context": "limped_vs_lead",
+      "position": "BB",
+      "facing": "BTN",
+      "actions": [],
+      "rationale": "A limper who bets the flop is polarized around a capped range — limpers rarely hold the true top of the deck, but a BIG bet in a limped pot is over-represented by real strength. Continue with made hands and draws at a good price, fold the air, and tighten the marginal bluff-catch as the lead gets bigger."
+    },
+    {
+      "node_context": "limped_vs_lead",
+      "position": "SB",
+      "facing": "BB",
+      "actions": [],
+      "rationale": "When the big blind stabs at a limped flop it is whoever-bets-first aggression, not a preflop-range edge: defend made hands and draws getting a price, but respect large sizings — in limped pots the big bets are value-heavy — and let the marginal one-pair hands fold more as the bet grows."
+    }
+  ],
+  "sizing_rules": {
+    "limped_lead": {
+      "check_base": 1.0,
+      "check_air_bonus": 0.6,
+      "check_middle_bonus": 0.9,
+      "check_oop_bonus": 0.5,
+      "check_wet_bonus": 0.4,
+      "value": { "strong": 2.0, "weak_made": 0.6, "draw": 1.2, "air": 0.5 },
+      "edge_weight": 1.0,
+      "small_bonus": 0.5,
+      "big_penalty": 0.5,
+      "big_middle_penalty": 0.8,
+      "big_air_penalty": 1.0
+    },
+    "limped_vs_lead": {
+      "fold_base": 0.6,
+      "fold_air_bonus": 1.0,
+      "fold_middle_bonus": 0.2,
+      "fold_price_weight": 1.5,
+      "fold_edge_bonus": 0.3,
+      "fold_value_relief": 0.6,
+      "big_lead_price": 0.4,
+      "big_lead_middle_fold_bonus": 0.5,
+      "value": { "strong": 2.0, "weak_made": 0.8, "draw": 1.4, "air": 0.0 },
+      "call_price_anchor": 0.5,
+      "call_price_weight": 2.0,
+      "call_air_penalty": 1.0,
+      "edge_weight": 0.5,
+      "raise_strong_bonus": 0.5,
+      "raise_draw_penalty": 0.2,
+      "raise_semibluff_wet_bonus": 0.8,
+      "raise_middle": -0.8,
+      "raise_air": -1.0
+    }
+  }
+}
