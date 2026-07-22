@@ -1155,14 +1155,39 @@ the serial spine S2→S4→S9→S10, not the agent budget.
 > off the tip of the merged chain. Note for M7: its go/no-go input already exists (RES-I §6 M1
 > re-measure = GO — L3+L4 landed 0.23–2.73/1000 vs the ≥5/1000 threshold; L5 build is warranted).
 
-- [ ] **M4 — Caller-re-raises-c-bet grader (RES-H H1).** (I8·C8·E5) **Scope:**
+- [x] **M4 — Caller-re-raises-c-bet grader (RES-H H1).** *(done 2026-07-22, W1 PR — `feat/epic5-m4-m5`.
+      `_merits_vs_caller_raise` + `grade_vs_caller_raise` (check-raise sibling; fold baseline 1.9 vs
+      1.6, halved bluffy/semibluff credits, §3.2 value-skewed prior) + `_flop_caller_raise_preflop`
+      gate + `map_flop_vs_caller_raise` (SRP, hero=opener, non-BB caller RAISED the canonical c-bet,
+      hero faces/closes; incremental CALL leg = raise_to−cbet; `_calibrate_catcher_fold` NOT called).
+      Fires 11/2000 any-seat-as-opener (in-band; 16.8/1000 is the any-seat upper bound). NodeContext/
+      LeakCategory=207 additive; provider routing additive; spot_signature frozen. **Refuter FAIL→1
+      HIGH fixed:** the weak_made CALL term halved `bluffy` unconditionally — on dry boards bluffy<0
+      so halving SHRANK the penalty → caller-raise folded LESS than check-raise at price≥0.4
+      (asymmetry inversion). Fix: halve the CREDIT on wet, keep FULL penalty on dry
+      (`(bluffy*0.25) if bluffy>0 else (bluffy*0.5)`); 231-cell grid scan 0 inversions. 796 tests.)*
+      (I8·C8·E5) **Scope:**
       `_merits_vs_caller_raise` + `grade_vs_caller_raise` (sibling of `grade_vs_check_raise`) with
       the §3.2 value-skewed prior; `map_flop_vs_caller_raise` mapper (SRP, hero=opener, canonical
       c-bet, non-BB caller raised, hero faces/closes); `_calibrate_catcher_fold` NOT called.
       **Pass/fail:** RES-H §5-H1 verbatim — incl. fires ≥~5/1000 in-band (measured 16.8);
       range-asymmetry direction test (fold freq ≥ check-raise grader's for fixed marginal hand);
       α-not-applied assertion; off-shape lines return `None`; HU/3-way hash-pins unchanged.
-- [ ] **M5 — HU limped-pot flop grader (RES-G Slice C, new node family).** (I7·C6·E4) **Scope:**
+- [x] **M5 — HU limped-pot flop grader (RES-G Slice C, new node family).** *(done 2026-07-22, W1 PR
+      — `feat/epic5-m4-m5`. App's FIRST limped-pot postflop grader, HU only. `_limped_flop_hu_preflop`
+      gate (0-raise pot, PREFLOP-entrant count==2 — derived from preflop actions not flop statuses;
+      3+-entrant OR degraded-to-2-live → `None`) + `map_limped_flop_lead`/`map_limped_flop_vs_lead` +
+      `grade_limped_lead`/`grade_limped_vs_lead` (§4b directions as DATA in new `content/postflop/
+      limped.json` v1; small polar lead, mostly-check OOP, texture edge from score=0). Fires ~86 lead
+      / ~21 vs-lead per 1500 organic hands. Additive/append-only (raised-pot byte-unchanged),
+      spot_signature frozen, NodeContext/LeakCategory=208/209, provider routing additive, schema
+      regenerated. **Refuter FAIL→1 HIGH fixed:** the draw RAISE merit was flat/price-independent
+      while call+fold decayed with price → RAISE won for a draw at big bets even on dry/villain-edge
+      (inverts §4b's "defend draws at a price; semibluff only wet+hero-edge"). Fix: cap draw-raise ≤
+      draw-call outside the wet+hero-edge §4b condition + bump `value.draw` 1.2→1.4 so CALL beats FOLD
+      to 1.0-pot; sweep confirms RAISE best ONLY in wet+hero cells. Deviation from spec: gate keys on
+      PREFLOP-entrant count (not flop-live) so degrade-to-2 stays `None` — refuter-verified airtight.)*
+      (I7·C6·E4) **Scope:**
       first limped-pot postflop grader, **HU only** (the tractable 31%); `map_limped_flop_lead` /
       `map_limped_flop_vs_lead` per RES-G §4b directions. **Pass/fail:** RES-G §6-C verbatim —
       0-raise HU flop grades freq+EV; **any 3+ limped flop still returns `None`** (explicit
