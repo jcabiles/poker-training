@@ -1,7 +1,7 @@
 """FastAPI application entry point.
 
 Mounts the versioned API under /api/v1. CORS is opened for the Vite dev
-server (localhost:5173). DB migrations auto-run on startup (alembic upgrade
+server (localhost:7777). DB migrations auto-run on startup (alembic upgrade
 head) so a clean checkout never hits a schema-less SQLite file.
 """
 
@@ -22,11 +22,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Poker Coach API", version="0.1.0", lifespan=lifespan)
 
-# Dev: Vite (5173) -> FastAPI (8008) is cross-origin. In prod the SPA is
+# Dev: Vite (7777) -> FastAPI (8008) is cross-origin. In prod the SPA is
 # served same-origin and this is a no-op.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:7777"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

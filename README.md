@@ -20,10 +20,10 @@ echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc     # or ~/.bashrc for bash — the
 direnv allow .
 
 # 4. run it
-poker-coach            # start backend :8008 + frontend :5173 in the background
+poker-coach            # start backend :8008 + frontend :7777 in the background
 poker-coach stop       #   stop / restart / status also work
 ```
-Open <http://localhost:5173>. No direnv? Use `./scripts/serve.sh start` instead — same launcher. Full details below.
+Open <http://localhost:7777>. No direnv? Use `./scripts/serve.sh start` instead — same launcher. Full details below.
 
 ## Layout
 ```
@@ -62,7 +62,7 @@ Or run separately (two terminals):
 ```bash
 # backend — API on :8008
 cd backend && uvicorn app.main:app --port 8008 --reload
-# frontend — UI on :5173
+# frontend — UI on :7777
 cd frontend && npm run dev
 ```
 

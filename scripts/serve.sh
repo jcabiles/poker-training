@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manage THIS project's dev stack: FastAPI backend (:8008) + Vite frontend (:5173).
+# Manage THIS project's dev stack: FastAPI backend (:8008) + Vite frontend (:7777).
 #
 # Scope/safety: tracks the two servers it starts via PID files in the repo. Both
 # the PID-file check and the command-line fallback match against this repo's
@@ -7,14 +7,14 @@
 # port is never mistaken for ours (and never killed).
 #
 # Usage: scripts/serve.sh {start|stop|restart|status}
-#        BACKEND_PORT=8123 FRONTEND_PORT=5200 scripts/serve.sh start   # override ports
+#        BACKEND_PORT=8123 FRONTEND_PORT=7200 scripts/serve.sh start   # override ports
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 
 export BACKEND_PORT="${BACKEND_PORT:-8008}"
-export FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+export FRONTEND_PORT="${FRONTEND_PORT:-7777}"
 
 BE_PIDFILE="$REPO/.backend.pid";  BE_LOG="$REPO/.backend.log"
 FE_PIDFILE="$REPO/.frontend.pid"; FE_LOG="$REPO/.frontend.log"
