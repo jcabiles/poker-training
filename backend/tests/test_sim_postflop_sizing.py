@@ -24,7 +24,7 @@ from app.domain.action import Decision
 from app.domain.scenarios import _OPEN_SIZE, _SEAT_ORDER
 from app.domain.spot import ActionType, Position, Street
 from app.domain.table.deck import deal_hand
-from app.domain.table.engine import HandState, apply, start_hand
+from app.domain.table.engine import HandState, apply, legal_actions, start_hand
 from app.domain.table.grade_map_postflop import map_turn_barrel
 from app.services.sim_session import _hero_legal_actions, apply_hero_action
 
@@ -189,6 +189,62 @@ def test_short_stack_barrel_offers_one_size_matching_grade_collapse():
     assert map_turn_barrel(short, HERO_SEAT) is None  # grading bailed to one/none
     short_bets = [la for la in _hero_legal_actions(short) if la.action is ActionType.BET]
     assert len(short_bets) == 1  # display offers exactly one — parity holds
+
+
+# --------------------------------------------- F6: min-bet offer fix (RES-F)
+
+
+def _bb_donk_lead_state(stacks: float = 100.0, seed: int = 1, osize: float = 12.0) -> HandState:
+    """Hero = BB, cold-calls a big BTN open, and is first to act on the flop —
+    a donk/lead node (hero NOT the aggressor). `postflop_node_key` returns
+    "flat" here (no HERO_NODE_SIZE baseline), the exact RES-F reproducing
+    condition: a large pot but an unmapped node."""
+    state = _state(Position.BB, stacks=stacks, seed=seed)
+    moves = [_fold(p) for p in _before(Position.BTN) if p not in _BLINDS]
+    moves.append((Position.BTN, Decision(action=ActionType.RAISE, size_bb=osize)))
+    moves.append(_fold(Position.SB))
+    moves.append(_call(Position.BB))
+    return _play(state, moves)
+
+
+def test_donk_lead_large_pot_offers_pot_fraction_not_lone_min_bet():
+    # RES-F reproducing spot: ~24.5bb pot, hero (BB) donk/leads OOP. Before the
+    # fix, the unmapped node returned None -> FE fell back to the engine's 1bb
+    # legal minimum. After the fix, hero is offered the flop's SMALL
+    # POSTFLOP_BET_FRACS fraction (0.33) x pot instead.
+    state = _bb_donk_lead_state(stacks=100.0)
+    assert state.street is Street.FLOP and state.to_act_seat == HERO_SEAT
+
+    legal = legal_actions(state)
+    from app.domain.table.sizing import postflop_node_key
+
+    node = postflop_node_key(state.board, legal, is_aggressor=False)
+    assert node == "flat"  # unmapped node, the RES-F trigger
+
+    pot_bb = sum(s.invested_total_bb for s in state.seats)
+    assert pot_bb > 20.0  # "large pot" per RES-F's reproducing condition
+
+    offered = _hero_legal_actions(state)
+    bet = next(la for la in offered if la.action is ActionType.BET)
+    assert bet.size_bb is not None
+    assert bet.size_bb != bet.min_bb  # not a lone 1bb offer
+    assert bet.min_bb <= bet.size_bb <= bet.max_bb  # legal bracket
+    expected = round(0.33 * pot_bb, 1)
+    assert abs(bet.size_bb - expected) < 0.05  # street's small fraction x pot
+
+
+def test_donk_lead_short_stack_collapses_to_single_legal_size():
+    # Short stack: the 0.33-pot fraction target exceeds hero's remaining stack,
+    # so the offer clamps into the legal bracket (collapses to the single
+    # legal ceiling) rather than fabricating a size hero can't actually bet.
+    state = _bb_donk_lead_state(stacks=15.0)
+    assert state.street is Street.FLOP and state.to_act_seat == HERO_SEAT
+
+    offered = _hero_legal_actions(state)
+    bet = next(la for la in offered if la.action is ActionType.BET)
+    assert bet.min_bb < bet.max_bb  # a real (non-degenerate) legal bracket
+    assert bet.size_bb == bet.max_bb  # clamped to the single legal ceiling
+    assert bet.min_bb <= bet.size_bb <= bet.max_bb
 
 
 # ---------------------------------------------- N4b: facing-raise sizing e2e

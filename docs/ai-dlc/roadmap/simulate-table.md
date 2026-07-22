@@ -901,13 +901,19 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       ~1 slice. **No-gos:** grading stays behind the one provider seam; no boolean verdicts; no
       exploit/persona-aware grading (that's L1). ICE 9·7·5.
 
-- [ ] **F6 — Min-bet legality fix (from RES-F).** Apply RES-F's recommended fix so hero's legal bet
-      options are sensible in large-pot / short-SPR spots (no lone 1BB-into-20BB option). Touch only
-      the path RES-F names (`sizing.py` / `table/play.py`). **Pass/fail:** RES-F's reproducing spot now
-      offers realistic sizing options; the canonical-bet mapper still grades those sizes (no new
-      "no baseline yet" holes introduced); fold-path playout regression (the 3× recurring FE fold bug)
-      re-verified. **Appetite:** ~1 slice. **No-gos:** no `spot_signature()` change; no bet-size
-      sliders. ICE 7·6·6.
+- [x] **F6 — Min-bet legality fix (from RES-F).** *(done 2026-07-21: RES-F Option 1 verbatim —
+      `sim_session.py::_hero_postflop_size_bb` `HERO_NODE_SIZE` miss (donk/lead, probe, delayed
+      c-bet — any non-aggressor node) now falls back to the street's small `POSTFLOP_BET_FRACS`
+      fraction × pot instead of returning None, clamped caller-side into the legal [min_bb, max_bb]
+      bracket; collapse ⇒ single legal size, no fabricated second option. `engine.py` UNTOUCHED —
+      1BB stays the legal min (correct NLHE rule; the bug was the offer). Refuter PASS (0 issues):
+      single caller, FE `size_bb ?? min_bb` backward-compatible; graders gate on hand shape never
+      offered size ⇒ no mis-grade possible (donk/lead structurally fails every BET grader → honest
+      "no baseline yet"); fallback provably reachable only on the unmapped `flat` node; preflop
+      structurally unreachable; stash-check proved both new tests fail on old code. Tests:
+      donk-lead 24.5BB pot offers ≈⅓-pot in-bracket; short-stack clamp collapses to single legal
+      size. 698 backend tests + ruff green. Note: RES-F corrected the slice's presumed touch-list —
+      fix lives in `sim_session.py`, not `sizing.py`/`play.py`.)* ICE 7·6·6.
 
 ### After the Build slices — sequenced, NOT yet spec-ready
 

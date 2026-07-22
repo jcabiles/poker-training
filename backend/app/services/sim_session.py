@@ -353,13 +353,23 @@ def _hero_preflop_size_bb(state) -> float | None:
 
 def _hero_postflop_size_bb(state, la, legal) -> float | None:
     """Hero's single predetermined postflop size = the RES-B node baseline
-    (HERO_NODE_SIZE) for the current node, as a pot-fraction → bb. None for a
-    node without a baseline (donk/lead) ⇒ FE falls back to min-raise."""
+    (HERO_NODE_SIZE) for the current node, as a pot-fraction → bb.
+
+    RES-F Option 1: a node without a HERO_NODE_SIZE baseline (donk/lead, probe,
+    delayed c-bet, hero-not-the-aggressor) falls back to the street's SMALL
+    `POSTFLOP_BET_FRACS` fraction × pot instead of returning None — otherwise
+    the FE's only fallback is the engine's 1BB legal minimum (a lone 1BB offer
+    into a big pot). The fallback fraction is a recognized street fraction, so
+    the canonical-bet grader still maps it where a grader exists for this node;
+    where none exists the decision stays honestly "no baseline yet"."""
     hero_pos = state.seats[HERO_SEAT].position
     is_aggr = last_aggressor_position(state.action_history) == hero_pos
     frac = HERO_NODE_SIZE.get(postflop_node_key(state.board, legal, is_aggressor=is_aggr))
     if frac is None:
-        return None
+        street_fracs = POSTFLOP_BET_FRACS.get(state.street.value)
+        if street_fracs is None:
+            return None
+        frac = street_fracs[0]
     call = next((x for x in legal if x.action is ActionType.CALL), None)
     to_call = (call.min_bb or 0.0) if call is not None else 0.0
     pot_bb = sum(s.invested_total_bb for s in state.seats)
