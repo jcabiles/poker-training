@@ -96,11 +96,11 @@ W5 pass does the ONE authoritative combined population-band re-anchor after P4 +
       - **N4/N5** drop maniac `threebet_mult` 5.5 → ~3.0–3.5 (24.75bb → ~13–16bb).
       - **N3** rebuild maniac `vs_3bet`/`vs_4bet`: wider 4bet value+bluff split + light 5bet-shove bluffs
         (Axs/small-pair), so maniac re-jams *lighter* than LAG, plus a few KK/AA flats for traps.
-      - **M1 (content half)** re-author maniac `aggression` 15.0 → a meaningful value **at/below** the
-        5.6 cap. *(Framing, per Codex-Sol F4: this is **representation cleanup** — documenting that the 15.0
-        is dead above the cap — NOT a behavioral-correctness fix; if the effective value stays ~5.6 the
-        played behavior is unchanged. Kept in P1 as a low-risk cleanup. The soft-saturation `tanh` variant
-        that actually changes behavior is Next.)*
+      - ~~**M1 (content half)** re-author maniac `aggression` 15.0 → ≤5.6 cap.~~ **DROPPED from P1 at
+        `/ai-dlc` (refuter F1):** setting the lever to the cap breaks `test_aggression_cap_binds_maniac_only`
+        (it asserts maniac `aggression > cap` *strictly* — the 15.0 exists to prove the cap clips maniac)
+        while changing **zero** sampled behavior. No behavioral value + a guard cost → **moved to NEXT**,
+        bundled with the behavior-changing `tanh` code-half (they should land together).
       - **A1 (shared table)** in `personas_postflop.py` lower `_CALL_BASE[AIR]` ~0.25 → ~0.05–0.10 and
         gate any air-continue behind a real draw (`_DRAW_CALL_BONUS`). **Ownership boundary (Codex-Sol F4):
         A1 is STREET-NEUTRAL** — it drops the *base* air-call merit on every street. The **river-specific**
@@ -112,8 +112,10 @@ W5 pass does the ONE authoritative combined population-band re-anchor after P4 +
         **Ordering:** run the validator AFTER N3's maniac rebuild so it self-checks the new mixes for
         introduced overlaps.
       **Pass/fail:** station never folds AA/KK/AKs unopened (test); no persona has a non-SB open-limp mix
-      (validator test); maniac `threebet_mult ≤ 3.5`; maniac 5bet-shove range ⊋ LAG's (wider, test); a
-      no-pair-no-draw river spot folds air ≥ ~0.9 to a medium bet (regenerate §4 dist); overlap validator
+      (validator test); maniac `threebet_mult ≤ 3.5`; maniac vs_4bet jams *lighter/trappier* than LAG
+      (≥3 shove combos LAG never shoves + nonzero AA/KK trap-flat weight — behavioral, not set-superset); a
+      no-pair-no-draw board drops air's no-draw call-freq to a medium bet ≥50% vs baseline with fold>call
+      (relative, NOT literal ≥0.9 — that river gate is P2a's; regenerate §4 dist); overlap validator
       rejects a synthetic overlapping-combo pack; population bands re-anchored **with in-file justification**
       + `coverage_baseline.json` re-recorded (§6.3); `verify.sh` + `ruff` green.
       **Appetite:** ~1 small epic. **No-gos:** no engine-signature change here (that's P2/P4); no solver
@@ -252,8 +254,10 @@ W5 pass does the ONE authoritative combined population-band re-anchor after P4 +
 - **M6 / F8 — Graded SPR-commit curve.** Binary cliff + identical 3.0 boost for all personas; a scared fish
   never folds an overpair below SPR 2. → smooth commitment over (spr_commit − live SPR) × equity × draw ×
   street, per-persona commit strength; keep TPTK able to fold rivers.
-- **M1 (code half) — Soft-saturation (`tanh`) aggression** so a higher lever still strictly orders maniac
-  above LAG at every merit (replaces the hard 5.6 cap; calibrate to observable AF, not lever magnitude).
+- **M1 (code half + deferred content half) — Soft-saturation (`tanh`) aggression** so a higher lever still
+  strictly orders maniac above LAG at every merit (replaces the hard 5.6 cap; calibrate to observable AF, not
+  lever magnitude). The maniac `aggression` re-author (deferred from P1) lands **here** — once the cap is
+  replaced by `tanh`, re-authoring 15.0 becomes behavior-meaningful instead of a dead-above-cap no-op.
 - **N6 — Value/bluff/street/texture sizing overrides.** Fish & station share identical own-sizing. →
   permit sizing overrides **respecting the anti-sizing-tell no-go** (F2 two-stage factorization is the template).
 - **N5 — Faced price meets hand equity / draw odds.** Bet size scales `_FOLD_BASE` alone; a gutshot and a
