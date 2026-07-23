@@ -37,10 +37,16 @@ Pass `street=ctx.street` at the `sample_postflop_decision` call (`:278`). `_Ctx`
 reveal feature must replay the polarized policy.)
 
 ### Q3 — tests + re-anchor *(test_personas_postflop.py, test_range_estimate.py, test_personas.py, test_coverage_baseline.py, test_limper_coverage_belt.py, test_mw_funnel_belt.py, backend/tests/data/coverage_baseline.json)*
-- **New — default-off byte-identity:** a river-board `same_seed` test proving no-`street` calls are unchanged.
+- **⚠️ Thread `street` into the in-file harness (refuter F1 — HIGH):** `test_personas_postflop.py` has a
+  DUPLICATE `_postflop_decision`/`_play_hand` helper (`:1012`) calling the sampler with NO `street=`. Thread the
+  decision's street (derive from `len(board)`) into it so the in-file population/WTSD bands actually exercise
+  river polarization — else the keystone ships untested by those bands.
+- **New — default-off byte-identity (refuter F3):** use the `_CaptureWeights` capture-rng idiom (`:527-538`) to
+  assert **exact normalized merit-weight dicts** are identical with `street=None` for MP/TP/OVERPAIR/AIR-CALL
+  spots — stronger than `same_seed` action equality.
 - **New — river polarization** (in `test_personas_postflop.py`): maniac river MP raise ≈0 (was ~38%), TP ≈0
   (~54%), OVERPAIR_TPTK raise ≈0; LAG/TAG one-pair river raise ≈0; air river CALL ≈0; **turn/flop behavior
-  unchanged** (assert a turn spot still allows the one-pair raise → proves only River floors).
+  unchanged** (assert a TURN one-pair spot still raises → proves only River floors).
 - **New — estimator parity** (in `test_range_estimate.py`): on a fixed river spot the estimator's recovered
   action distribution == the live policy's (both via capture rng, `street=River`).
 - **Re-anchor** any population/belt band moved by the `play.py` opt-in (levers-first, in-file justification);

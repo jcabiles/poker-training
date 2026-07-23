@@ -31,12 +31,19 @@ range estimator kept in **parity** with the live policy.
     **0.0** in BOTH the facing branch (the `RAISE` entry, `:486-492`) and the matched-with-option branch
     (`CHECK+RAISE`, where `agg_action is RAISE`). Leave the `BET` action (`CHECK+BET`) untouched. **Boundary
     decision (Codex-Sol F7): OVERPAIR_TPTK IS floored** — river raises come only from `TWO_PAIR_PLUS+` or the
-    bluff cell (matches the north-star; an overpair/TPTK river raise is thin value that only folds out worse).
+    bluff cell (matches the north-star; a TPTK river raise is thin value that only folds out worse).
+    **Known coarse compromise (refuter F2):** `OVERPAIR_TPTK` MERGES a bare overpair (higher equity, a
+    borderline-legit polarizing raise for a maniac/LAG) with TPTK — the merged bucket can't distinguish them
+    without the kicker/relative-nut split, which is **N4 (NEXT)**. Flooring the whole rung is the defensible
+    coarse call under that constraint; the finer overpair-keeps-raising treatment is explicitly deferred to N4.
   - **Air CALL ≈0 on the river:** for a bluff-cell hand (`AIR`/`ACE_HIGH`, draw NONE — always NONE on the
     river) facing a bet, floor the CALL merit to **0.0** (air folds or bluff-raises, never calls). This is the
     river-specific gate P1's A1 deliberately deferred.
 - **Do NOT** add any new `rng` draw — the action draw stays the FIRST `rng.choices` (range_estimate + capture
   rngs key on that). Flooring is a merit-value change before the existing normalize/choices, nothing else.
+- **Ordering (refuter F4):** apply the river floor to the base `entries` merits **before** the SPR-commit boost
+  pass (`:508-521`) — a floored 0 survives `0 × _COMMIT_AGG_BOOST = 0`. State this so a future edit to either
+  mechanism can't silently break the "0×3=0" invariant.
 
 ### Q2 — live loop + estimator opt-in *(play.py + range_estimate.py)*
 - `play.py`: thread `state.street` from `bot_decision` (`:170` scope) → `_postflop_decision` (`:128`) →
@@ -47,11 +54,21 @@ range estimator kept in **parity** with the live policy.
   policy, so the villain-range reveal (R1) reads the true river distribution, not the stale streetless one.
 
 ### Q3 — tests *(test_personas_postflop.py + test_range_estimate.py)*
-- **Default-off byte-identity:** assert the ~16 direct callers (no `street=`) are unchanged — a `same_seed`
-  test on a river board with and without the default path returns identical decisions.
+- **⚠️ Thread `street` into the in-file closed-loop harness (refuter F1 — HIGH):** `test_personas_postflop.py`
+  has its OWN duplicate `_postflop_decision`/`_play_hand` helper (`:1012`) that calls `sample_postflop_decision`
+  **without** `street=` — separate from `play.py`'s real path. Left as-is, the in-file population/WTSD bands run
+  STREETLESS and never exercise river polarization (the keystone could ship untested by those bands). Thread the
+  decision's street (derive from `len(board)`) into that local helper so the closed-loop bands measure the
+  polarized behavior. (The coverage/limper/mw-funnel belts already import the real `play.py` path, so Q2a
+  covers them.)
+- **Default-off byte-identity (refuter F3 — stronger idiom):** use the `_CaptureWeights`/`_exact_dist` capture-rng
+  idiom (`:527-538`) to assert the **exact normalized merit-weight dicts are identical** with `street=None` vs
+  the pre-P2a code, for MIDDLE_PAIR/TOP_PAIR/OVERPAIR_TPTK/AIR-CALL spots — not just `same_seed` action equality
+  (which can coincide even if weights differ).
 - **River polarization:** maniac river MIDDLE_PAIR raise-freq ≈0 (was ~38%), TOP_PAIR ≈0 (was ~54%),
   OVERPAIR_TPTK raise ≈0; LAG/TAG one-pair river raise ≈0; river raises only from `TWO_PAIR_PLUS+`/bluff-cell;
-  air river CALL ≈0. Turn/flop behavior unchanged (only `street=River` floors).
+  air river CALL ≈0. Turn/flop behavior unchanged (assert a TURN one-pair spot still raises → proves only
+  `street=River` floors).
 - **Estimator parity:** on a fixed river spot, the estimator's recovered action distribution
   (`_postflop_action_dist` via the capture rng) **equals** the live policy's distribution (same capture on
   `sample_postflop_decision(..., street=River)`). This is the R1-truthfulness guarantee.
