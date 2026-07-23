@@ -44,17 +44,19 @@ street-neutral base-drop rationale + that the river-zero gate is deferred to P2a
 **Done:** value is 0.08; domain-purity test green; `personas_postflop.py` imports unchanged. Owns only this
 file. (Expect `test_personas_postflop.py` + population-band deltas — those are re-anchored in T6, NOT here.)
 
-### T5 — N2 overlap validator *(backend/tests/test_content.py; may edit packs for residual overlaps)*
-Add `test_no_overlapping_combos_within_node`: for every pack × preflop node, expand each mix's combos and
-assert the sets are pairwise-disjoint; include a synthetic overlapping pack the validator **rejects**. Fix
-any residual real overlaps surfaced in the packs (sole owner of packs at this wave).
+### T5 — N2 dead-mix validator *(backend/tests/test_content.py — REVISED, no pack edits)*
+**Revised (T5 discovery — 17 benign `specifics-then-catch-all` overlaps found; literal overlap-rejection is
+mis-specified, see spec N2).** Add `test_no_fully_shadowed_mix_within_node`: for every pack × preflop node,
+assert **no mix is fully shadowed** (every one of its expanded combos already claimed by an earlier mix → it
+can never fire). Include a synthetic pack with a genuinely dead mix (`*` then `AA`) the validator **rejects**
+(positive + negative). Do NOT edit any pack (the benign combo redundancies are a NEXT cleanup).
 Also add a **N3 behavioral-guard test** (fan-in refuter — the guard is true-by-inspection today but unenforced
 in CI): assert maniac `vs_4bet` has **≥3 `5bet_shove` combos with zero LAG shove weight** AND **nonzero
 `call` weight on AA and/or KK** (expand via `parse_range`). Home it in `test_content.py` (or a sibling content
 test) — it's a content-structure assertion, not a sampling one.
-**Done:** overlap validator passes on all six real packs + rejects the synthetic overlap; N3-guard test green;
-`test_content.py` green. **If it edits any pack to remove a residual overlap, list the exact combos removed** —
-those are baseline-moving (refuter F5) and must feed T6's re-anchor justification.
+**Done:** dead-mix validator passes on all six real packs + rejects the synthetic dead-mix pack; N3-guard test
+green; `test_content.py` green. **No pack edits** (so nothing baseline-moving flows from T5 to T6 — refuter F5
+is now moot for this slice).
 
 ### T6 — re-anchor bands + baselines *(test_personas_postflop.py, test_personas.py, test_coverage_baseline.py, test_limper_coverage_belt.py, test_mw_funnel_belt.py, backend/tests/data/coverage_baseline.json)*
 **Re-verify the failing set EMPIRICALLY — do NOT trust a handed-down list (fan-in refuter):** the reported

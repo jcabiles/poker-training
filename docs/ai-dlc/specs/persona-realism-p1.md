@@ -72,11 +72,18 @@ logic** — the river "air-call ≈0" gate belongs to P2a (street-aware). This i
 persona AND the population harness AND `range_estimate` replay → it deliberately changes sampled decisions →
 `test_personas_postflop.py` fixtures + population bands re-anchor in **T6** (not silently).
 
-### N2 — overlap validator *(test_content.py)*
-Add a test asserting **no combo appears in more than one mix within a single preflop node** across all six
-packs (first-match-wins silently shadows later overlaps — doc 12 N2). Include a **synthetic overlapping pack
-that the validator rejects** (positive + negative case). **Run/author AFTER T2's maniac rebuild** so it
-self-checks the new mixes; fix any residual real overlaps it surfaces (T5 owns the packs at that point).
+### N2 — dead-mix validator *(test_content.py)* — REVISED at build time
+**Discovery (T5):** literal "no combo in two mixes" is **mis-specified** — the six packs contain 17 benign
+`specifics-then-catch-all` overlaps (e.g. maniac `vs_rfi` mix2 = `*`; station's premium mix precedes the
+wide-limp mix). First-match-wins makes these correct by construction; they are notational, not bugs, and none
+is a dead mix. Rejecting them would force rewriting 5 packs (churn + frequency risk + extra baseline movement)
+for zero behavior gain. The invariant doc-12 N2 actually cares about ("an authored mix is silently shadowed")
+is a **fully-shadowed / unreachable mix** — a mix whose EVERY combo is already claimed by an earlier mix in
+the node, so it can never fire. **Revised N2:** assert **no preflop node has a fully-shadowed (dead) mix**
+across all six packs; include a synthetic pack with a genuinely dead mix (e.g. `*` then `AA`) that the
+validator **rejects** (positive + negative). This still catches the real future bug (a new premium mix placed
+after a catch-all) without condemning the legitimate idiom. The pervasive benign combo-level redundancies
+(LAG `KTo`, tag `ATs/KJs`, …) are noted for an optional NEXT cleanup — NOT fixed here (no pack edits).
 
 ## Out of scope (P1)
 - No `street` kwarg / river polarization (P2a). No scare-card/bluff-decay memory (P2b). No stickiness split
