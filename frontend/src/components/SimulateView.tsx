@@ -744,7 +744,17 @@ export default function SimulateView() {
   return (
     <section className="simulate">
       <div className="sim-topbar">
-        <h1 className="sim-heading">Simulate</h1>
+        <h1 className="sim-heading">
+          Simulate
+          {hand && (
+            // Per-session hand counter — orients you on the live table. Same
+            // `hand_no` the replayer titles a hand by; History numbers hands
+            // its own way, so this is a live-table cue, not a History key.
+            <span className="sim-hand-no">
+              Hand <span className="num">{hand.hand_no}</span>
+            </span>
+          )}
+        </h1>
         {view && (
           <div className="sim-topbar-controls">
             {/* Primary next-step lives here, first in the cluster and above the
