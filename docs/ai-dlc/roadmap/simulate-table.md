@@ -1150,10 +1150,11 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       branch seating hero=BB behind limpers, lift the blind-seat `None` gate for BB-check only.
       **Pass/fail:** RES-G §6-B verbatim — BB facing 1–3 limpers grades iso vs check freq+EV; fold
       never offered; all non-BB limped shapes byte-unchanged.
-> **RUN PAUSED HERE (2026-07-22, user call: token budget).** M1–M3 shipped; M4–M7 below are
-> spec-ready and unstarted — resume by handing M4 to the standard worker→refuter cycle on a branch
-> off the tip of the merged chain. Note for M7: its go/no-go input already exists (RES-I §6 M1
-> re-measure = GO — L3+L4 landed 0.23–2.73/1000 vs the ≥5/1000 threshold; L5 build is warranted).
+> **RUN RESUMED + EPIC 5 COMPLETE (2026-07-22).** M1–M3 (prior run) + M4–M7 (this run) all shipped.
+> M4–M7 built as 3 parallel-waves ([M4‖M5]→M6→M7), worktree-isolated makers + fresh-context refuter
+> per slice + Codex-dual-review-attempted (sandbox-blocked, failed open). PRs #78 (M4+M5), #79 (M6),
+> and the M7 PR. Refuters caught 2 genuine HIGH inversions in W1 (both fixed + grid-proofed) and
+> passed W2/W3 clean. Graded-MW coverage lifted 0.23–2.73 → 3.0–7.3/1000 (M7 re-measure).
 
 - [x] **M4 — Caller-re-raises-c-bet grader (RES-H H1).** *(done 2026-07-22, W1 PR — `feat/epic5-m4-m5`.
       `_merits_vs_caller_raise` + `grade_vs_caller_raise` (check-raise sibling; fold baseline 1.9 vs
@@ -1211,7 +1212,26 @@ the serial spine S2→S4→S9→S10, not the agent budget.
       **Pass/fail:** RES-H §5-H2 verbatim — HU byte-identical (opp=1 ⇒ scalar 1.0) AND 3-way
       byte-identical (base pinned); monotone-in-opponents invariant; direction-only (no MDF
       constants); 4-way with live player behind hero returns `None`.
-- [ ] **M7 — Hero-seat widening go/no-go (RES-I L5) — gated on M1's 30k re-measure.** (I7·C4·E3)
+- [x] **M7 — Hero-seat widening go/no-go (RES-I L5) — gated on M1's 30k re-measure.** *(done
+      2026-07-22, W3 PR — `feat/epic5-m7`, stacked on M6. Go/no-go = GO (M1 re-measure 0.23–2.73/1000
+      < ≥5 threshold). Built 6 new MW mappers: hero-as-OPENER c-bet/turn/river barrels in the BB-in
+      3/4-way `_mw_srp_preflop` shape (aggressor nodes — "hero closes" governs FACING nodes only, you
+      bet INTO a live field), and hero-as-COLD-CALLER facing nodes in a NEW no-BB shape
+      (`_mw_nobb_srp_preflop`: opener + 2 non-blind callers, blinds folded, hero = later caller who
+      genuinely closes — a caller can never close in the BB-in shape since BB acts last after a bet;
+      skip-documented + pinned). Reuses M1's `RECOGNIZED_BET_FRACS`/`_is_canonical_bet` (no fork, no
+      new faced size). Display==grade extended in `sim_session.py` (barrel + facing gates). Coverage
+      327→349 (total 1233 frozen). **30k re-measure (the go/no-go evidence): tag 3.00/4.07,
+      calling_station 6.60/7.33 per 1000 (seeds 20260722/7); tag–station avg 4.80/5.70.** Station
+      proxy clears ≥5/1000 both seeds; tag short; average straddles the bar — a real ~10× lift on the
+      tag proxy, HALF-MET on the strict ≥5 average (skip-and-documented per policy; binding chokes =
+      structural caller-never-closes BB-in shapes + opener lines dying to non-intact bet-call-call
+      continuation; the RES-I §4-rejected persona-mix/open-band levers were NOT touched). **Refuter
+      PASS 0 issues** — independently reproduced the +22 baseline delta, corroborated the re-measure
+      via a reimplemented belt, swept 81 organic spots (all freq sum to 1.0, no None leak), verified
+      no-BB pot math vs engine `amount_bb` semantics. BB-path byte-unchanged; spot_signature frozen;
+      837 tests 3× stable.)*
+      (I7·C4·E3)
       **Scope:** decision slice: if M1's re-measure leaves graded-MW below the ≥5/1000 threshold
       (expected: L3+L4 alone cap ~0.3–3/1000), build opener + caller MW mappers (measured ceiling
       6–11/1000); else close as not-needed. **Pass/fail:** the go/no-go is decided FROM the M1
