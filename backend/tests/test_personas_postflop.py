@@ -958,6 +958,182 @@ def _exact_dist_opp(persona, hole, board, legal, pot, stack, opponents, current_
 
 
 # =====================================================================
+# P2a — street-aware river polarization (persona-realism-p2a Q3)
+# =====================================================================
+#
+# On `street=Street.RIVER` the sampler floors to 0.0: the non-bluff RAISE
+# merit for {MIDDLE_PAIR, TOP_PAIR, OVERPAIR_TPTK} (facing RAISE entry AND
+# the matched CHECK+RAISE branch; BET untouched) and the bluff-cell CALL
+# merit (air folds or bluff-raises, never calls). Default `street=None` (and
+# any non-river street) is byte-identical to the pre-P2a sampler. Exact
+# normalized weights via the capture rng — deterministic, no sampling noise.
+
+_RIVER_BOARD = ["Kc", "9s", "3h", "7d", "2s"]
+_TURN_BOARD = _RIVER_BOARD[:4]
+# hole -> bucket on _RIVER_BOARD (verified by strength_bucket, all draw NONE):
+_RIVER_HOLES = {
+    StrengthBucket.MIDDLE_PAIR: ("9h", "4d"),
+    StrengthBucket.TOP_PAIR: ("Kh", "8d"),
+    StrengthBucket.OVERPAIR_TPTK: ("Ah", "Ad"),
+    StrengthBucket.AIR: ("6h", "4d"),
+    StrengthBucket.TWO_PAIR_PLUS: ("Kd", "9d"),
+    StrengthBucket.MONSTER: ("3c", "3d"),
+}
+_ONE_PAIR_FLOOR = (
+    StrengthBucket.MIDDLE_PAIR,
+    StrengthBucket.TOP_PAIR,
+    StrengthBucket.OVERPAIR_TPTK,
+)
+
+
+def _facing_legal():
+    return [
+        personas_postflop_legal_fold(),
+        personas_postflop_legal_call(3.0),
+        personas_postflop_legal_raise(9.0, 97.0),
+    ]
+
+
+_OMIT = object()  # sentinel: call sample_postflop_decision with NO street kwarg
+
+
+def _dist_street(persona, hole, board, legal, street, current_bet_to=3.0, **kwargs):
+    """Exact normalized action distribution with an explicit `street` kwarg
+    (kwargs lets the byte-identity test OMIT the kwarg entirely)."""
+    cap = _CaptureWeights()
+    if street is not _OMIT:
+        kwargs["street"] = street
+    sample_postflop_decision(
+        _pack(persona),
+        hole,
+        board,
+        legal,
+        9.0,
+        97.0,
+        1,
+        cap,  # type: ignore[arg-type] — duck-typed capture rng
+        current_bet_to=current_bet_to,
+        **kwargs,
+    )
+    return cap.dist
+
+
+def test_street_none_byte_identical_to_omitted_kwarg():
+    """Refuter F3 (stronger than same-seed action equality): the exact
+    normalized merit-weight dicts are identical for `street=None` vs omitting
+    the kwarg entirely, on the MP/TP/OVERPAIR/AIR river spots the floor
+    targets — the default is the pre-P2a sampler byte-for-byte. RIVER differs
+    on every one of these spots (discriminating: proves the equality is not
+    vacuous)."""
+    legal = _facing_legal()
+    for bucket in (*_ONE_PAIR_FLOOR, StrengthBucket.AIR):
+        hole = _RIVER_HOLES[bucket]
+        omitted = _dist_street("maniac", hole, _RIVER_BOARD, legal, _OMIT)
+        explicit_none = _dist_street("maniac", hole, _RIVER_BOARD, legal, None)
+        river = _dist_street("maniac", hole, _RIVER_BOARD, legal, Street.RIVER)
+        assert omitted == explicit_none, bucket
+        assert river != explicit_none, bucket
+
+
+def test_non_river_street_identical_to_none():
+    """Only Street.RIVER floors: on flop/turn boards, passing the street
+    explicitly reproduces the street=None weights exactly (byte-identity for
+    the live loop's flop/turn decisions)."""
+    legal = _facing_legal()
+    flop = ["Kc", "9s", "3h"]
+    for hole in (("9h", "4d"), ("Kh", "8d"), ("6h", "4d")):
+        assert _dist_street("maniac", hole, flop, legal, Street.FLOP) == _dist_street(
+            "maniac", hole, flop, legal, None
+        )
+        assert _dist_street("maniac", hole, _TURN_BOARD, legal, Street.TURN) == _dist_street(
+            "maniac", hole, _TURN_BOARD, legal, None
+        )
+
+
+@pytest.mark.parametrize("persona", ["maniac", "lag", "tag"])
+def test_river_one_pair_never_raises_facing_a_bet(persona):
+    """River polarization, facing branch: one-pair-class raise weight is
+    EXACTLY 0. Pre-P2a (street=None) weights, this spot: maniac MP .382 /
+    TP .543 / OVERPAIR .777; lag .261/.405/.665; tag .199/.320/.578."""
+    legal = _facing_legal()
+    for bucket in _ONE_PAIR_FLOOR:
+        hole = _RIVER_HOLES[bucket]
+        river = _dist_street(persona, hole, _RIVER_BOARD, legal, Street.RIVER)
+        streetless = _dist_street(persona, hole, _RIVER_BOARD, legal, None)
+        assert river[ActionType.RAISE] == 0.0, (persona, bucket)
+        assert streetless[ActionType.RAISE] > 0.0, (persona, bucket)  # floor is river-only
+
+
+def test_river_check_raise_branch_floored_bet_untouched():
+    """Matched-with-option branch: the CHECK+RAISE agg merit is floored for
+    the one-pair class (maniac pre-P2a: MP .706 / TP .873 / OVERPAIR .929 →
+    all 0.0), but the unopened CHECK+BET branch is NOT touched — thin river
+    value bets stay legal (river weights == streetless weights)."""
+    matched = [personas_postflop_legal_check(), personas_postflop_legal_raise(6.0, 97.0)]
+    unopened = [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 97.0)]
+    for bucket in _ONE_PAIR_FLOOR:
+        hole = _RIVER_HOLES[bucket]
+        river = _dist_street("maniac", hole, _RIVER_BOARD, matched, Street.RIVER)
+        assert river[ActionType.RAISE] == 0.0, bucket
+        assert _dist_street("maniac", hole, _RIVER_BOARD, matched, None)[ActionType.RAISE] > 0.0
+        # BET branch byte-identical river vs streetless.
+        assert _dist_street(
+            "maniac", hole, _RIVER_BOARD, unopened, Street.RIVER, current_bet_to=0.0
+        ) == _dist_street("maniac", hole, _RIVER_BOARD, unopened, None, current_bet_to=0.0)
+
+
+@pytest.mark.parametrize("persona", ALL_PERSONAS)
+def test_river_air_never_calls_but_still_bluff_raises(persona):
+    """Bluff-cell CALL merit floored to exactly 0 on the river for every
+    persona (air folds or bluff-raises — maniac pre-P2a called .086); the
+    _BLUFF_RAISE_FACTOR path survives (raise weight strictly positive)."""
+    hole = _RIVER_HOLES[StrengthBucket.AIR]
+    river = _dist_street(persona, hole, _RIVER_BOARD, _facing_legal(), Street.RIVER)
+    assert river[ActionType.CALL] == 0.0
+    assert river[ActionType.RAISE] > 0.0
+
+
+def test_river_raises_only_from_two_pair_plus_or_bluff_cell():
+    """The polarization claim end-to-end: over all six buckets on the river,
+    positive raise weight comes ONLY from TWO_PAIR_PLUS/MONSTER (value) or
+    the bluff cell (air) — never the one-pair middle."""
+    legal = _facing_legal()
+    raisers = {
+        bucket
+        for bucket, hole in _RIVER_HOLES.items()
+        if _dist_street("maniac", hole, _RIVER_BOARD, legal, Street.RIVER)[ActionType.RAISE] > 0.0
+    }
+    assert raisers == {
+        StrengthBucket.TWO_PAIR_PLUS,
+        StrengthBucket.MONSTER,
+        StrengthBucket.AIR,
+    }
+
+
+def test_river_polarization_sampled_and_turn_at_old_freq():
+    """Sampled (real rng) confirmation + turn control: maniac middle pair
+    facing a river bet never raises over 400 draws; the SAME hole/spot on the
+    turn board (street=Street.TURN) still raises at its old frequency — the
+    exact turn weights equal street=None (raise weight .382), proving only
+    the river floors."""
+    pack = _pack("maniac")
+    hole = _RIVER_HOLES[StrengthBucket.MIDDLE_PAIR]
+    legal = _facing_legal()
+    rng = random.Random(20260723)
+    river_raises = 0
+    for _ in range(400):
+        d = sample_postflop_decision(
+            pack, hole, _RIVER_BOARD, legal, 9.0, 97.0, 1, rng,
+            current_bet_to=3.0, street=Street.RIVER,
+        )
+        river_raises += d.action is ActionType.RAISE
+    assert river_raises == 0
+    turn = _dist_street("maniac", hole, _TURN_BOARD, legal, Street.TURN)
+    assert turn == _dist_street("maniac", hole, _TURN_BOARD, legal, None)
+    assert turn[ActionType.RAISE] > 0.3  # old freq (~.382), not floored
+
+
+# =====================================================================
 # Closed-loop harness: full-hand playouts through the S2 engine
 # =====================================================================
 
@@ -1009,12 +1185,28 @@ def _preflop_decision(pack, position, facing, hole, legal, rng) -> Decision:
     return Decision(action=act_action)
 
 
+# P2a (refuter F1): the closed-loop harness mirrors play.py's street opt-in —
+# derived from the board length exactly as the live loop derives it from
+# state.street — so the population/WTSD bands below actually exercise river
+# polarization instead of running the streetless default.
+_STREET_BY_BOARD_LEN = {3: Street.FLOP, 4: Street.TURN, 5: Street.RIVER}
+
+
 def _postflop_decision(
     pack, hole, board, legal, pot_bb, stack_bb, opponents, rng, current_bet_to
 ) -> Decision:
     kinds = {la.action for la in legal}
     d = sample_postflop_decision(
-        pack, hole, board, legal, pot_bb, stack_bb, opponents, rng, current_bet_to=current_bet_to
+        pack,
+        hole,
+        board,
+        legal,
+        pot_bb,
+        stack_bb,
+        opponents,
+        rng,
+        current_bet_to=current_bet_to,
+        street=_STREET_BY_BOARD_LEN[len(board)],
     )
     if d.action not in kinds:
         # Defensive: never happens if the sampler honors `legal`, but keep
@@ -1261,17 +1453,46 @@ def budget():
 # (station .688/.685, nit .605/.669, tag .634/.660, lag .592/.604) — kept, as
 # were every AF and fold-to-cbet band (measured in-band at both N).
 
+# P2a RE-ANCHOR (persona-realism-p2a Q3, 2026-07-23 — river polarization):
+# play.py AND this file's own harness (refuter F1, `_postflop_decision` above)
+# now pass `street` into the sampler, so the closed-loop bands measure the
+# polarized river for the first time: the one-pair class never raises the
+# river, and no-draw air never CALLs a river bet (it folds or bluff-raises).
+# Engine is final for this slice (no lever retune available — the packs'
+# levers were re-fit in P1 and are out of Q3's scope), so bands move to the
+# re-measured values. Direction is theory-consistent everywhere:
+#   - WTSD FALLS across the board (air that used to peel river bets now
+#     folds; fewer junk showdowns): station .688/.685 → .575/.581,
+#     fish .609/.601, nit .531/.567, tag .529/.550, lag .479/.494,
+#     maniac .420/.398 (measured at N=399/N=670, seed 20260710).
+#   - AF RISES for the aggressive personas (river air-calls leave the CALL
+#     denominator faster than the floored river raises leave the numerator):
+#     lag 2.28/2.50 → 3.20/3.17 (old 3.2 top now sits ON the measured value
+#     — the deterministic failure this re-anchor fixes), maniac 3.32/3.19 →
+#     3.74/4.10, nit 1.05 → 1.52/1.19.
+# Bands = 3σ CI union at both N, rounded outward (binomial for ftc/WTSD,
+# delta-method for AF — same math as the F1/F3 re-anchors above). Floors kept
+# where the old floor was already below the new CI (looser is safe for a
+# ceiling-style regression guard). NOTE: lag's AF top (4.5) now overlaps
+# maniac's band — the population AF ordering claim has migrated to the
+# exact-weight pins (test_maniac_still_strictly_most_aggressive and the
+# fold/bluff ordering tests), which are deterministic and unaffected.
+#
 # persona -> (AF band or None, fold_to_cbet band, WTSD band), all fractions.
 BANDS = {
-    "passive_fish": ((0.0, 1.560), (0.0, 0.549), (0.57, 0.73)),  # WTSD re-anchored (P1 A1)
-    "calling_station": ((0.0, 1.056), (0.0, 0.424), (0.66, 0.83)),  # WTSD re-anchored (F1)
-    "nit": ((0.6, 2.025), (0.10, 0.90), (0.50, 0.80)),  # AF/ftc/WTSD re-anchored (F1)
+    "passive_fish": ((0.0, 1.560), (0.0, 0.549), (0.53, 0.68)),  # WTSD re-anchored (P2a)
+    "calling_station": ((0.0, 1.056), (0.0, 0.424), (0.51, 0.64)),  # WTSD re-anchored (P2a)
+    # nit AF top 2.025 → 2.4 (P2a: measured 1.520 at N=399, CI top 2.350) and
+    # WTSD floor 0.50 → 0.37 (CI floor 0.378 at N=399, n=96).
+    "nit": ((0.6, 2.4), (0.10, 0.90), (0.37, 0.80)),  # AF/WTSD re-anchored (P2a)
     # tag ftc floor re-anchored (F1, RES-D §4): price-aware defense folds small
     # c-bets far less, pulling the aggregate to ~0.21 — ON the old 0.203 floor
     # (measured 0.195-0.26 across machines; n scales with machine speed and can
     # be as low as ~40 ⇒ 3σ ≈ ±0.19, so the floor must sit well below center).
-    "tag": ((1.4, 3.6), (0.05, 0.55), (0.52, 0.79)),  # AF/ftc/WTSD re-anchored (F1)
-    "lag": ((1.5, 3.2), (0.163, 0.637), (0.54, 0.77)),  # AF/WTSD re-anchored (F1)
+    # P2a: ftc floor 0.05 → 0.0 (measured 0.152 at n=33 ⇒ CI floor < 0) and
+    # WTSD (0.52,0.79) → (0.41,0.65) (river polarization, see block above).
+    "tag": ((1.4, 3.6), (0.0, 0.55), (0.41, 0.65)),  # ftc/WTSD re-anchored (P2a)
+    "lag": ((1.5, 4.5), (0.12, 0.64), (0.37, 0.59)),  # AF/ftc/WTSD re-anchored (P2a)
     # maniac AF top re-anchored (F3, RES-D §4 measure-then-anchor): the F1
     # band's 999 (∞) top was a saturation artifact — with aggression=15
     # effectively argmaxing bet/raise, AF had no meaningful upper bound to
@@ -1293,7 +1514,10 @@ BANDS = {
     # ~120 ⇒ tol ~±0.135 → top 0.56. Floor 0.0 kept. All other personas
     # re-measured inside their existing bands at both N (station .227/.199,
     # fish .303/.275, nit n/a/.314, tag .400/.391, lag .271/.237) — kept.
-    "maniac": ((2.4, 4.5), (0.0, 0.56), (0.39, 0.56)),  # WTSD re-anchored (P1 A1), ftc F7, AF F3
+    # maniac P2a: AF top 4.5 → 5.1 (measured 4.102 at N=670, CI top 5.079),
+    # ftc top 0.56 → 0.61 (measured .446/.466, CI top 0.609), WTSD
+    # (0.39,0.56) → (0.34,0.50) (measured .420/.398 — river polarization).
+    "maniac": ((2.4, 5.1), (0.0, 0.61), (0.34, 0.50)),  # AF/ftc/WTSD re-anchored (P2a)
 }
 
 

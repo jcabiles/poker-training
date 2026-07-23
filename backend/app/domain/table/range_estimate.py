@@ -285,6 +285,7 @@ def _postflop_action_dist(
         ctx.opponents,
         cap,  # type: ignore[arg-type] — duck-typed capture rng
         current_bet_to=ctx.current_bet_to,
+        street=ctx.street,
     )
     if cap.population is None:  # zero-total-merit fallback path: deterministic
         return {decision.action: 1.0}

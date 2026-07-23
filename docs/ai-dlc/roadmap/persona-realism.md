@@ -127,8 +127,16 @@ W5 pass does the ONE authoritative combined population-band re-anchor after P4 +
       **Appetite:** ~1 small epic. **No-gos:** no engine-signature change here (that's P2/P4); no solver
       ranges; no grader/`spot_signature()` touch; keep the anti-sizing-tell overlap.
 
-- [ ] **P2a — Street-aware refactor: thread `street` + polarize the river.** *(THE keystone)*
+- [x] **P2a — Street-aware refactor: thread `street` + polarize the river.** *(THE keystone)* ✅ DONE 2026-07-23
       ICE 9·7·5. *(fixes M2 + M7 — the user's #1 complaint "maniac over-calls the river / weird choices")*
+      **Shipped** (branch `feat/persona-realism-p2a`, stacked on P1, 3 waves, dual-verified — fan-in refuter
+      patched out the flooring and confirmed the polarization/parity tests genuinely fail without it): `street`
+      kwarg (default byte-identical) floors river RAISE for {MP,TP,OVERPAIR_TPTK} + air-CALL to 0; `play.py` +
+      `range_estimate.py` opt in (estimator parity test green). Measured: maniac river raise MP .382→0, TP
+      .543→0, OVERPAIR .777→0; air CALL→0 (bluff-raise survives); TWO_PAIR_PLUS/MONSTER + TURN byte-unchanged.
+      OVERPAIR_TPTK flooring = coarse compromise (finer split → N4). Bands re-anchored (WTSD/AF), ordering on the
+      exact-weight pin; coverage 28.3%→29.3% held. Follow-up: exact-equality assertion for TWO_PAIR_PLUS/MONSTER
+      river raises (behavior verified; guard missing).
       **Problem:** the postflop engine takes **no street argument** — flop = turn = river given the same
       bucket (doc 12 §2.4, `:381`). So the maniac raises one pair on the river for "value" (MP 38% / TP 54%),
       LAG/TAG raise one pair 40%/32%, and busted air still calls — rivers should be **polarized** (nuts or

@@ -50,10 +50,18 @@ _WANT_BB = {("BB", 1), ("BB", 2), ("BB", 3)}
 # the re-measured post-P1 values; every coverage pair still fires (the
 # _WANT_* assertions are the real belt). A future drift here again means a
 # limped-shape-producing behavior changed — investigate, don't retune.
+# RE-PINNED for P2a (persona-realism-p2a Q3, 2026-07-23): play.py now passes
+# `street` to the postflop sampler, and river polarization (one-pair never
+# raises the river, air never calls) changes bot RIVER decisions — which
+# consume draws from the SAME shared rng that deals/plays every subsequent
+# hand, shifting the whole organic stream at this seed (old post-P1 counts:
+# UTG2¹ 94, LJ¹ 127, HJ¹ 140, CO¹ 133, CO² 29, SB¹ 101, SB² 43, BTN¹ 125,
+# BTN² 48). No preflop content changed in P2a; the drift is stream
+# displacement only.
 _PRE_M3_FIRES = {
-    ("UTG2", 1): 94, ("LJ", 1): 127, ("HJ", 1): 140, ("CO", 1): 133,
-    ("CO", 2): 29, ("SB", 1): 101, ("SB", 2): 43, ("BTN", 1): 125,
-    ("BTN", 2): 48,
+    ("UTG2", 1): 84, ("LJ", 1): 123, ("HJ", 1): 142, ("CO", 1): 131,
+    ("CO", 2): 31, ("SB", 1): 95, ("SB", 2): 42, ("BTN", 1): 122,
+    ("BTN", 2): 49,
 }
 
 

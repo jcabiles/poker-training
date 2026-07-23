@@ -21,7 +21,7 @@ from enum import StrEnum
 from app.domain.action import Decision
 from app.domain.content.models import PersonaPack
 from app.domain.equity import _RIDX, _eval5
-from app.domain.spot import ActionType, Card, LegalAction
+from app.domain.spot import ActionType, Card, LegalAction, Street
 from app.domain.table.sizing import postflop_node_key, pot_fraction_to_bb
 
 _ACE = 12  # rank index of the ace in equity.RANKS
@@ -268,6 +268,17 @@ _DRAW_AGG_BONUS = {DrawCategory.NONE: 0.0, DrawCategory.WEAK: 0.15, DrawCategory
 _DRAW_RAISE_BONUS = {DrawCategory.NONE: 0.0, DrawCategory.WEAK: 0.05, DrawCategory.STRONG: 0.15}
 _DRAW_CALL_BONUS = {DrawCategory.NONE: 0.0, DrawCategory.WEAK: 0.20, DrawCategory.STRONG: 0.55}
 # Structural constants (shared mechanics).
+# River polarization (P2a Q1): on the river (opt-in via the `street` kwarg)
+# raising is polar — value raises come from TWO_PAIR_PLUS+, bluff raises from
+# the bluff cell; the one-pair middle (bluff-catchers) never raises, and air
+# never calls. These buckets get their non-bluff raise merit floored to 0.0.
+# OVERPAIR_TPTK is a coarse compromise: the merged bucket spans thin-value
+# hands that a finer split would let raise; splitting it is a later slice.
+_RIVER_RAISE_FLOOR = (
+    StrengthBucket.MIDDLE_PAIR,
+    StrengthBucket.TOP_PAIR,
+    StrengthBucket.OVERPAIR_TPTK,
+)
 _BLUFF_RAISE_FACTOR = 0.3  # bluff-raising is structurally rarer than bluff-betting
 _COMMIT_AGG_BOOST = 3.0  # SPR-commit shift toward call/jam
 # F3 bounded aggression (RES-D §0 saturation fix): the `aggression` lever is
@@ -394,6 +405,7 @@ def sample_postflop_decision(
     noise: float = 1.0,
     current_bet_to: float = 0.0,
     is_aggressor: bool = False,
+    street: Street | None = None,
 ) -> Decision:
     """Draw a frequency-mixed postflop decision from the pack's levers.
 
@@ -484,15 +496,20 @@ def sample_postflop_decision(
         if bucket in _MW_CATCH_BUCKETS:
             fold_merit *= _MW_CATCH_TIGHTEN ** max(opponents - 1, 0)
         entries.append((ActionType.FOLD, fold_merit))
-        entries.append(
-            (ActionType.CALL, (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * pf.stickiness)
-        )
+        # River polarization (see _RIVER_RAISE_FLOOR): air never bluff-CALLS
+        # the river — it folds or bluff-raises. Flooring happens BEFORE the
+        # SPR-commit block so a floored 0 survives the commit boost.
+        call_merit = (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * pf.stickiness
+        if bluff_cell and street is Street.RIVER:
+            call_merit = 0.0
+        entries.append((ActionType.CALL, call_merit))
         if ActionType.RAISE in by_kind:
-            raise_merit = (
-                _BLUFF_RAISE_FACTOR * bluff_mass
-                if bluff_cell
-                else (_RAISE_BASE[bucket] + _DRAW_RAISE_BONUS[draw]) * agg_scale
-            )
+            if bluff_cell:
+                raise_merit = _BLUFF_RAISE_FACTOR * bluff_mass  # polar bluff survives
+            else:
+                raise_merit = (_RAISE_BASE[bucket] + _DRAW_RAISE_BONUS[draw]) * agg_scale
+                if street is Street.RIVER and bucket in _RIVER_RAISE_FLOOR:
+                    raise_merit = 0.0  # bluff-catchers never value-raise the river
             entries.append((ActionType.RAISE, raise_merit))
     else:  # unopened (CHECK+BET) or matched-with-option (CHECK+RAISE)
         agg_action = ActionType.BET if ActionType.BET in by_kind else ActionType.RAISE
@@ -502,6 +519,15 @@ def sample_postflop_decision(
         else:
             agg_merit = (_AGG_BASE[bucket] + _DRAW_AGG_BONUS[draw]) * agg_scale
             check_merit = _CHECK_BASE[bucket]
+            # River polarization: the matched-with-option RAISE (check-raise
+            # line) is floored like the facing raise; the unopened BET is NOT
+            # touched — thin river value bets stay legal.
+            if (
+                agg_action is ActionType.RAISE
+                and street is Street.RIVER
+                and bucket in _RIVER_RAISE_FLOOR
+            ):
+                agg_merit = 0.0
         entries.append((ActionType.CHECK, check_merit))
         entries.append((agg_action, agg_merit))
 

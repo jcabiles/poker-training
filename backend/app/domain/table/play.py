@@ -126,7 +126,17 @@ def _preflop_decision(
 
 
 def _postflop_decision(
-    pack, hole, board, legal, pot_bb, stack_bb, opponents, rng, current_bet_to, is_aggressor
+    pack,
+    hole,
+    board,
+    legal,
+    pot_bb,
+    stack_bb,
+    opponents,
+    rng,
+    current_bet_to,
+    is_aggressor,
+    street,
 ) -> Decision:
     kinds = {la.action for la in legal}
     d = sample_postflop_decision(
@@ -140,6 +150,7 @@ def _postflop_decision(
         rng,
         current_bet_to=current_bet_to,
         is_aggressor=is_aggressor,
+        street=street,
     )
     if d.action not in kinds:
         # Defensive: never happens if the sampler honors `legal`, but keep
@@ -200,6 +211,7 @@ def bot_decision(
         rng,
         state.current_bet_bb,
         is_aggressor,
+        state.street,
     )
 
 
