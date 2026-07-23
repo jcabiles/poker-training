@@ -15,13 +15,23 @@ from app.domain.action import Decision
 from app.domain.archetypes import VillainType
 from app.domain.content.notation import parse_range
 from app.domain.personas import load_persona_packs
-from app.domain.spot import RANKS, SUITS, ActionType, PlayerStatus, Position, Street
+from app.domain.personas_postflop import sample_postflop_decision
+from app.domain.spot import (
+    RANKS,
+    SUITS,
+    ActionType,
+    LegalAction,
+    PlayerStatus,
+    Position,
+    Street,
+)
 from app.domain.table.deck import DealtHand, deal_hand, positions_for_button
 from app.domain.table.engine import HandState, apply, legal_actions, start_hand
 from app.domain.table.play import _preflop_facing, assign_lineup, bot_decision
 from app.domain.table.range_estimate import (
     PublicAction,
     PublicActionHistory,
+    _postflop_action_dist,
     _replay_contexts,
     estimate_range,
 )
@@ -374,6 +384,78 @@ def test_through_action_prefix(packs):
     assert _positive(open_only) != _positive(full)
     clamped = estimate_range(tag, hist, seat=3, through_action=len(hist.actions))
     assert clamped == full
+
+
+# --------------------------------------- river parity (P2a, R1 truthfulness)
+
+
+class _CaptureFirstChoices:
+    """Duck-typed rng recording the sampler's first choices() distribution
+    (the action draw) — same idiom as range_estimate._CaptureRng."""
+
+    def __init__(self):
+        self.dist = None
+
+    def choices(self, population, weights, k=1):
+        if self.dist is None:
+            self.dist = dict(zip(population, weights, strict=True))
+        return [population[0]]
+
+
+def test_estimator_river_dist_equals_live_polarized_policy(packs):
+    """P2a Q3 estimator parity (the R1-reveal truthfulness guard): on a fixed
+    RIVER facing-a-bet context, the estimator's recovered action distribution
+    (`_postflop_action_dist`) EQUALS a direct capture of the live policy
+    (`sample_postflop_decision(..., street=Street.RIVER)`) on the same inputs
+    — the estimator replays the polarized river policy, not the stale
+    streetless one (the street=None distribution differs on both probe
+    holes, so the equality is discriminating)."""
+    tag = packs[VillainType.TAG]
+    dealt = _dealt_fixed(("As", "Ad"), ["Kh", "7d", "2c", "9s", "3h"])
+    state = start_hand(dealt, button_seat=0, stacks_bb=[100.0] * 9)
+    moves = [(3, _raise_to(3.0))]
+    moves += [(s, _FOLD) for s in (4, 5, 6, 7, 8, 0, 1)]
+    moves += [(2, _CALL)]
+    moves += [(2, _CHECK), (3, _bet(3.0)), (2, _CALL)]  # flop
+    moves += [(2, _CHECK), (3, _bet(6.0)), (2, _CALL)]  # turn
+    moves += [(2, _CHECK), (3, _bet(12.0)), (2, _CALL)]  # river: seat 2 faces a bet
+    state = _script(state, moves)
+    ctx = _replay_contexts(_project(state), seat=2, n=len(_project(state).actions))[-1]
+    assert ctx.street is Street.RIVER
+    assert ActionType.RAISE in ctx.kinds
+
+    # Probe holes where river polarization bites: middle pair (raise floored)
+    # and no-draw air (call floored) on the Kh7d2c9s3h board.
+    for hole in (("9c", "4d"), ("6h", "4c")):
+        estimator = _postflop_action_dist(tag, hole, ctx)
+        legal = [LegalAction(action=k) for k in sorted(ctx.kinds)]
+        live = _CaptureFirstChoices()
+        sample_postflop_decision(
+            tag,
+            hole,
+            list(ctx.board),
+            legal,
+            ctx.pot_bb,
+            ctx.stack_bb,
+            ctx.opponents,
+            live,  # type: ignore[arg-type] — duck-typed capture rng
+            current_bet_to=ctx.current_bet_to,
+            street=Street.RIVER,
+        )
+        assert estimator == live.dist, hole
+        streetless = _CaptureFirstChoices()
+        sample_postflop_decision(
+            tag,
+            hole,
+            list(ctx.board),
+            legal,
+            ctx.pot_bb,
+            ctx.stack_bb,
+            ctx.opponents,
+            streetless,  # type: ignore[arg-type]
+            current_bet_to=ctx.current_bet_to,
+        )
+        assert estimator != streetless.dist, hole  # polarization visible in the reveal
 
 
 # ---------------------------------------------------------------- perf

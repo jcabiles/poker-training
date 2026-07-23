@@ -18,6 +18,14 @@ villain seats play real persona packs, so P1's pack fixes (B1/M3/N3, threebet
 hand stream drifts → total 1233 → 1246, graded 349 → 366. Graded coverage
 HELD (ratio 28.3% → 29.4%) vs the immutable
 coverage_baseline.persona-realism-start.json snapshot.
+
+RE-RECORDED for P2a (persona-realism-p2a Q3, 2026-07-23 — slice-authorized,
+operational; the ONE authoritative combined re-anchor is W5): play.py now
+passes `street` into the postflop sampler, so river polarization (one-pair
+class never raises the river, air never calls) changes villain river play →
+the hand stream drifts → total 1246 → 1255, graded 366 → 368. Cumulative vs
+the immutable persona-realism-start snapshot: total 1233 → 1255, graded
+349 → 368 (ratio 28.3% → 29.3% — held).
 """
 
 from __future__ import annotations
