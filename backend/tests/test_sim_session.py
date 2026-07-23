@@ -110,7 +110,12 @@ def test_play_hand_to_showdown(db):
             for sd in final.hand.showdown:
                 assert len(sd.hole_cards) == 2
             deltas = {sd.seat_index: sd.delta_bb for sd in final.hand.showdown}
-            assert any(d > 0 for d in deltas.values())
+            # Settlement must award the pot to at least one showdown seat, so
+            # some seat comes out non-negative. `>= 0`, not `> 0`: a legitimate
+            # board-plays chop (equal investment, no dead money) settles every
+            # showdown seat to exactly 0.0 — a real outcome, not a bug. Using
+            # `> 0` made this rarely flake on chopped-pot draws.
+            assert any(d >= 0 for d in deltas.values())
             return
         view = deal_next_hand(db, final.session_id)
     pytest.fail("no showdown reached in 30 hands")
