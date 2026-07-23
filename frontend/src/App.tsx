@@ -349,7 +349,13 @@ export default function App() {
         ))}
       </nav>
 
-      <StatsStrip summary={summary} leaks={leaks} />
+      {/* Practice-scoped strip (accuracy/streak/due/hands/leaks are all drill
+          data). Hidden on the Simulate cluster (simulate/history/dashboard) so
+          its "accuracy" never sits beside the differently-scoped "Your record"
+          Good/Optimal rates and read as the same scale. */}
+      {view !== "simulate" && view !== "history" && view !== "dashboard" && (
+        <StatsStrip summary={summary} leaks={leaks} />
+      )}
 
       {view === "home" ? (
         <Home plan={plan} leaks={leaks} />
