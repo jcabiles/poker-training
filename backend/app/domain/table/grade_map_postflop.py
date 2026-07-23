@@ -915,6 +915,384 @@ def map_mw_vs_river_bet(state: HandState, hero_seat: int) -> Spot | None:
     )
 
 
+# --- M7 (RES-I L5): hero-seat widening — opener + cold-caller MW mappers ----
+# Widens the multiway family beyond hero-as-BB (RES-I §4 measured the BB-only
+# scope at 0.23–2.73/1000, below the ≥5/1000 rankability threshold; §6 = GO).
+# Two new hero seats, graded by the EXISTING graders + M6's opp-aware
+# `_apply_multiway` scalars — no new grader, no new NodeContext:
+#
+#   * hero as the OPENER in the BB-in MW shape (`_mw_srp_preflop`): c-bet /
+#     turn-barrel / river-barrel decisions into 2–3 live players. These are
+#     AGGRESSOR nodes — hero initiates the betting, so players acting after
+#     him are inherent to the node (exactly like the HU barrel mappers, where
+#     the villain always still holds an action); the "hero closes" invariant
+#     governs FACING nodes only. `grade_cbet`/`grade_*_barrel`'s aggressor-side
+#     `_apply_multiway` (bluff dampen / value lean, geometric in opp) is the
+#     deliberate model for betting into a live field.
+#   * hero as a COLD-CALLER, closing. Inside the BB-in `_mw_srp_preflop`
+#     shape a cold-caller can NEVER close — postflop the BB acts first, so
+#     after the opener's bet the action wraps caller(s)-then-BB and the BB
+#     always holds a live action behind every caller (skip-and-document:
+#     those facing nodes stay None under the closing invariant, same law as
+#     4-way-live-behind-hero). The caller family therefore fires in the
+#     no-BB MW shape — opener + exactly TWO non-blind cold-callers, blinds
+#     folded (RES-I §2: 485/10k flops, the largest previously-structural
+#     kill) — with hero as the LATER caller, who genuinely closes the street
+#     once the earlier caller has responded.
+#
+# Both families reuse `_is_canonical_bet` (M1's RECOGNIZED_BET_FRACS — never
+# a private fraction set, RES-I §5) and keep every prior-street gate exact.
+# Existing BB-path mappers are untouched; all new shapes are disjoint from
+# every existing mapper by hero role + preflop entrant shape.
+
+
+def map_mw_flop_cbet(state: HandState, hero_seat: int) -> Spot | None:
+    """3/4-way flop c-bet: hero opened the MW pot (`_mw_srp_preflop` shape),
+    the BB checked, hero decides check / bet small / bet big into the live
+    field. Mirrors `map_flop_cbet` with the MW preflop gate + `_mw_ranges`
+    content gate (every cold-caller's VS_RFI entry must exist)."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _mw_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, callers, bb, open_to = gate
+    if opener.seat != hero_seat:
+        return None
+    if not _bb_checked_only(state, Street.FLOP):
+        return None
+    flop_pot = round((2 + len(callers)) * open_to + 0.5, 2)
+    pot = _live_pot(state)
+    if abs(pot - flop_pot) > _EPS:
+        return None
+    ranges = _mw_ranges(opener.position, [c.position for c in callers])
+    if ranges is None:
+        return None
+    bb_range, opener_range = ranges
+    return _barrel_spot(
+        state, hero_seat, bb, pot, Street.FLOP, NodeContext.CBET,
+        opener_range, bb_range,
+    )
+
+
+def map_mw_turn_barrel(state: HandState, hero_seat: int) -> Spot | None:
+    """3/4-way turn barrel: hero opened the MW pot, the canonical flop
+    bet-call(s)-call line stayed intact, and the BB has checked the turn."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 4 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _mw_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, callers, bb, open_to = gate
+    if opener.seat != hero_seat:
+        return None
+    n_way = 2 + len(callers)
+    flop_pot = round(n_way * open_to + 0.5, 2)
+    fbet = _mw_check_bet_call_call(
+        state, Street.FLOP, hero.position, callers, flop_pot
+    )
+    if fbet is None:
+        return None
+    if not _bb_checked_only(state, Street.TURN):
+        return None
+    pot = _live_pot(state)
+    if abs(pot - (flop_pot + n_way * fbet)) > _EPS:
+        return None
+    ranges = _mw_ranges(opener.position, [c.position for c in callers])
+    if ranges is None:
+        return None
+    bb_range, opener_range = ranges
+    return _barrel_spot(
+        state, hero_seat, bb, pot, Street.TURN, NodeContext.TURN_BARREL,
+        opener_range, bb_range,
+    )
+
+
+def map_mw_river_barrel(state: HandState, hero_seat: int) -> Spot | None:
+    """3/4-way river barrel: hero opened the MW pot, canonical flop AND turn
+    bet-call(s)-call stayed intact, and the BB has checked the river."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 5 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _mw_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, callers, bb, open_to = gate
+    if opener.seat != hero_seat:
+        return None
+    n_way = 2 + len(callers)
+    flop_pot = round(n_way * open_to + 0.5, 2)
+    fbet = _mw_check_bet_call_call(
+        state, Street.FLOP, hero.position, callers, flop_pot
+    )
+    if fbet is None:
+        return None
+    turn_pot = round(flop_pot + n_way * fbet, 2)
+    tbet = _mw_check_bet_call_call(
+        state, Street.TURN, hero.position, callers, turn_pot
+    )
+    if tbet is None:
+        return None
+    if not _bb_checked_only(state, Street.RIVER):
+        return None
+    pot = _live_pot(state)
+    if abs(pot - (turn_pot + n_way * tbet)) > _EPS:
+        return None
+    ranges = _mw_ranges(opener.position, [c.position for c in callers])
+    if ranges is None:
+        return None
+    bb_range, opener_range = ranges
+    return _barrel_spot(
+        state, hero_seat, bb, pot, Street.RIVER, NodeContext.RIVER_BARREL,
+        opener_range, bb_range,
+    )
+
+
+def _mw_nobb_srp_preflop(state: HandState) -> tuple | None:
+    """Gate: no-BB 3-way single-raised pot. One non-blind opener at an in-band
+    open, exactly TWO non-blind cold-callers, BOTH blinds folded. Entrants are
+    derived from the PREFLOP actions (a caller may legitimately have folded to
+    a later postflop bet). Opener must still be IN; callers IN or
+    postflop-FOLDED (never all-in); nobody else live. Returns
+    (opener, callers, open_to) — `callers` a tuple in preflop call order,
+    which equals position/postflop-act order — or None."""
+    pre = _street_actions(state, Street.PREFLOP)
+    if any(
+        h.action not in (ActionType.FOLD, ActionType.RAISE, ActionType.CALL)
+        for h in pre
+    ):
+        return None
+    raises = [h for h in pre if h.action is ActionType.RAISE]
+    calls = [h for h in pre if h.action is ActionType.CALL]
+    if len(raises) != 1 or len(calls) != 2:
+        return None  # not an SRP with exactly two callers
+    opener_pos = raises[0].position
+    caller_pos = [c.position for c in calls]
+    if opener_pos in _BLIND_POSITIONS or any(
+        p in _BLIND_POSITIONS for p in caller_pos
+    ):
+        return None  # a blind entrant is the `_mw_srp_preflop` family instead
+    if len(set(caller_pos)) != 2:
+        return None  # duplicate caller (limp-then-call chain)
+    opener = next((s for s in state.seats if s.position is opener_pos), None)
+    callers = tuple(
+        s for p in caller_pos for s in state.seats if s.position is p
+    )
+    if opener is None or len(callers) != 2:
+        return None
+    if opener.status is not PlayerStatus.IN:
+        return None
+    if any(c.status not in (PlayerStatus.IN, PlayerStatus.FOLDED) for c in callers):
+        return None  # an all-in anywhere in the line is off-shape
+    entrants = {opener.seat} | {c.seat for c in callers}
+    if any(
+        s.status is not PlayerStatus.FOLDED
+        for s in state.seats
+        if s.seat not in entrants
+    ):
+        return None  # blinds (or anyone else) must be dead
+    open_to = raises[0].amount_bb
+    if not (2.0 - _EPS <= open_to <= _OVERSIZE_OPEN_CAP + _EPS):
+        return None
+    return opener, callers, open_to
+
+
+def _mw_nobb_bet_responded(
+    state, street: Street, opener_pos: Position, prior_callers, pot_before: float
+) -> tuple[float, int] | None:
+    """Gate: this street went EXACTLY bet(opener, canonical) ->
+    call-or-fold(EVERY caller before hero); hero — the LAST caller — now
+    faces the bet and CLOSES (no BB exists in this shape; the opener acts
+    first postflop and holds no further action once hero responds). Returns
+    (bet, n_called) or None. A raise is a different node -> None."""
+    acts = _street_actions(state, street)
+    if len(acts) != 1 + len(prior_callers):
+        return None
+    bet, *resps = acts
+    if bet.action is not ActionType.BET or bet.position is not opener_pos:
+        return None
+    if not _is_canonical_bet(bet.amount_bb, pot_before, street):
+        return None
+    if {r.position for r in resps} != {c.position for c in prior_callers}:
+        return None  # a non-caller acted, or a prior caller hasn't responded
+    n_called = 0
+    for resp in resps:
+        if resp.action is ActionType.CALL:
+            if abs(resp.amount_bb - bet.amount_bb) > _EPS:
+                return None  # short call = someone is all-in — off-shape
+            n_called += 1
+        elif resp.action is not ActionType.FOLD:
+            return None  # a raise — hero faces a raise, not the bet
+    return bet.amount_bb, n_called
+
+
+def _mw_nobb_bet_call_call(
+    state, street: Street, opener_pos: Position, callers, pot_before: float
+) -> float | None:
+    """Gate: a PRIOR street went EXACTLY bet(opener, canonical) -> call(EVERY
+    caller) — the full no-BB MW continuation line stayed intact. Returns the
+    bet size or None."""
+    acts = _street_actions(state, street)
+    if len(acts) != 1 + len(callers):
+        return None
+    bet, *caller_calls = acts
+    if bet.action is not ActionType.BET or bet.position is not opener_pos:
+        return None
+    if not _is_canonical_bet(bet.amount_bb, pot_before, street):
+        return None
+    if {c.position for c in caller_calls} != {c.position for c in callers}:
+        return None
+    for c in caller_calls:
+        if c.action is not ActionType.CALL or abs(c.amount_bb - bet.amount_bb) > _EPS:
+            return None  # a fold/raise, or short call (all-in) — off-shape
+    return bet.amount_bb
+
+
+def _mw_caller_ranges(
+    opener_pos: Position, hero_pos: Position, other_caller_positions
+) -> tuple[str, str] | None:
+    """(hero's VS_RFI call range, opener RFI raise range) for the caller
+    family — PLUS the content gate on every OTHER caller's VS_RFI call entry
+    (an unmodeled range in the pot -> None, same law as `_mw_ranges`). Other
+    callers' ranges are gates only, never a grader input."""
+    rfi_entry = _find_entry(NodeContext.RFI, opener_pos, None)
+    hero_entry = _find_entry(NodeContext.VS_RFI, hero_pos, opener_pos)
+    opener_range = _combos_for(rfi_entry, ActionType.RAISE)
+    hero_range = _combos_for(hero_entry, ActionType.CALL)
+    if not opener_range or not hero_range:
+        return None
+    for p in other_caller_positions:
+        entry = _find_entry(NodeContext.VS_RFI, p, opener_pos)
+        if entry is None or not _combos_for(entry, ActionType.CALL):
+            return None
+    return hero_range, opener_range
+
+
+def map_mw_caller_vs_cbet(state: HandState, hero_seat: int) -> Spot | None:
+    """No-BB 3-way vs flop c-bet: hero = the LATER of two non-blind
+    cold-callers, the opener c-bet a canonical size, the earlier caller
+    responded — hero closes. Hero's raise is a plain in-position raise (hero
+    never checked), so the legs use the facing-bet mults."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 3 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _mw_nobb_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, callers, open_to = gate
+    if callers[-1].seat != hero_seat:
+        return None  # the earlier caller never closes (hero-not-closing -> None)
+    flop_pot = round(3 * open_to + 1.5, 2)  # both blinds dead
+    faced = _mw_nobb_bet_responded(
+        state, Street.FLOP, opener.position, callers[:-1], flop_pot
+    )
+    if faced is None:
+        return None
+    cbet, n_called = faced
+    pot = _live_pot(state)
+    if abs(pot - (flop_pot + cbet * (1 + n_called))) > _EPS:
+        return None
+    ranges = _mw_caller_ranges(
+        opener.position, hero.position, [c.position for c in callers[:-1]]
+    )
+    if ranges is None:
+        return None
+    hero_range, opener_range = ranges
+    return _faced_bet_spot(
+        state, hero_seat, opener, pot, cbet,
+        Street.FLOP, NodeContext.VS_CBET, hero_range, opener_range,
+        mults=FACING_RAISE_MULTS["raise"],
+    )
+
+
+def map_mw_caller_vs_turn_bet(state: HandState, hero_seat: int) -> Spot | None:
+    """No-BB 3-way vs turn barrel: canonical flop bet-call-call, then the
+    opener bets the turn and the earlier caller responded — hero closes."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 4 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _mw_nobb_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, callers, open_to = gate
+    if callers[-1].seat != hero_seat:
+        return None
+    flop_pot = round(3 * open_to + 1.5, 2)
+    fbet = _mw_nobb_bet_call_call(
+        state, Street.FLOP, opener.position, callers, flop_pot
+    )
+    if fbet is None:
+        return None
+    turn_pot = round(flop_pot + 3 * fbet, 2)
+    faced = _mw_nobb_bet_responded(
+        state, Street.TURN, opener.position, callers[:-1], turn_pot
+    )
+    if faced is None:
+        return None
+    tbet, n_called = faced
+    pot = _live_pot(state)
+    if abs(pot - (turn_pot + tbet * (1 + n_called))) > _EPS:
+        return None
+    ranges = _mw_caller_ranges(
+        opener.position, hero.position, [c.position for c in callers[:-1]]
+    )
+    if ranges is None:
+        return None
+    hero_range, opener_range = ranges
+    return _faced_bet_spot(
+        state, hero_seat, opener, pot, tbet,
+        Street.TURN, NodeContext.VS_TURN_BET, hero_range, opener_range,
+    )
+
+
+def map_mw_caller_vs_river_bet(state: HandState, hero_seat: int) -> Spot | None:
+    """No-BB 3-way vs river bet: canonical flop AND turn bet-call-call, then
+    the opener bets the river and the earlier caller responded — hero closes."""
+    hero = state.seats[hero_seat]
+    if len(state.board) != 5 or hero.position in _BLIND_POSITIONS:
+        return None
+    gate = _mw_nobb_srp_preflop(state)
+    if gate is None:
+        return None
+    opener, callers, open_to = gate
+    if callers[-1].seat != hero_seat:
+        return None
+    flop_pot = round(3 * open_to + 1.5, 2)
+    fbet = _mw_nobb_bet_call_call(
+        state, Street.FLOP, opener.position, callers, flop_pot
+    )
+    if fbet is None:
+        return None
+    turn_pot = round(flop_pot + 3 * fbet, 2)
+    tbet = _mw_nobb_bet_call_call(
+        state, Street.TURN, opener.position, callers, turn_pot
+    )
+    if tbet is None:
+        return None
+    river_pot = round(turn_pot + 3 * tbet, 2)
+    faced = _mw_nobb_bet_responded(
+        state, Street.RIVER, opener.position, callers[:-1], river_pot
+    )
+    if faced is None:
+        return None
+    rbet, n_called = faced
+    pot = _live_pot(state)
+    if abs(pot - (river_pot + rbet * (1 + n_called))) > _EPS:
+        return None
+    ranges = _mw_caller_ranges(
+        opener.position, hero.position, [c.position for c in callers[:-1]]
+    )
+    if ranges is None:
+        return None
+    hero_range, opener_range = ranges
+    return _faced_bet_spot(
+        state, hero_seat, opener, pot, rbet,
+        Street.RIVER, NodeContext.VS_RIVER_BET, hero_range, opener_range,
+    )
+
+
 # --- M4 (RES-H H1): caller-re-raises-c-bet — hero = opener facing the raise --
 # Hero opened an SRP, c-bet the flop at a canonical size, and the NON-BB
 # preflop cold-caller raised the c-bet; hero faces/closes. Two entrant shapes

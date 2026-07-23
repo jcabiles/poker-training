@@ -300,8 +300,12 @@ def test_flop_cbet_maps_with_builder_ranges(hero_pos):
 # --------------------------------------------------------- None returns
 
 
-def test_multiway_flop_returns_none():
-    # Hero UTG opens, LJ AND BB call: three-way flop is not HU-canonical.
+def test_multiway_flop_opener_cbet_now_maps():
+    # M7 SUPERSESSION of the old test_multiway_flop_returns_none: hero UTG
+    # opens, LJ AND BB call — never HU-canonical (pinned None through M6) —
+    # but M7's hero-as-opener MW mapper (RES-I L5) now maps hero's c-bet
+    # decision as a 3-live CBET spot. Full-shape coverage lives in
+    # tests/domain/test_mw_hero_seat_widening.py.
     state = _state(Position.UTG)
     state = _play(
         state,
@@ -320,7 +324,9 @@ def test_multiway_flop_returns_none():
     )
     assert state.street is Street.FLOP
     assert state.to_act_seat == HERO_SEAT
-    assert map_decision_point(state, HERO_SEAT) is None
+    spot = map_decision_point(state, HERO_SEAT)
+    assert spot is not None
+    assert spot.node_context == [NodeContext.CBET]
 
 
 def test_limped_pot_off_count_returns_none():

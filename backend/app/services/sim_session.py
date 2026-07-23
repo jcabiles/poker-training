@@ -62,7 +62,12 @@ from app.domain.table.grade_map import map_decision_point
 from app.domain.table.grade_map_postflop import (
     map_flop_vs_cbet,
     map_flop_vs_check_raise,
+    map_mw_caller_vs_cbet,
+    map_mw_caller_vs_river_bet,
+    map_mw_caller_vs_turn_bet,
     map_mw_flop_vs_cbet,
+    map_mw_river_barrel,
+    map_mw_turn_barrel,
     map_mw_vs_river_bet,
     map_mw_vs_turn_bet,
     map_river_barrel,
@@ -409,17 +414,17 @@ def _is_turn_barrel_node(state) -> bool:
     `map_turn_barrel` recognizes (aggressor, HU SRP line, BB checked the turn).
     Gating on the mapper (not just the street) keeps the displayed two-size
     offer in lockstep with the graded spot — no display-vs-grade divergence."""
-    return (
-        state.street is Street.TURN
-        and map_turn_barrel(state, HERO_SEAT) is not None
+    return state.street is Street.TURN and (
+        map_turn_barrel(state, HERO_SEAT) is not None
+        or map_mw_turn_barrel(state, HERO_SEAT) is not None  # M7 MW opener
     )
 
 
 def _is_river_barrel_node(state) -> bool:
     """True when hero's BET here is a gradeable river barrel (mapper non-None)."""
-    return (
-        state.street is Street.RIVER
-        and map_river_barrel(state, HERO_SEAT) is not None
+    return state.street is Street.RIVER and (
+        map_river_barrel(state, HERO_SEAT) is not None
+        or map_mw_river_barrel(state, HERO_SEAT) is not None  # M7 MW opener
     )
 
 
@@ -455,12 +460,19 @@ def _facing_raise_spot(state) -> Spot | None:
             map_flop_vs_cbet(state, HERO_SEAT)
             or map_flop_vs_check_raise(state, HERO_SEAT)
             or map_mw_flop_vs_cbet(state, HERO_SEAT)
+            or map_mw_caller_vs_cbet(state, HERO_SEAT)  # M7 no-BB caller
         )
     if state.street is Street.TURN:
-        return map_vs_turn_bet(state, HERO_SEAT) or map_mw_vs_turn_bet(state, HERO_SEAT)
+        return (
+            map_vs_turn_bet(state, HERO_SEAT)
+            or map_mw_vs_turn_bet(state, HERO_SEAT)
+            or map_mw_caller_vs_turn_bet(state, HERO_SEAT)  # M7 no-BB caller
+        )
     if state.street is Street.RIVER:
-        return map_vs_river_bet(state, HERO_SEAT) or map_mw_vs_river_bet(
-            state, HERO_SEAT
+        return (
+            map_vs_river_bet(state, HERO_SEAT)
+            or map_mw_vs_river_bet(state, HERO_SEAT)
+            or map_mw_caller_vs_river_bet(state, HERO_SEAT)  # M7 no-BB caller
         )
     return None
 

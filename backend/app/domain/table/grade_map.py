@@ -26,7 +26,13 @@ from app.domain.table.grade_map_postflop import (
     map_flop_vs_check_raise,
     map_limped_flop_lead,
     map_limped_flop_vs_lead,
+    map_mw_caller_vs_cbet,
+    map_mw_caller_vs_river_bet,
+    map_mw_caller_vs_turn_bet,
+    map_mw_flop_cbet,
     map_mw_flop_vs_cbet,
+    map_mw_river_barrel,
+    map_mw_turn_barrel,
     map_mw_vs_river_bet,
     map_mw_vs_turn_bet,
     map_river_barrel,
@@ -56,28 +62,38 @@ def map_decision_point(state: HandState, hero_seat: int) -> Spot | None:
         # never masks one with the other. M5 adds the two HU LIMPED-pot
         # shapes, disjoint from every raised-pot mapper by preflop raise
         # count (zero vs one+) and from each other by flop action shape.
+        # M7 adds the hero-as-opener MW c-bet (hero role: opener, 2+ preflop
+        # callers) and the no-BB caller shape (both blinds folded — disjoint
+        # from every BB-in mapper by entrant shape).
         return (
             map_flop_cbet(state, hero_seat)
             or map_flop_vs_cbet(state, hero_seat)
             or map_flop_vs_check_raise(state, hero_seat)
             or map_flop_vs_caller_raise(state, hero_seat)
             or map_mw_flop_vs_cbet(state, hero_seat)
+            or map_mw_flop_cbet(state, hero_seat)
+            or map_mw_caller_vs_cbet(state, hero_seat)
             or map_limped_flop_lead(state, hero_seat)
             or map_limped_flop_vs_lead(state, hero_seat)
         )
     # R5: turn/river continuation-line shapes, disjoint by hero position
-    # (opener barrels vs BB defends) + entrant count (N5 3-way). Everything
-    # else stays None ("no baseline yet").
+    # (opener barrels vs BB defends) + entrant count (N5 3-way; M7 opener
+    # barrels + no-BB caller shapes). Everything else stays None ("no
+    # baseline yet").
     if state.street is Street.TURN:
         return (
             map_turn_barrel(state, hero_seat)
             or map_vs_turn_bet(state, hero_seat)
             or map_mw_vs_turn_bet(state, hero_seat)
+            or map_mw_turn_barrel(state, hero_seat)
+            or map_mw_caller_vs_turn_bet(state, hero_seat)
         )
     if state.street is Street.RIVER:
         return (
             map_river_barrel(state, hero_seat)
             or map_vs_river_bet(state, hero_seat)
             or map_mw_vs_river_bet(state, hero_seat)
+            or map_mw_river_barrel(state, hero_seat)
+            or map_mw_caller_vs_river_bet(state, hero_seat)
         )
     return None
