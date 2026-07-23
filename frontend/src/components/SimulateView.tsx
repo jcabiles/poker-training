@@ -569,16 +569,17 @@ export default function SimulateView() {
   // click, not the bot playback, so it may show immediately.
   const revealHandEnd = !playing;
 
-  // Enter deals the next hand once the hand has settled — the topbar button can
-  // sit above the fold, but Enter saves the reach entirely. Skipped when focus
-  // is on an interactive control so we never hijack an Enter meant for another
-  // button (Watch, reveal, etc.); busyRef is the same sync guard run() uses, so
-  // a stray double-fire (global handler + a focused button's own Enter) can't
-  // deal twice.
+  // Enter or Space deals the next hand once the hand has settled — the topbar
+  // button can sit above the fold, but the key saves the reach entirely. Skipped
+  // when focus is on an interactive control so we never hijack a key meant for
+  // another button (Watch, reveal, etc.) — a focused button still gets its
+  // native Space/Enter click; busyRef is the same sync guard run() uses, so a
+  // stray double-fire (global handler + a focused button's own key) can't deal
+  // twice.
   useEffect(() => {
     if (!hand?.hand_over || !revealHandEnd) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Enter" || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.key !== "Enter" && e.key !== " ") || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (
         target?.closest(
@@ -711,7 +712,7 @@ export default function SimulateView() {
             {/* Primary next-step lives here, first in the cluster and above the
                 fold — the old home in SimShowdown sat below the tall felt and
                 needed a scroll every hand. Present only once the hand has
-                settled (same gate the result panel uses); Enter deals too. */}
+                settled (same gate the result panel uses); Enter/Space deal too. */}
             {hand?.hand_over && revealHandEnd && (
               <button
                 type="button"
