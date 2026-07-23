@@ -1314,10 +1314,44 @@ the serial spine S2→S4→S9→S10, not the agent budget.
   is PRE-EXISTING shell chrome (already a NEXT item @ S9 line 212 — the new views reflow clean);
   reveal-list "Seat N" vs position vocabulary polish. What-if/re-sim, hand import/export, SRS
   seeding remain out.)*
+- **Persona realism — ALL 6 personas (nit / fish / station + maniac / LAG / TAG) decision-making.**
+  *(user-reported 2026-07-23; TWO dual adversarial reviews — non-aggressive + aggressive — each
+  Codex Sol **FAIL** + Claude Opus **PASS-WITH-ISSUES/leaning-FAIL**; full findings + math + code
+  refs + sources in `docs/ai-dlc/research/RES-J-persona-realism.md`; engine reference + fix guide in
+  `docs/research/12-persona-engine-and-realism-fixes.md`.)*
+  *Evidence:* no persona behaves like its namesake — all personality lives in 5 shared scalar levers
+  over one **memoryless, street-blind** merit rulebook (`personas_postflop.py`), which can't express
+  the documented distinctions. **Two root causes drive all six:** (a) the engine takes no
+  street/history/initiative argument (flop = turn = river given the same bucket), (b) `stickiness`
+  does two jobs (looseness + size-elasticity) and one `aggression` scalar spans every bucket/street.
+  *Non-aggressive findings:* **(bug)** calling station **folds AA/KK/AKs 40%** unopened preflop
+  (`calling_station.json:21,32` `raise .6/fold .4` + first-mix-wins); loose personas **call pure air**
+  absurdly (station ~78% w/ 72o on QJ9, nit ~57% — `_CALL_BASE[AIR]×stickiness`); **elasticity
+  collapse** — station should be *inelastic* and fish *elastic*, both welded to `stickiness` (F1).
+  *Aggressive findings (2026-07-23 2nd review):* **maniac river play is unhinged** — facing a river
+  bet it raises **middle pair 38% / top pair 54%**, calls **busted air 23%**, folds a pair only
+  4–17% (rivers should be *polarized* — never raise a medium hand); **maniac aggression 15.0 is a
+  lie** — capped at 5.6 (`min(aggression,5.6)`) and its signature air-barreling runs off `bluff_freq`,
+  never the aggression lever; **maniac & LAG open-limp** preflop (off-archetype — aggressive players
+  raise-or-fold); **TAG/LAG raise one pair too often** (LAG 40% / TAG 32% facing a bet); **memoryless
+  barreling** — `bluff_mass` constant flop=turn=river, no give-up (real bluff freq declines by street);
+  **preflop responses are position/size-blind** (`vs_rfi/3bet/4bet` all `positions:null` — a TAG
+  answers a UTG open and a BTN open identically; a min-raise == a shove); **maniac's 4bet/5bet range
+  is tighter-or-equal to LAG's** (archetype inversion; never light-jams); some authored preflop mixes
+  are **silently shadowed** by first-match-wins. → **DECOMPOSED into a dedicated roadmap:**
+  `docs/ai-dlc/roadmap/persona-realism.md` (scope locked 2026-07-23 interview — **Core realism fix**:
+  **P1** correctness patch (fold-aces, open-limps, oversized 3bet, air-calls, overlap validator) →
+  **P2a** street-aware refactor + river polarization (the keystone) → **P2b** scare-card + per-street
+  bluff decay → **P3** split `stickiness` → looseness/elasticity, with **P4** position/size-aware
+  preflop responses running parallel on the preflop engine. Deep items (value/bluff split, graded
+  commit, kicker/equity) are that roadmap's NEXT; **persona sub-types (`profile_id` vs `archetype`)
+  are Later, coupled to Hidden-persona mode** below — fake tells → fake reads).
 - **Hidden-persona mode + read tagging.** *Evidence:* gate decision — visible badges v1,
   read-development later. *Open questions:* does tagging need showdown-history support.
   *(Epic-2 **R1**'s reveal buttons are a training wheel this mode would eventually gate —
   keep R1's reveal server-side + on-demand so hidden-persona mode can withhold it later.)*
+  **Depends on Persona-realism (above)** — hiding the label only teaches real reads if the bots
+  play like their type; sequence realism fixes (≥ the quick wins + elasticity split) first.
 - **Session analytics view (per-street decision quality).** *(promoted from Later
   2026-07-12 — explicit user vision: "track my decisions at each street, then show me
   analytics on whether I made good/bad/acceptable decisions at each street.")* *Evidence:*
