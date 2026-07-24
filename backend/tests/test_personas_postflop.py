@@ -195,10 +195,16 @@ def test_monotonicity_aggression_never_lowers_bet_raise_freq():
     assert freq_high >= freq_base - 1e-9
 
 
-def test_monotonicity_stickiness_never_lowers_call_freq():
+def test_monotonicity_call_looseness_never_lowers_call_freq():
+    # W2-a: the call-freq monotonicity now rides `call_looseness` (the flat call
+    # multiplier). Build `high` by raising ONLY call_looseness — leave stickiness
+    # (hence the size_elasticity fallback / fold-side price factor) UNCHANGED so
+    # the assertion isolates the call axis and isn't confounded by fold behavior.
     base = _pack("nit")
     high = base.model_copy(deep=True)
-    high.postflop = base.postflop.model_copy(update={"stickiness": base.postflop.stickiness * 3})
+    high.postflop = base.postflop.model_copy(
+        update={"call_looseness": base.postflop.stickiness * 3}
+    )
 
     hole = ("9h", "2d")  # middle pair, facing a bet
     board = ["Ac", "9s", "3h"]
@@ -216,6 +222,35 @@ def test_monotonicity_stickiness_never_lowers_call_freq():
         return count / n
 
     assert call_freq(high) >= call_freq(base) - 1e-9
+
+
+def test_size_elasticity_steeper_fold_vs_bigger_size():
+    # W2-a: higher size_elasticity ⇒ a STEEPER fold-rate rise from a SMALL faced
+    # size to an OVERBET (the fish-vs-station identity axis). Exact normalized
+    # fold probability via _CaptureWeights (no sampling noise). Both configs share
+    # every other lever, so only the price exponent differs.
+    base_pf = _pack("tag").postflop
+    low = _pack("tag")
+    low.postflop = base_pf.model_copy(update={"size_elasticity": 0.5})
+    high = _pack("tag")
+    high.postflop = base_pf.model_copy(update={"size_elasticity": 1.5})
+    hole, board = ("9h", "2d"), ["Ac", "9s", "3h"]  # middle pair facing a bet
+
+    def fold_gap(pack):
+        # SMALL: to_call 3 into pre-bet pot 9 → faced_frac 0.33; OVERBET: 9 into 6 → 1.5.
+        small = _dist_for_pack(
+            pack, hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(3.0)],
+            12.0, 100.0, current_bet_to=3.0,
+        )
+        over = _dist_for_pack(
+            pack, hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(9.0)],
+            15.0, 100.0, current_bet_to=9.0,
+        )
+        return over[ActionType.FOLD] - small[ActionType.FOLD]
+
+    assert fold_gap(high) > fold_gap(low)
 
 
 def test_sizing_spread_no_deterministic_strength_to_size():
