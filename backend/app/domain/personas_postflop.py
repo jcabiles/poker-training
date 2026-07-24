@@ -17,12 +17,16 @@ from __future__ import annotations
 import itertools
 import random
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from app.domain.action import Decision
 from app.domain.content.models import PersonaPack, PersonaPostflop
 from app.domain.equity import _RIDX, _eval5
 from app.domain.spot import ActionType, Card, LegalAction, Street
 from app.domain.table.sizing import postflop_node_key, pot_fraction_to_bb
+
+if TYPE_CHECKING:
+    from app.domain.table.postflop_context import PostflopContext
 
 _ACE = 12  # rank index of the ace in equity.RANKS
 _KING = 11
@@ -499,6 +503,7 @@ def sample_postflop_decision(
     is_aggressor: bool = False,
     street: Street | None = None,
     latest_aggressor_contribution_bb: float | None = None,
+    context: PostflopContext | None = None,
 ) -> Decision:
     """Draw a frequency-mixed postflop decision from the pack's levers.
 
@@ -508,6 +513,11 @@ def sample_postflop_decision(
     `is_aggressor=False` keeps every existing caller (the statistical harness,
     the range estimator) on the flat `sizing` distribution byte-for-byte — so
     action-frequency bands are unchanged; only the live bot loop opts in.
+
+    W3-a: `context` (in_position / bet_prev_street / busted_draw) is threaded
+    end-to-end as a walking skeleton but NOT yet read — the position/street/
+    texture mechanics (W3-b/c/d) consume it. Default `None` and every current
+    caller are byte-identical.
 
     Facing state is derived from the `legal` shapes (unopened: CHECK+BET;
     matched-with-option: CHECK+RAISE; facing chips: FOLD+CALL[+RAISE]).
