@@ -48,6 +48,12 @@ into the elasticity split, changing their faced-size fold decisions in the seede
 lineup → the shared-rng hand stream drifts → total 1259 → 1270, graded 371 → 365
 (ratio 29.5% → 28.7%, still above the immutable persona-realism-start floor of
 28.3% — held). Seeded-fixture re-record; population bands stay frozen to W4-b.
+
+RE-RECORDED for W2-b (persona-realism-w2, 2026-07-24 — slice-authorized): the
+commit/draw EV gate (STRONG draw folds to overbets instead of force-jamming; naked
+WEAK draw stops stacking off at high commitment) changes villain play → the stream
+drifts again → total 1270 → 1227, graded 365 → 363 (ratio 28.7% → 29.6%, held above
+the 28.3% floor). Seeded-fixture re-record; population bands stay frozen to W4-b.
 """
 
 from __future__ import annotations

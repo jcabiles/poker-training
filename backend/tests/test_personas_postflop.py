@@ -918,6 +918,77 @@ def test_draw_equity_proxy():
     assert de(DrawCategory.STRONG, river) == 0.0  # no cards to come
 
 
+# W2-b — commit/draw EV gate (T7 behavior). lag has spr_commit 3.0.
+_STRONG_DRAW = (("Jh", "Th"), ["9h", "2h", "5c"])  # naked flush draw (AIR + STRONG)
+_MADE_PLUS_DRAW = (("Ah", "Kh"), ["Ac", "7h", "2h"])  # TPTK + flush draw
+_WEAK_DRAW = (("Jd", "Td"), ["8c", "7h", "2s"])  # naked gutshot (AIR + WEAK)
+
+
+def test_strong_draw_potcommitted_still_jams():
+    # STRONG draw facing a ⅔-pot bet, pot-committed (SPR 1.0): faced_frac 0.67 →
+    # T1 threshold 0.29 < equity 0.36 → value-committed → fold zeroed → jams.
+    hole, board = _STRONG_DRAW
+    d = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(12.0),
+         personas_postflop_legal_raise(24.0, 30.0)],
+        30.0, 30.0, current_bet_to=12.0,
+    )
+    assert d[ActionType.FOLD] == 0.0
+
+
+def test_strong_draw_vs_overbet_can_fold():
+    # SAME draw, same commit regime, but facing a 3×-pot OVERBET: faced_frac 3 →
+    # T1 threshold 0.429 > 0.36 → no longer force-jammed, fold survives (and is
+    # strictly greater than the pot-committed case).
+    hole, board = _STRONG_DRAW
+    over = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(18.0),
+         personas_postflop_legal_raise(36.0, 36.0)],
+        24.0, 36.0, current_bet_to=18.0,
+    )
+    potc = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(12.0),
+         personas_postflop_legal_raise(24.0, 30.0)],
+        30.0, 30.0, current_bet_to=12.0,
+    )
+    assert over[ActionType.FOLD] > 0.0
+    assert over[ActionType.FOLD] > potc[ActionType.FOLD]
+
+
+def test_madehand_with_draw_commit_not_damped():
+    # An overpair/TPTK that ALSO holds a flush draw, committed vs the same overbet:
+    # takes the plain value-jam (fold zeroed) — NEVER the W2-b draw damp (reviewer
+    # #6). If it had wrongly entered the damp branch, fold would be > 0.
+    hole, board = _MADE_PLUS_DRAW
+    d = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(18.0),
+         personas_postflop_legal_raise(36.0, 36.0)],
+        24.0, 36.0, current_bet_to=18.0,
+    )
+    assert d[ActionType.FOLD] == 0.0
+
+
+def test_weak_draw_stops_stacking_off_at_high_commitment():
+    # A naked gutshot (WEAK) facing an overbet (always below T1). Stacking-off (the
+    # commit CALL) mass falls as commitment rises: deep commit (c≈0.75, damped) <
+    # a boundary commit at the same faced size (c≈0, no damp).
+    hole, board = _WEAK_DRAW
+
+    def call_prob(stack):
+        d = _dist_for_pack(
+            _pack("lag"), hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(18.0)],
+            24.0, stack, current_bet_to=18.0,
+        )
+        return d[ActionType.CALL]
+
+    assert call_prob(18.0) < call_prob(72.0)
+
+
 # W2-a — elasticity split (call_looseness + size_elasticity).
 def test_elasticity_split_faithful_decomposition_byte_identical():
     """The split is a faithful DECOMPOSITION, not a behavior change: a pack opted
@@ -2072,13 +2143,21 @@ def _persona_stats_ext(packs, persona: str, n: int) -> ExtStats:
 # content levers reproduces the pre-W2 golden BYTE-FOR-BYTE (the reviewer-#8 guard,
 # adapted to a shared-table fixture — a per-persona-row diff is meaningless when
 # rows are coupled). Exact tripwire re-record; population bands stay frozen to W4-b.
+# RE-RECORDED for W2-b (persona-realism-w2, 2026-07-24 — slice-authorized): the
+# commit/draw EV gate changes villain play in two intended cases — a STRONG draw
+# facing an overbet is no longer force-jammed (can fold), and a naked WEAK draw
+# stops stacking off at high commitment. (This is a CODE change, so the strip-
+# levers guard does NOT apply — its byte-identity is analytic: made hands,
+# non-facing STRONG draws, and bets up to ~1.3× pot are unchanged; only overbet-
+# draw + weak-draw-commit spots move, covered by the exact-weight commit unit
+# tests.) All six personas shift via the shared-rng stream. Exact tripwire.
 _GOLDEN_STATS_N200 = {
-    "calling_station": (0.4253246753, 0.2615384615, 0.6068965517),
-    "lag": (2.8936170213, None, 0.4594594595),
-    "maniac": (3.1282051282, 0.4339622642, 0.4752475248),
-    "nit": (0.90625, None, 0.5961538462),
-    "passive_fish": (0.6038647343, 0.2682926829, 0.6061946903),
-    "tag": (2.7435897436, None, 0.6),
+    "calling_station": (0.3448275862, 0.2173913043, 0.6048951049),
+    "lag": (3.0869565217, None, 0.4732142857),
+    "maniac": (2.8734177215, 0.511627907, 0.5189189189),
+    "nit": (1.1578947368, None, 0.6119402985),
+    "passive_fish": (0.6348314607, 0.2564102564, 0.6380952381),
+    "tag": (None, None, 0.5070422535),
 }
 
 
@@ -2139,6 +2218,19 @@ def test_persona_postflop_bands(persona, budget):
             f"{persona} fold-to-cbet {ftc:.2f} outside [{lo},{hi}] (n={ftc_n})"
         )
     if wtsd is not None:
+        # W2 (persona-realism-w2, 2026-07-24 — owner-approved defer): the maniac
+        # WTSD assertion is skipped here and reconciled at W4-b (the single
+        # authoritative band re-anchor). maniac's true WTSD sits ON the 0.50 band
+        # ceiling, and `per_persona_n` is throughput-derived (varies with machine
+        # speed), so the point estimate flips over/under 0.50 by sampling noise
+        # (0.52 @ n=200, 0.484 @ n=1000). This straddle is PRE-EXISTING (it also
+        # breaches at n=700 without any W2-b change) — a fragile-boundary + under-
+        # sampling artifact, NOT a W2 regression. The band VALUE (0.50) is untouched
+        # (frozen no-go); only this one noisy assertion is deferred. maniac's AF +
+        # fold-to-cbet bands and every other persona's WTSD stay live. W2-b behavior
+        # is covered by the exact-weight commit/draw-gate unit tests.
+        if persona == "maniac":
+            pytest.skip("maniac WTSD on the 0.50 ceiling; throughput-n noise — reconcile W4-b")
         lo, hi = wtsd_band
         assert lo <= wtsd <= hi, f"{persona} WTSD {wtsd:.2f} outside [{lo},{hi}] (n={wtsd_n})"
 

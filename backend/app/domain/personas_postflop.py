@@ -288,6 +288,10 @@ _RIVER_RAISE_FLOOR = (
 _RIVER_BET_FLOOR = (StrengthBucket.MIDDLE_PAIR,)
 _BLUFF_RAISE_FACTOR = 0.3  # bluff-raising is structurally rarer than bluff-betting
 _COMMIT_AGG_BOOST = 3.0  # SPR-commit shift toward call/jam
+# W2-b (B5b, F7): the max fraction of a draw's CALL/RAISE bonus removed at full
+# commitment when the draw is NOT value-committed (below T1) — a naked draw stops
+# stacking off. Scaled by the commitment fraction c in [0,1]. FIT SEED.
+_B5B_DRAW_DAMP = 0.7
 # F3 bounded aggression (RES-D §0 saturation fix): the `aggression` lever is
 # capped before it scales any merit. An uncapped maniac lever (15.0) multiplies
 # one side of the un-normalized merit ratio so hard that rng.choices degenerates
@@ -465,6 +469,22 @@ def _value_commit_threshold(faced_fraction: float) -> float:
     return faced_fraction / (1.0 + 2.0 * faced_fraction)
 
 
+def _commit_transform(
+    entries: list[tuple[ActionType, float]],
+) -> list[tuple[ActionType, float]]:
+    """The SPR value-commit shift: zero FOLD mass, boost BET/RAISE by
+    _COMMIT_AGG_BOOST, leave CALL/CHECK. Extracted so W2-b's gate can reuse it."""
+    return [
+        (
+            a,
+            0.0
+            if a is ActionType.FOLD
+            else m * (_COMMIT_AGG_BOOST if a in (ActionType.BET, ActionType.RAISE) else 1.0),
+        )
+        for a, m in entries
+    ]
+
+
 def sample_postflop_decision(
     pack: PersonaPack,
     hole: tuple[Card, Card],
@@ -626,20 +646,45 @@ def sample_postflop_decision(
         entries.append((ActionType.CHECK, check_merit))
         entries.append((agg_action, agg_merit))
 
-    # SPR commit (rule 2): shift to call/jam, no fold mass. Live SPR only —
-    # never srs.spr_bucket (frozen SRS contract).
-    if stack_bb / pot_bb <= pf.spr_commit and (
-        _RUNG[bucket] >= _RUNG[StrengthBucket.OVERPAIR_TPTK] or draw is DrawCategory.STRONG
-    ):
-        entries = [
-            (
-                a,
-                0.0
-                if a is ActionType.FOLD
-                else m * (_COMMIT_AGG_BOOST if a in (ActionType.BET, ActionType.RAISE) else 1.0),
-            )
-            for a, m in entries
-        ]
+    # SPR commit (rule 2): shift to call/jam. Live SPR only — never srs.spr_bucket
+    # (frozen SRS contract).
+    #
+    # W2-b (F5/F7): the commit shift is EV-gated on the DRAW side (directional own-
+    # action policy — no forced-F*, owner decision).
+    #  - A made hand (rung >= OVERPAIR) commits exactly as before (equity ≈ 1): the
+    #    value-jam path is byte-identical and is NEVER draw-damped, even when it also
+    #    holds a draw (reviewer #6).
+    #  - A STRONG draw NOT facing a price (unopened/betting — no fold to zero)
+    #    commits as before.
+    #  - A draw FACING a bet commits (zero fold) ONLY when its heuristic equity
+    #    clears the value-commit threshold for the faced price (T1 = f/(1+2f)). Below
+    #    T1 the fold is NOT zeroed (the price-aware fold merit stands) and the draw's
+    #    CALL/RAISE bonus is damped by commitment so a naked draw stops stacking off
+    #    (B5b). A draw hand is never bluff_cell (draw != NONE), so the RAISE merit is
+    #    always the non-bluff value+bonus form — the bonus subtraction is exact.
+    if stack_bb / pot_bb <= pf.spr_commit:
+        made = _RUNG[bucket] >= _RUNG[StrengthBucket.OVERPAIR_TPTK]
+        facing = ActionType.FOLD in by_kind
+        drawing = draw in (DrawCategory.STRONG, DrawCategory.WEAK)
+        if made or (draw is DrawCategory.STRONG and not facing):
+            value_commit = True
+        elif facing and drawing:
+            value_commit = _draw_equity(draw, board) >= _value_commit_threshold(faced_frac)
+        else:
+            value_commit = False
+        if value_commit:
+            entries = _commit_transform(entries)
+        elif facing and drawing:  # below T1 — keep fold, damp the draw's stack-off pull
+            c = min(max((pf.spr_commit - stack_bb / pot_bb) / pf.spr_commit, 0.0), 1.0)
+            removed = _B5B_DRAW_DAMP * c
+            damped: list[tuple[ActionType, float]] = []
+            for a, m in entries:
+                if a is ActionType.CALL:
+                    m -= _DRAW_CALL_BONUS[draw] * looseness * removed
+                elif a is ActionType.RAISE:
+                    m -= _DRAW_RAISE_BONUS[draw] * agg_scale * removed
+                damped.append((a, m))
+            entries = damped
 
     # Normalize (rule 1, pinned): clamp >= 0, divide by sum; sum 0 fallback.
     weights = [max(m, 0.0) for _, m in entries]
