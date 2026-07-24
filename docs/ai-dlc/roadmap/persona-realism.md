@@ -214,7 +214,7 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
 
 ### W2 — persona identity + EV correctness
 
-- [ ] **W2-a — Elasticity split: `stickiness` → `call_looseness` + `size_elasticity` (C1, fixes F10).** *ICE 8·7·5 — the keystone identity fix.*
+- [x] **W2-a — Elasticity split: `stickiness` → `call_looseness` + `size_elasticity` (C1, fixes F10).** ✅ 2026-07-24 (PR pending) — *ICE 8·7·5 — the keystone identity fix.* Two optional levers, default-off byte-identical; opt-in `size_elasticity` uses a DIRECT exponent (0 = size-blind, fixing the `0**-DAMP` crash + direction reversal a naive rename caused — fan-in catch). Station `size_elasticity 0.0` (flat fold-curve), fish `1.3` (steep). Fixtures re-recorded (shared-table); bands frozen.
       **Problem:** one dial controls **both** how loose a persona calls **and** how much bet size scares it, so you
       can't make the **station inelastic-but-loose** (calls any size) while the **fish is elastic-but-scared**
       (fit-or-fold) — the one axis that *defines* their difference is welded shut.
@@ -229,7 +229,7 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
       do not re-fit bands mid-spine. **No-gos:** keep default-off byte-identity for un-split packs; no band edits
       pre-W4. **Appetite:** ~1 large slice.
 
-- [ ] **W2-b — Semi-bluff draw-jam gate + weak-draw equity gate (B5 + B5b, fixes F5 + F7).** *ICE 7·8·5 — coupled pair.*
+- [x] **W2-b — Semi-bluff draw-jam gate + weak-draw equity gate (B5 + B5b, fixes F5 + F7).** ✅ 2026-07-24 (PR pending) — *ICE 7·8·5 — coupled pair.* EV-gated commit shift: made hands value-jam byte-identical; a facing draw commits only when rule-of-4-and-2 equity clears the T1 threshold `f/(1+2f)` (STRONG folds to a 3×-pot overbet, jams pot-committed); naked WEAK draw stops stacking off (B5b damp). **Deviation (owner-approved, both reviewers):** the roadmap's "fold merit ≈ F\*" conflated the opponent's required-fold with the bot's own fold prob — replaced by a directional own-action policy (existing price-aware fold stands below T1). Rigorous F\* → Later. **maniac WTSD band assertion deferred to W4-b** (sits on the frozen 0.50 ceiling; throughput-n sampling noise, pre-existing).
       **Problem:** the SPR-commit path zeros fold merit and fires for naked air+draw (forced no-fold jam, F5); and the
       `_DRAW_CALL_BONUS` (0.20, ~2.5× the air base) makes bots chase weak draws too far (F7) — a fold-side brake alone
       can't overpower it.
@@ -388,6 +388,12 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
   (archetype stat table) needs recalibration. **Confidence: n/a** — a conditional trigger, not a planned build.
 - **Solver-boundary revisit for kicker/equity precision (N4/N5 ceiling).** **Confidence: low.** Assumption: whether
   "simplified-but-winning" heuristics suffice, or this is the trigger to revisit the no-solver line. EVs stay *approximate* either way.
+- **Rigorous semi-bluff F\* fold target (from W2-b).** W2-b shipped a *directional* below-T1 fold policy (existing price-
+  aware fold merit stands) after both reviewers flagged the roadmap's "fold merit ≈ F\*" as conflating the OPPONENT's
+  required-fold frequency with the BOT's own fold probability. A principled version would define the bot's own below-T1
+  fold target q from a justified model and set fold merit last as `q/(1-q)·Σ(nonfold merits)` (the closed form both
+  reviewers derived). **Confidence: low.** Assumption: whether the directional policy is realistic enough, or a
+  defensible q model is worth the machinery. Pairs with the draw-equity proxy calibration (H7).
 
 ---
 
