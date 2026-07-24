@@ -40,7 +40,9 @@ No matched-with-option position effect · no OOP defense/realization damp · no
 Domain purity · grading via the sampler unchanged · `spot_signature()` frozen · FE types
 untouched (`position_sensitivity` is content-only, no API shape change) · flop stays
 byte-identical for the STREET schedule (mult 1.0); W3-b (opted personas) and W3-d
-deliberately move flop one-pair betting.
+deliberately move one-pair betting. **W3-d scope note:** the overcard + wetness brakes
+apply on the FLOP, TURN, and RIVER alike (any street a MIDDLE_PAIR/TOP_PAIR is betting) —
+no flop-only guard. Prose elsewhere saying "flop one-pair betting" is illustrative.
 
 ## Fixtures re-recorded (slice-authorized; bands frozen to W4-b)
 - `_GOLDEN_STATS_N200`, `coverage_baseline.json`, limper `_PRE_M3_FIRES` — shared-rng
@@ -64,4 +66,18 @@ on the cheaper throughput-n. Band VALUES untouched (frozen). maniac WTSD stays d
 check .` clean. Both WTSD tests stable across repeated runs.
 
 ## Review dispositions
-_(folded from the refuter + Codex Sol fan-in — see the PR.)_
+Fan-in: Claude `refuter` + Codex Sol, both on the diff. Findings folded:
+- **`position_sensitivity` unbounded (both reviewers, med/P2a):** the schema allowed any
+  `s ≥ 0`, and the symmetric OOP multiplier `1 − 0.25·s` goes ≤ 0 at `s ≥ 4`, silently
+  zeroing OOP betting — the same uncapped-lever class as the F3 aggression cap. **Fixed:**
+  bounded `le=1.0` (the lever's documented domain) + `test_position_sensitivity_bounded_to_unit_interval`.
+- **"value never position-scaled" (Codex P1):** NOT a defect — W3-b's design (roadmap +
+  this spec) intentionally scales the WHOLE aggressive candidate incl. `_AGG_BASE`. The
+  "value never scaled" invariant is a **W3-c** (street) property, which holds. No change.
+- **W3-d street scope undersold (refuter, low):** doc said "flop one-pair betting"; the
+  brakes apply on all streets. **Fixed:** scope note added above.
+- **Coverage ratio dip / players-to-flop floor flake (both, low):** confirmed
+  pre-existing / mapper-orthogonal stream-mix, not W3 regressions. Coverage documented in
+  the fixture; the players-to-flop guard (a test-only regression smoke-detector on a fixed
+  lineup, no engine logic) left as-is per owner — noted for the future variable-lineup work.
+

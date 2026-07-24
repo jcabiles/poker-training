@@ -162,7 +162,9 @@ class PersonaPostflop(BaseModel):
     # symmetric multiplier on the WHOLE aggressive candidate (bluff + value +
     # semi-bluff) in the unopened/betting branch only — the OOP continue/defense
     # damp is a separate later slice. None → 0.0, keeping un-opted packs identical.
-    position_sensitivity: float | None = Field(default=None, ge=0.0)
+    # Bounded to [0, 1] so the symmetric OOP multiplier 1 − 0.25·s stays strictly
+    # positive — a larger s would drive it <= 0 and silently zero every OOP bet.
+    position_sensitivity: float | None = Field(default=None, ge=0.0, le=1.0)
     bluff_freq: float = Field(ge=0.0, le=1.0)  # baseline bet/raise rate with air
     sizing: dict[str, float]  # pot-fraction str -> weight; weights sum to ~1
     # R2: optional per-node override, keyed by postflop node name (e.g.

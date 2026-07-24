@@ -2597,3 +2597,15 @@ def test_overpair_and_set_still_bet_on_wet_boards():
     over = _br("tag", ("Ah", "Ad"), ["Kc", "8c", "3c"], street=Street.FLOP)
     setbet = _br("tag", ("7s", "7d"), ["7c", "Kc", "3c"], street=Street.FLOP)
     assert over > 0.5 and setbet > 0.5
+
+
+def test_position_sensitivity_bounded_to_unit_interval():
+    # The OOP multiplier 1 - 0.25*s must stay positive; the schema caps s at 1.0.
+    import pydantic
+
+    from app.domain.content.models import PersonaPostflop
+
+    base = _pack("tag").postflop.model_dump()
+    PersonaPostflop.model_validate({**base, "position_sensitivity": 1.0})  # ok
+    with pytest.raises(pydantic.ValidationError):
+        PersonaPostflop.model_validate({**base, "position_sensitivity": 1.5})
