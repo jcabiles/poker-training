@@ -896,6 +896,28 @@ def _dist_for_pack(pack, hole, board, legal, pot, stack, opponents=1, current_be
     return cap.dist
 
 
+# W2-b — pure EV helpers (T6; unused by the sampler until T7).
+def test_value_commit_threshold():
+    tc = personas_postflop._value_commit_threshold
+    assert tc(1.0) == pytest.approx(1.0 / 3.0)  # pot-size bet
+    assert tc(3.0) == pytest.approx(3.0 / 7.0)  # 3×-pot overbet ≈ 0.429
+    assert tc(0.5) == pytest.approx(0.5 / 2.0)  # half-pot → 0.25
+    # monotone increasing in faced size
+    assert tc(0.5) < tc(1.0) < tc(3.0)
+
+
+def test_draw_equity_proxy():
+    de = personas_postflop._draw_equity
+    DrawCategory = personas_postflop.DrawCategory
+    flop, turn, river = ["Ac", "9s", "3h"], ["Ac", "9s", "3h", "2d"], ["Ac", "9s", "3h", "2d", "7c"]
+    assert de(DrawCategory.STRONG, flop) == pytest.approx(0.36)
+    assert de(DrawCategory.STRONG, turn) == pytest.approx(0.18)
+    assert de(DrawCategory.WEAK, flop) == pytest.approx(0.16)
+    assert de(DrawCategory.WEAK, turn) == pytest.approx(0.08)
+    assert de(DrawCategory.NONE, flop) == 0.0
+    assert de(DrawCategory.STRONG, river) == 0.0  # no cards to come
+
+
 # W2-a — elasticity split (call_looseness + size_elasticity).
 def test_elasticity_split_faithful_decomposition_byte_identical():
     """The split is a faithful DECOMPOSITION, not a behavior change: a pack opted

@@ -438,6 +438,33 @@ def _price_exponent(pf: PersonaPostflop) -> float:
     return _PRICE_SENSITIVITY * pf.size_elasticity
 
 
+def _draw_equity(draw: DrawCategory, board: list[Card]) -> float:
+    """W2-b heuristic draw equity — rule-of-4-and-2, NO solve (interim EV; label
+    approximate). Street is derived from `len(board)` so this never depends on the
+    optional `street` kwarg being passed: flop (3 cards, 2 to come) uses ×4, turn
+    (4 cards, 1 to come) uses ×2. STRONG ≈ 9 outs (flush/OESD), WEAK ≈ 4 outs
+    (gutshot/backdoor). River (5 cards) or NONE → 0.0 (no draw equity; the made-
+    hand path governs the river). Calibration is a Later item (H7)."""
+    outs = {DrawCategory.STRONG: 9.0, DrawCategory.WEAK: 4.0}.get(draw, 0.0)
+    if outs == 0.0:
+        return 0.0
+    cards_to_come = 5 - len(board)
+    if cards_to_come >= 2:
+        return outs * 4.0 / 100.0  # STRONG 0.36 / WEAK 0.16
+    if cards_to_come == 1:
+        return outs * 2.0 / 100.0  # STRONG 0.18 / WEAK 0.08
+    return 0.0
+
+
+def _value_commit_threshold(faced_fraction: float) -> float:
+    """W2-b value-commit (T1) threshold: the equity at which calling/jamming all-in
+    is +EV, e ≥ B/(P+2B). Expressed via the faced pot-fraction f = B/P (the already
+    pre-aggression-corrected `faced_frac`): B/(P+2B) = f/(1+2f). f=1 (pot) → 1/3;
+    f=3 (3×-pot overbet) → 3/7 = 0.429. A heuristic CALL-commit price proxy for the
+    stack-off, NOT a full jam-EV solve (reviewer #3)."""
+    return faced_fraction / (1.0 + 2.0 * faced_fraction)
+
+
 def sample_postflop_decision(
     pack: PersonaPack,
     hole: tuple[Card, Card],
