@@ -8,6 +8,7 @@
   "postflop": {
     "aggression": 2.4,
     "stickiness": 0.6,
+    "position_sensitivity": 1.0,
     "bluff_freq": 0.22,
     "sizing": { "0.33": 0.25, "0.5": 0.35, "0.75": 0.3, "1.0": 0.1 },
     "sizing_by_node": {

@@ -256,7 +256,7 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
       selection (A3), busted-draw survives the river reset (A4); all existing suites byte-identical (no consumers yet).
       **No-gos:** thread just-ahead of consumers, not big-bang; domain purity. **Appetite:** ~1 slice.
 
-- [ ] **W3-b — Position mechanic IP/OOP (B1, fixes F1).** *ICE 7·6·5 — GROUNDED direction, DIRECTIONAL magnitude.*
+- [x] **W3-b — Position mechanic IP/OOP (B1, fixes F1).** *ICE 7·6·5 — GROUNDED direction, DIRECTIONAL magnitude.* ✅ 2026-07-24 (PR pending, PR 2 of the W3 seam) — `position_sensitivity` lever (tag/nit 1.0, lag 0.6; station/fish/maniac blind) × `_position_agg_mult` on the aggressor-side BET candidate; CBet_IP > CBet_OOP for disciplined types; un-opted callers byte-identical.
       **Problem:** bots play IP and OOP identically.
       **Solution:** an IP/OOP multiplier on the WHOLE aggressive candidate (bluff_mass + `_AGG_BASE` + draw-agg bonus,
       not just `_AGG_BASE`) + an optional per-persona `position_sensitivity` lever (station/fish ≈ 0 = stay
@@ -267,7 +267,7 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
       **No-gos:** aggressor-side c-bet/barrel frequency ONLY (the OOP continue-realization damp is Later — don't smuggle
       it in). **Appetite:** ~1 large slice.
 
-- [ ] **W3-c — Street-conditional aggression schedule + busted-draw river bluff (B6 + B7, fixes F4/F19/F8).** *ICE 7·7·4 — GROUNDED shape, turn LEVEL fit.*
+- [x] **W3-c — Street-conditional aggression schedule + busted-draw river bluff (B6 + B7, fixes F4/F19/F8).** *ICE 7·7·4 — GROUNDED shape, turn LEVEL fit.* ✅ 2026-07-24 (PR pending, PR 2 of the W3 seam) — `_STREET_AGG_MULT` (flop 1.0 byte-identical → turn 0.6 → river 0.33) on bluff/semi-bluff ONLY; WEAK semi-bluff → 0 by river (F19); busted-draw river bluff via `bet_prev_street`+`busted_draw` (STRAIGHT>FLUSH). Turn no longer byte-identical to flop; give-up line exists.
       **Problem:** aggression is street-neutral (turn == flop byte-identical); `bluff_mass` doesn't decay; busted draws
       lose their identity at the river and can't tell a coherent story.
       **Solution:** a `street_agg_mult` on the BLUFF/semi-bluff merit ONLY (value unchanged): flop 1.0 (byte-identical
@@ -281,7 +281,7 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
       fixed persona/bucket; a give-up line exists (checks back / folds air it would have barrelled); turn-barrel bands
       land in archetype ranges (D6). **No-gos:** heuristic only (no equity solve). **Appetite:** ~1 large slice.
 
-- [ ] **W3-d — Made-hand vulnerability + texture brakes (B2 + B3, fixes F3-overcard-side + F20).** *ICE 7·6·4 — GROUNDED direction, magnitudes fit.*
+- [x] **W3-d — Made-hand vulnerability + texture brakes (B2 + B3, fixes F3-overcard-side + F20).** *ICE 7·6·4 — GROUNDED direction, magnitudes fit.* ✅ 2026-07-24 (PR pending, PR 2 of the W3 seam) — `_overcard_bet_damp` (0→1.0/1→0.75/2+→0.5) + `_wetness_bet_mult` (dry 1.0 → two-tone 0.85 → connected 0.70 → monotone 0.55) on MIDDLE_PAIR/TOP_PAIR BET only; OVERPAIR_TPTK + sets untouched; composes multiplicatively with B1 + multiway.
       **Problem:** a vulnerable made hand doesn't slow down when overcards fall (F3); board texture affects only SIZING,
       never whether-to-bet (F20).
       **Solution:** (B2) on MIDDLE_PAIR / TOP_PAIR ONLY (NOT OVERPAIR_TPTK — it bundles overpairs), damp the bet merit by

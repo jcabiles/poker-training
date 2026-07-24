@@ -17,7 +17,6 @@ from __future__ import annotations
 from enum import IntEnum
 from typing import TYPE_CHECKING, NamedTuple
 
-from app.domain.personas_postflop import DrawCategory, StrengthBucket, strength_bucket
 from app.domain.spot import ActionType, Card, HistoryAction, PlayerStatus, Position, Street
 
 if TYPE_CHECKING:
@@ -126,6 +125,11 @@ def busted_draw_kind(hole: tuple[Card, Card], board: list[Card]) -> BustedDraw:
     busted-air bluff candidate). Type: FLUSH if the turn draw had a flush
     component (its missed suit is visible on board), else STRAIGHT.
     """
+    # Lazy import breaks the personas_postflop <-> postflop_context cycle: the
+    # sampler imports PostflopContext/BustedDraw at module load (W3-b reads them),
+    # so this module must not import personas_postflop at top level.
+    from app.domain.personas_postflop import DrawCategory, StrengthBucket, strength_bucket
+
     if len(board) != 5:  # a busted draw is a river concept — complete board only
         return BustedDraw.NONE
     made, _ = strength_bucket(hole, board)
