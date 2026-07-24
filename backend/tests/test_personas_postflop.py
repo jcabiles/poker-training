@@ -816,6 +816,47 @@ def _exact_dist(persona: str, hole, board, legal, pot, stack, current_bet_to=0.0
     return cap.dist
 
 
+def _dist_for_pack(pack, hole, board, legal, pot, stack, opponents=1, current_bet_to=0.0):
+    """Like `_exact_dist` but for an already-built (possibly lever-modified) pack."""
+    cap = _CaptureWeights()
+    sample_postflop_decision(
+        pack, hole, board, legal, pot, stack, opponents, cap, current_bet_to=current_bet_to
+    )
+    return cap.dist
+
+
+# W2-a — elasticity split (call_looseness + size_elasticity).
+def test_elasticity_split_faithful_decomposition_byte_identical():
+    """The split is a faithful DECOMPOSITION, not a behavior change: a pack opted
+    into the new levers at their fallback-equivalent values samples a BYTE-IDENTICAL
+    normalized distribution vs the unset pack. call_looseness = stickiness reproduces
+    the flat call scaling; size_elasticity = stickiness**(-DAMP) makes the DIRECT
+    exponent (SENS * elasticity) equal the legacy inverse exponent (SENS * s**-DAMP)."""
+    base = _pack("passive_fish")
+    s = base.postflop.stickiness
+    equiv_elasticity = s ** (-personas_postflop._PRICE_STICKINESS_DAMP)
+    opted = base.model_copy(deep=True)
+    opted.postflop = base.postflop.model_copy(
+        update={"call_looseness": s, "size_elasticity": equiv_elasticity}
+    )
+    hole, board = ("9h", "8h"), ["Ac", "7s", "2h"]  # a hand facing a bet (fold+call live)
+    legal = [personas_postflop_legal_fold(), personas_postflop_legal_call(3.0)]
+    base_dist = _dist_for_pack(base, hole, board, legal, 6.0, 100.0)
+    opted_dist = _dist_for_pack(opted, hole, board, legal, 6.0, 100.0)
+    assert base_dist == opted_dist
+
+
+def test_size_elasticity_zero_is_size_flat():
+    """The station's size-blind config: size_elasticity = 0.0 must NOT raise
+    (the naive stickiness**(-DAMP) rename would do 0**-0.15 → ZeroDivisionError)
+    and must produce a price factor FLAT across every size bucket."""
+    pf_zero = _pack("calling_station").postflop.model_copy(update={"size_elasticity": 0.0})
+    exp = personas_postflop._price_exponent(pf_zero)  # must not raise
+    assert exp == 0.0
+    factors = [personas_postflop._price_factor(frac, exp) for frac in (0.3, 0.55, 0.9, 1.5)]
+    assert all(abs(f - factors[0]) < 1e-12 for f in factors)  # SMALL..OVERBET flat
+
+
 # Pinned representative spot: top pair weak kicker (Ah2d on Ac9s3h, no draw),
 # unopened flop, SPR well above commit — the paradigmatic saturation symptom
 # (a one-pair hand every persona MIXES bet/check with; pre-fix the maniac

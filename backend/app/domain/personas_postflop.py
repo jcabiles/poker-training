@@ -19,7 +19,7 @@ import random
 from enum import StrEnum
 
 from app.domain.action import Decision
-from app.domain.content.models import PersonaPack
+from app.domain.content.models import PersonaPack, PersonaPostflop
 from app.domain.equity import _RIDX, _eval5
 from app.domain.spot import ActionType, Card, LegalAction, Street
 from app.domain.table.sizing import postflop_node_key, pot_fraction_to_bb
@@ -327,10 +327,13 @@ _ALPHA_REF = _BUCKET_ALPHA[SizeBucket.MEDIUM]
 #   over-folded the α ceiling at every size (a tag folded ~0.39 to a ⅓-pot bet
 #   vs α 0.25); 0.35 re-levels the whole curve under the ceiling.
 # - SENSITIVITY: exponent on the α ratio — how fast fold merit grows with size.
-# - STICKINESS_DAMP: the `stickiness` lever wiring — the effective exponent is
-#   SENSITIVITY * stickiness**(-DAMP), so stickier personas (station 1.8,
+# - STICKINESS_DAMP: the LEGACY `stickiness` price wiring, used ONLY when a pack
+#   has not opted into W2-a (`size_elasticity is None`) — the effective exponent
+#   is SENSITIVITY * stickiness**(-DAMP), so stickier personas (station 1.8,
 #   fish 1.4) respond LESS to price than the disciplined low-stickiness ones
-#   (nit/tag 0.6), on top of stickiness's existing call-merit scaling.
+#   (nit/tag 0.6). W2-a splits this: an explicit `size_elasticity` bypasses this
+#   branch for a DIRECT exponent (see `_price_exponent`), and the flat call-merit
+#   scaling moves to the separate `call_looseness` lever.
 _PRICE_LEVEL = 0.35
 _PRICE_SENSITIVITY = 2.2
 _PRICE_STICKINESS_DAMP = 0.15
@@ -406,13 +409,33 @@ def _sizing_dist(pf, board: list[Card], legal: list[LegalAction], is_aggressor: 
     return pf.sizing
 
 
-def _price_factor(faced_fraction: float, stickiness: float) -> float:
+def _price_factor(faced_fraction: float, exponent: float) -> float:
     """Multiplier on the fold merit for a faced bet at `faced_fraction` of the
-    pot: LEVEL * (α_bucket/α_ref) ** (SENSITIVITY * stickiness**-DAMP).
-    Monotone non-decreasing across SMALL→OVERBET because _BUCKET_ALPHA is."""
+    pot: LEVEL * (α_bucket/α_ref) ** exponent. Monotone non-decreasing across
+    SMALL→OVERBET because _BUCKET_ALPHA is (for any exponent >= 0). The exponent
+    is resolved by `_price_exponent` (W2-a)."""
     alpha = _BUCKET_ALPHA[size_bucket(faced_fraction)]
-    exponent = _PRICE_SENSITIVITY * stickiness ** (-_PRICE_STICKINESS_DAMP)
     return _PRICE_LEVEL * (alpha / _ALPHA_REF) ** exponent
+
+
+def _price_exponent(pf: PersonaPostflop) -> float:
+    """W2-a: the price-response exponent, driven by `size_elasticity`.
+
+    Two branches to preserve default-off byte-identity WHILE fixing the crash +
+    direction reversal a naive rename would cause:
+    - `size_elasticity is None` (un-opted-in) → the LEGACY inverse formula
+      `SENSITIVITY * stickiness**(-DAMP)`: stickier personas (station 1.8, fish
+      1.4) respond LESS to price than the disciplined low-stickiness ones
+      (nit/tag 0.6). Byte-identical to pre-W2.
+    - `size_elasticity` set → a DIRECT exponent `SENSITIVITY * size_elasticity`.
+      This is a DIFFERENT scale from stickiness, chosen so 0.0 is size-blind
+      (exponent 0 → flat factor, no `0**-DAMP` ZeroDivisionError) and larger
+      values are STEEPER (scared) — the intuitive direction. ~1.0 reproduces a
+      normal price response (exponent ≈ 2.2).
+    """
+    if pf.size_elasticity is None:
+        return _PRICE_SENSITIVITY * pf.stickiness ** (-_PRICE_STICKINESS_DAMP)
+    return _PRICE_SENSITIVITY * pf.size_elasticity
 
 
 def sample_postflop_decision(
@@ -460,6 +483,10 @@ def sample_postflop_decision(
     pf = pack.postflop
     if pf is None:
         raise ValueError(f"persona pack {pack.id!r} has no postflop block")
+    # W2-a: the two split identity levers, each falling back to `stickiness` when
+    # the pack hasn't opted in (default-off byte-identity). `looseness` scales the
+    # flat CALL merit; the price-response exponent is resolved by `_price_exponent`.
+    looseness = pf.call_looseness if pf.call_looseness is not None else pf.stickiness
     bucket, draw = strength_bucket(hole, board)
     by_kind = {la.action: la for la in legal}
 
@@ -519,7 +546,7 @@ def sample_postflop_decision(
             faced_frac = to_call_bb / max(pot_bb - max(current_bet_to, to_call_bb), 0.01)
         else:
             faced_frac = to_call_bb / max(pot_bb - latest_aggressor_contribution_bb, 0.01)
-        fold_merit = _FOLD_BASE[bucket] * _price_factor(faced_frac, pf.stickiness)
+        fold_merit = _FOLD_BASE[bucket] * _price_factor(faced_frac, _price_exponent(pf))
         # F4 (RES-D §6): bluff-catch-class buckets fold MORE per added
         # opponent — direction only, see _MW_CATCH_TIGHTEN above.
         if bucket in _MW_CATCH_BUCKETS:
@@ -528,7 +555,7 @@ def sample_postflop_decision(
         # River polarization (see _RIVER_RAISE_FLOOR): air never bluff-CALLS
         # the river — it folds or bluff-raises. Flooring happens BEFORE the
         # SPR-commit block so a floored 0 survives the commit boost.
-        call_merit = (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * pf.stickiness
+        call_merit = (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * looseness
         if bluff_cell and street is Street.RIVER:
             call_merit = 0.0
         entries.append((ActionType.CALL, call_merit))
