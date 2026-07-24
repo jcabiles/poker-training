@@ -41,6 +41,13 @@ stream drifts again → total 1196 → 1259, graded 363 → 371 (ratio 30.4% →
 still well above the immutable persona-realism-start floor of 28.3% — held).
 W1-b required no coverage re-record (its faced_frac fix hit no divergent spot in
 this deterministic sweep).
+
+RE-RECORDED for W2-a (persona-realism-w2, 2026-07-24 — slice-authorized): the
+calling_station (size_elasticity 0.0) and passive_fish (size_elasticity 1.3) opt
+into the elasticity split, changing their faced-size fold decisions in the seeded
+lineup → the shared-rng hand stream drifts → total 1259 → 1270, graded 371 → 365
+(ratio 29.5% → 28.7%, still above the immutable persona-realism-start floor of
+28.3% — held). Seeded-fixture re-record; population bands stay frozen to W4-b.
 """
 
 from __future__ import annotations

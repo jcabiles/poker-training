@@ -224,6 +224,28 @@ def test_monotonicity_call_looseness_never_lowers_call_freq():
     assert call_freq(high) >= call_freq(base) - 1e-9
 
 
+def test_station_size_blind_fish_size_scared_content():
+    # W2-a T4 pass/fail on the AUTHORED packs: the station (size_elasticity 0.0)
+    # folds at a FLAT rate across SMALL→OVERBET (calls any size); the fish
+    # (size_elasticity 1.3) folds much more to a big size (fit-or-fold). Exact
+    # normalized fold probability; middle pair facing a bet, SPR well above commit.
+    hole, board = ("9h", "2d"), ["Ac", "9s", "3h"]
+
+    def fold_at(pack, to_call, pot, cbt):
+        return _dist_for_pack(
+            pack, hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(to_call)],
+            pot, 100.0, current_bet_to=cbt,
+        )[ActionType.FOLD]
+
+    station, fish = _pack("calling_station"), _pack("passive_fish")
+    # SMALL: faced_frac 3/9 = 0.33; OVERBET: 9/6 = 1.5.
+    st_small, st_over = fold_at(station, 3.0, 12.0, 3.0), fold_at(station, 9.0, 15.0, 9.0)
+    fi_small, fi_over = fold_at(fish, 3.0, 12.0, 3.0), fold_at(fish, 9.0, 15.0, 9.0)
+    assert abs(st_over - st_small) < 1e-9  # station: flat (size-blind)
+    assert fi_over - fi_small > 0.15  # fish: steep fold-rise with size
+
+
 def test_size_elasticity_steeper_fold_vs_bigger_size():
     # W2-a: higher size_elasticity ⇒ a STEEPER fold-rate rise from a SMALL faced
     # size to an OVERBET (the fish-vs-station identity axis). Exact normalized
@@ -480,11 +502,25 @@ def test_fold_to_bet_monotone_in_faced_size(persona, fold_by_size):
     facing ⅓-pot folds MEASURABLY less than the same bot facing pot-size."""
     r = fold_by_size[persona]
     seq = [r[f] for f in PRICE_FRACS]
-    assert seq == sorted(seq), f"{persona} fold-to-bet not monotone in size: {seq}"
-    assert r[1.0] - r[0.33] >= 0.10, (
-        f"{persona} pot-size fold {r[1.0]:.3f} not measurably above "
-        f"⅓-pot fold {r[0.33]:.3f}"
-    )
+    if persona == "calling_station":
+        # W2-a: the station is size-blind BY DESIGN (size_elasticity 0.0) — its
+        # per-spot fold probability is FLAT across sizes (see the exact-weight unit
+        # test test_station_size_blind_*). Here the rate is sampled over 500 random
+        # spots with per-cell seeds, so it wiggles within NOISE (~±0.03) and is not
+        # strictly monotone — the invariant is "no PRICE RESPONSE", i.e. the
+        # SMALL→OVERBET swing stays well under the 0.10 measurable-rise bar the
+        # other personas must clear. The flat curve IS the price-blind leak this
+        # persona intentionally keeps (calls any size).
+        assert abs(r[1.0] - r[0.33]) < 0.05, (
+            f"station should be size-blind (flat within noise), got "
+            f"{r[1.0]:.3f} vs {r[0.33]:.3f}"
+        )
+    else:
+        assert seq == sorted(seq), f"{persona} fold-to-bet not monotone in size: {seq}"
+        assert r[1.0] - r[0.33] >= 0.10, (
+            f"{persona} pot-size fold {r[1.0]:.3f} not measurably above "
+            f"⅓-pot fold {r[0.33]:.3f}"
+        )
 
 
 @pytest.mark.parametrize("persona", [p for p in ALL_PERSONAS if p != "nit"])
@@ -867,7 +903,7 @@ def test_elasticity_split_faithful_decomposition_byte_identical():
     normalized distribution vs the unset pack. call_looseness = stickiness reproduces
     the flat call scaling; size_elasticity = stickiness**(-DAMP) makes the DIRECT
     exponent (SENS * elasticity) equal the legacy inverse exponent (SENS * s**-DAMP)."""
-    base = _pack("passive_fish")
+    base = _pack("tag")  # an UNSET persona (station/fish now opt into the levers)
     s = base.postflop.stickiness
     equiv_elasticity = s ** (-personas_postflop._PRICE_STICKINESS_DAMP)
     opted = base.model_copy(deep=True)
@@ -2004,13 +2040,23 @@ def _persona_stats_ext(packs, persona: str, n: int) -> ExtStats:
 # field grows -> multiway spots in the harness shift AF/FtC/WTSD again. These are
 # the post-W1-c exact goldens (post-W1-b golden was byte-identical to W1-a — the
 # faced_frac fix is inert in this harness wrapper).
+# RE-RECORDED for W2-a (persona-realism-w2, 2026-07-24 — slice-authorized): the
+# calling_station (size_elasticity 0.0, size-blind) and passive_fish
+# (size_elasticity 1.3, size-scared) opt into the elasticity split, changing
+# their faced-size fold decisions. This is a SHARED-TABLE sim — all six personas
+# play one lineup on one rng stream — so EVERY persona's aggregate stats move
+# (the un-opted-in nit/tag/lag/maniac shift via environment + rng-stream
+# displacement, NOT a policy change). Proven code-innocent: stripping the two new
+# content levers reproduces the pre-W2 golden BYTE-FOR-BYTE (the reviewer-#8 guard,
+# adapted to a shared-table fixture — a per-persona-row diff is meaningless when
+# rows are coupled). Exact tripwire re-record; population bands stay frozen to W4-b.
 _GOLDEN_STATS_N200 = {
-    "calling_station": (0.4411764706, 0.1641791045, 0.6172413793),
-    "lag": (3.3404255319, None, 0.6330275229),
-    "maniac": (3.4915254237, 0.5217391304, 0.4719101124),
-    "nit": (None, None, 0.5882352941),
-    "passive_fish": (0.5156950673, 0.3414634146, 0.6396396396),
-    "tag": (2.4210526316, None, 0.5974025974),
+    "calling_station": (0.4253246753, 0.2615384615, 0.6068965517),
+    "lag": (2.8936170213, None, 0.4594594595),
+    "maniac": (3.1282051282, 0.4339622642, 0.4752475248),
+    "nit": (0.90625, None, 0.5961538462),
+    "passive_fish": (0.6038647343, 0.2682926829, 0.6061946903),
+    "tag": (2.7435897436, None, 0.6),
 }
 
 

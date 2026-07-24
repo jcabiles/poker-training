@@ -73,10 +73,16 @@ _WANT_BB = {("BB", 1), ("BB", 2), ("BB", 3)}
 # multiway made-value BET damp (F13) changes bot postflop betting, displacing the
 # stream again (old post-W1-b counts: UTG2¹ 96, LJ¹ 132, HJ¹ 154, CO¹ 145, CO²
 # 33, SB¹ 101, SB² 53, BTN¹ 124, BTN² 50). Every _WANT_* shape still fires.
+# RE-PINNED for W2-a (persona-realism-w2, 2026-07-24 — slice-authorized): the
+# calling_station/passive_fish elasticity split (size_elasticity) changes their
+# faced-size fold decisions in the shared lineup, displacing the shared-rng stream
+# again (old post-W1-c counts: UTG2¹ 86, LJ¹ 117, HJ¹ 139, CO¹ 128, CO² 45, SB¹
+# 119, SB² 51, BTN¹ 127, BTN² 43). No preflop content changed; every _WANT_* shape
+# still fires (verified) — stream displacement only.
 _PRE_M3_FIRES = {
-    ("UTG2", 1): 86, ("LJ", 1): 117, ("HJ", 1): 139, ("CO", 1): 128,
-    ("CO", 2): 45, ("SB", 1): 119, ("SB", 2): 51, ("BTN", 1): 127,
-    ("BTN", 2): 43,
+    ("UTG2", 1): 91, ("LJ", 1): 122, ("HJ", 1): 140, ("CO", 1): 113,
+    ("CO", 2): 43, ("SB", 1): 111, ("SB", 2): 45, ("BTN", 1): 134,
+    ("BTN", 2): 40,
 }
 
 
