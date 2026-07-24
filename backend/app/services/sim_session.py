@@ -1259,19 +1259,24 @@ def reveal(
     scope: str,
     owner_id: str = "",
 ) -> RevealView:
-    """On-demand reveal of the just-completed hand's villain cards after a hero
-    fold (R1). Sourced from the completed hand's `state_json` (all 9 seats' hole
-    cards); the hero is always excluded (hero folded, hero cards already ship on
-    `Hero`). Reveal buttons fire BEFORE `deal_next_hand` advances `hand_no`, so
-    the session's current hand IS the just-completed one.
+    """On-demand reveal of the just-completed hand's villain cards (R1). Sourced
+    from the completed hand's `state_json` (all 9 seats' hole cards); the hero is
+    always excluded (hero cards already ship on `Hero`). Reveal buttons fire
+    BEFORE `deal_next_hand` advances `hand_no`, so the session's current hand IS
+    the just-completed one.
+
+    Originally hero-fold-only; now available on ANY completed hand (debug
+    range-inspection toggle, FE-gated, default off) so the hero can inspect what
+    the bots were actually holding — including seats a genuine showdown never
+    compared. Reveal is additive: it never mutates the wire `showdown`, so the
+    normal privacy invariant on `_view` is untouched.
 
     available=false (200 body, no seats) when: the reveal capability is off, the
-    scope is unknown, no completed hand exists, or the hero did NOT fold this
-    hand (a genuine showdown auto-reveals via `_view`, so there is nothing to
-    reveal here). 404 stays reserved for SessionNotFound.
+    scope is unknown, or no completed hand exists. 404 stays reserved for
+    SessionNotFound.
 
     scope 'last-in' = non-hero seats still IN/ALLIN at hand end (the lone winner
-    on a fold-out, or the villain-vs-villain showdown participants);
+    on a fold-out, or the showdown participants);
     'all' = every non-hero seat dealt into the hand.
     """
     session = _get_session(db, session_id, owner_id)
@@ -1283,9 +1288,6 @@ def reveal(
     if hand is None or hand.state_json is None or hand.status != "complete":
         return RevealView(available=False, scope=scope)
     state = HandState.model_validate_json(hand.state_json)
-    if state.seats[HERO_SEAT].status is not PlayerStatus.FOLDED:
-        # Hero reached showdown / won — auto-reveal already handled it.
-        return RevealView(available=False, scope=scope)
     seats = [
         RevealedSeatView(seat_index=i, hole_cards=eng.hole_cards)
         for i, eng in enumerate(state.seats)

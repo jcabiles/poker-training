@@ -11,11 +11,12 @@ import Card from "../Card";
 // folded to one seat), `showdown` is empty and we show the fold-out line
 // instead. Position labels come from the seat roster.
 //
-// R1: when the HERO folded and the remaining villains did not reach showdown,
-// they stayed face-down. Two buttons let the hero reveal them on demand —
+// R1: two buttons let the hero reveal the just-played villain cards on demand —
 // "Reveal Last-In" (seats still live at hand end) and "Reveal All" (every dealt
-// seat). If villains did reach showdown, their compared cards arrive through
-// `showdown` and auto-reveal like any other public showdown.
+// seat). Cards that reached a genuine showdown also arrive through `showdown`
+// and auto-reveal. The buttons are gated on the `debugReveal` toggle (default
+// off) — a range-inspection aid — and, when on, appear after EVERY hand,
+// including hands the hero played to showdown.
 
 function fmtDelta(delta: number): string {
   const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
@@ -26,21 +27,24 @@ export default function SimShowdown({
   showdown,
   seats,
   heroFolded,
+  debugReveal,
   revealScope,
   onReveal,
 }: {
   showdown: ShowdownSeatView[];
   seats: SeatView[];
-  // R1: true only when the hero folded this hand — the sole case where villains
-  // stayed face-down and there is anything to reveal. Otherwise the buttons are
-  // hidden (a genuine showdown already auto-revealed).
+  // True when the hero folded this hand — drives only the empty-showdown copy.
   heroFolded: boolean;
+  // Debug range-inspection toggle. When on, the reveal buttons are offered after
+  // every hand regardless of hero fold / showdown; when off (default) they are
+  // hidden and the face-down range-reading drill is preserved.
+  debugReveal: boolean;
   // Which reveal scope is currently active (drives the pressed state), or null.
   revealScope: "last-in" | "all" | null;
   onReveal: (scope: "last-in" | "all") => void;
 }) {
   const posBySeat = new Map<number, string>(seats.map((s) => [s.seat_index, s.position]));
-  const canManualReveal = heroFolded && showdown.length === 0;
+  const canManualReveal = debugReveal;
 
   return (
     <section className="sim-showdown panel" aria-label="Hand result">
@@ -69,7 +73,9 @@ export default function SimShowdown({
       ) : (
         <p className="sim-showdown-fold">
           {heroFolded
-            ? "No showdown — you folded. Reveal the villains below."
+            ? debugReveal
+              ? "No showdown — you folded. Reveal the villains below."
+              : "No showdown — you folded."
             : "The pot was taken down before showdown — no cards revealed."}
         </p>
       )}
