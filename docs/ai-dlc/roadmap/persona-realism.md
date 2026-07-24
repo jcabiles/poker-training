@@ -176,7 +176,10 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
 
 ### W1 — low-risk wins (small, contained, some infra already present)
 
-- [ ] **W1-a — River one-pair BET floor, MIDDLE_PAIR only (B8, fixes F6).** *ICE 7·8·7 — small; re-anchors bands.*
+- [x] **W1-a — River one-pair BET floor, MIDDLE_PAIR only (B8, fixes F6).** ✅ 2026-07-24 (feat/persona-realism-w1).
+      `_RIVER_BET_FLOOR=(MIDDLE_PAIR,)`; the named byte-identity test split (theory H1); slice-authorized
+      seeded-fixture re-records (golden AF/WTSD, coverage 30.4%, limper belt) — tolerance BANDS stay frozen to W4-b.
+      *ICE 7·8·7 — small; re-anchors bands.*
       **Problem:** P2a floored the river *raise* but the unopened river **BET** for a middle pair (a bluff-catcher,
       never a value bet) is still not floored.
       **Solution:** `_RIVER_BET_FLOOR = (MIDDLE_PAIR,)` — floor the unopened river BET for MIDDLE_PAIR ONLY; strictly
@@ -187,7 +190,12 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
       unit-assertion split ONLY — re-anchoring here would re-fit bands that W2/W3 then move again). **No-gos:** don't
       touch the raise-floor P2a set; MIDDLE_PAIR only; no band edits pre-W4. **Appetite:** ~1 small slice.
 
-- [ ] **W1-b — faced_frac increment fix + backwards comment (B9, fixes F9).** *ICE 7·9·8 — small, genuinely low-risk.*
+- [x] **W1-b — faced_frac increment fix + backwards comment (B9, fixes F9).** ✅ 2026-07-24 (feat/persona-realism-w1).
+      ENGINE-ONLY (Codex #1: the estimator builds CALL min_bb=None → numerator 0 → the denominator fix is inert
+      there, so NO `_Ctx`/estimator change was needed). play.py threads the W0-a increment; comment direction fixed
+      (OVERSTATES); self-re-raise + back-raise + fresh-identity + wiring tests. **Follow-up spun out → Later:
+      the estimator is faced-price-BLIND (numerator 0) — a pre-existing approximation; giving it a real to_call is a
+      separate, higher-blast-radius slice.** *ICE 7·9·8 — small, genuinely low-risk.*
       **Problem:** on same-street re-raises the faced-price denominator uses the whole bet-to instead of the latest
       aggressor's increment → over-states price → over-folds; the in-code comment documents this backwards.
       **Solution:** use the A1 latest-aggressor increment as the same-street re-raise denominator; fix the comment.
@@ -195,7 +203,9 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
       only); a NEW self-re-raise test proves bots over-fold slightly less to 3-bet wars. **No-gos:** don't change
       fresh-raiser behavior. **Appetite:** ~1 small slice.
 
-- [ ] **W1-c — Multiway made-value tightening (B10, fixes F13).** *ICE 6·7·8 — small, directional.*
+- [x] **W1-c — Multiway made-value tightening (B10, fixes F13).** ✅ 2026-07-24 (feat/persona-realism-w1).
+      `_MW_VALUE_DAMP=0.8` (unfit directional seed) on TOP_PAIR/MIDDLE_PAIR unopened BET only, capped at the 4-way
+      tier; HU byte-identical; monotone+plateau test via exact captured weights. *ICE 6·7·8 — small, directional.*
       **Problem:** value-betting is opponent-count-blind — made hands barely tighten as more players see the flop.
       **Solution:** a geometric damp `~0.8**(opp−1)` (FIT SEED) on made-value aggression as opponent count rises;
       HU byte-identical; cap at a **labeled 4-way tier** (5+way magnitudes are unresearched — Later).

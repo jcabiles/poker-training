@@ -27,6 +27,7 @@ from app.domain.spot import ActionType, PlayerStatus, Position, Street
 from app.domain.table.engine import HandState, apply, legal_actions
 from app.domain.table.sizing import (
     last_aggressor_position,
+    pot_before_current_aggression,
     preflop_node,
     preflop_raise_to,
 )
@@ -137,6 +138,7 @@ def _postflop_decision(
     current_bet_to,
     is_aggressor,
     street,
+    latest_aggressor_contribution_bb,
 ) -> Decision:
     kinds = {la.action for la in legal}
     d = sample_postflop_decision(
@@ -151,6 +153,7 @@ def _postflop_decision(
         current_bet_to=current_bet_to,
         is_aggressor=is_aggressor,
         street=street,
+        latest_aggressor_contribution_bb=latest_aggressor_contribution_bb,
     )
     if d.action not in kinds:
         # Defensive: never happens if the sampler honors `legal`, but keep
@@ -200,6 +203,12 @@ def bot_decision(
     # R2: this seat sizes as the aggressor (c-bet/barrel) iff it made the most
     # recent bet/raise; otherwise its bet is a donk/lead → flat sizing.
     is_aggressor = last_aggressor_position(state.action_history) == seat_state.position
+    # W1-b (F9): the EXACT pre-aggression denominator for the price-aware fold —
+    # the latest aggressor's chip increment (W0-a), correcting the self-re-raise /
+    # back-raise over-subtraction that `state.current_bet_bb` alone caused.
+    contribution = pot_before_current_aggression(
+        state.action_history, state.street
+    ).latest_aggressor_contribution_bb
     return _postflop_decision(
         pack,
         seat_state.hole_cards,
@@ -212,6 +221,7 @@ def bot_decision(
         state.current_bet_bb,
         is_aggressor,
         state.street,
+        contribution,
     )
 
 

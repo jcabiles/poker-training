@@ -183,3 +183,25 @@ def test_incomplete_all_in_raise():
     # pot_before = SB .5 + BB 1 + UTG 3 = 4.5 (seat4's 4 excluded).
     assert res.pot_before_bb == 4.5
     assert res.pot_before_bb == round(_live_pot(state) - 4.0, 2)
+
+
+# --------------------------------------------------------------------------
+# 8. W1-b wiring — POSTFLOP self-re-raise: the increment play.py threads into the
+#    price-aware fold is strictly BELOW the live bet-TO, so the faced_frac
+#    denominator (live_pot − contribution) is correct where current_bet_bb alone
+#    over-subtracted. HU: SB bets 2, BB raises to 6, SB re-raises to 13.
+# --------------------------------------------------------------------------
+def test_postflop_self_reraise_contribution_below_current_bet():
+    state = _start()
+    state = _fold_until(state, 1)  # fold to SB
+    state = _act(state, 1, ActionType.CALL)  # SB completes
+    state = _act(state, 2, ActionType.CHECK)  # BB checks -> flop
+    assert state.street is Street.FLOP
+    state = _act(state, 1, ActionType.BET, 2.0)  # SB bets
+    state = _act(state, 2, ActionType.RAISE, 6.0)  # BB raises to 6
+    state = _act(state, 1, ActionType.RAISE, 13.0)  # SB re-raises (self-re-raise)
+    assert state.to_act_seat == 2  # BB now faces the re-raise
+    res = pot_before_current_aggression(state.action_history, state.street)
+    assert res.latest_aggressor_contribution_bb == 11.0  # 13 − SB's own earlier 2
+    assert res.latest_aggressor_contribution_bb < state.current_bet_bb  # 11 < 13
+    assert res.pot_before_bb == round(_live_pot(state) - 11.0, 2)

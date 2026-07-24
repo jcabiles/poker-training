@@ -279,6 +279,13 @@ _RIVER_RAISE_FLOOR = (
     StrengthBucket.TOP_PAIR,
     StrengthBucket.OVERPAIR_TPTK,
 )
+# W1-a (F6): the unopened river BET floor — strictly NARROWER than the raise
+# floor. A middle pair on the river is a bluff-catcher, never a value bet, under
+# a conservative HU/balanced-villain DEFAULT (it CAN value-bet vs capped/station
+# ranges — a rank approximation, not a theorem). TOP_PAIR/OVERPAIR keep the thin
+# river value bet (they are floored on the RAISE only). P2a floored the river
+# raise + air-call; this closes the residual unopened-BET leak for MIDDLE_PAIR.
+_RIVER_BET_FLOOR = (StrengthBucket.MIDDLE_PAIR,)
 _BLUFF_RAISE_FACTOR = 0.3  # bluff-raising is structurally rarer than bluff-betting
 _COMMIT_AGG_BOOST = 3.0  # SPR-commit shift toward call/jam
 # F3 bounded aggression (RES-D §0 saturation fix): the `aggression` lever is
@@ -367,6 +374,21 @@ _BLUFF_SHARE_REF = _BUCKET_BLUFF_SHARE[SizeBucket.MEDIUM]
 _MW_CATCH_TIGHTEN = 1.15
 _MW_CATCH_BUCKETS = (StrengthBucket.AIR, StrengthBucket.ACE_HIGH, StrengthBucket.MIDDLE_PAIR)
 
+# W1-c (F13, RES-D §6 direction-only): the VALUE-BET side of the multiway
+# correction. `multiway_bluff_damp` already tightens bluffs and `_MW_CATCH_TIGHTEN`
+# the bluff-catch folds per added opponent; made-value BETTING was flat across
+# `opponents`. Damp the unopened made-value BET merit geometrically as the field
+# grows — HU (opponents==1) is byte-identical (exponent 0). Scoped to the
+# THIN-value buckets (top pair / middle pair — the opponent-count-sensitive ones);
+# NOT monsters/two-pair+/overpairs (strong value you bet multiway regardless).
+# `0.8` is an UNFIT directional SEED (no multiway made-value metric is live — a
+# merit multiplier under softmax, so the observed bet-rate change is far smaller
+# than 0.8**k); capped at a labeled 4-way tier (`_MW_VALUE_CAP` added opponents —
+# 5+way magnitudes are unresearched → Later).
+_MW_VALUE_DAMP = 0.8
+_MW_VALUE_CAP = 3
+_MW_VALUE_BUCKETS = (StrengthBucket.TOP_PAIR, StrengthBucket.MIDDLE_PAIR)
+
 
 def _bluff_size_factor(frac: float) -> float:
     """Multiplier on the bluff mass for a chosen pot-fraction: the bucket's
@@ -406,6 +428,7 @@ def sample_postflop_decision(
     current_bet_to: float = 0.0,
     is_aggressor: bool = False,
     street: Street | None = None,
+    latest_aggressor_contribution_bb: float | None = None,
 ) -> Decision:
     """Draw a frequency-mixed postflop decision from the pack's levers.
 
@@ -471,25 +494,31 @@ def sample_postflop_decision(
         # reference, damped by stickiness. Call/raise merits are untouched —
         # they absorb the complement through normalization.
         #
-        # Pre-aggression pot = pot_bb − current_bet_to (the aggressor's full
-        # bet-TO this street), NOT pot_bb − to_call: facing a raise or
-        # check-raise, to_call is only the increment over our own street
-        # chips, and those chips belong in the denominator (e.g. bet 3 into 9,
-        # raised to 8 → to_call 5, live pot 20; frac is 5/12 ≈ 0.42 MEDIUM,
-        # not 5/15 = 0.33 SMALL). The inner max() covers callers that leave
-        # current_bet_to at its 0.0 default (harness/estimator simple-bet
-        # spots where the facing seat has zero street chips, so
-        # current_bet_to == to_call).
+        # Pre-aggression pot = the pot the aggressor's bet/raise was made INTO
+        # = live pot − the aggressor's own contribution (the chips their bet/raise
+        # added). NUMERATOR is to_call (the facing seat's call increment — the
+        # right pot-fraction numerator; only the denominator was ever wrong).
         #
-        # Known limitation: when the aggressor re-raises their OWN earlier
-        # bet this street (same-street 3-bet+), current_bet_to includes
-        # their pre-raise street chips, so this over-subtracts and
-        # understates faced_frac by up to one bucket. Exact recovery needs
-        # per-action pot history the engine doesn't keep; the error is
-        # conservative (under-folding vs re-raises) and confined to
-        # same-street 3-bet+ lines. Tracked as an Epic-4 follow-up.
+        # W1-b (F9): when the live loop supplies `latest_aggressor_contribution_bb`
+        # (the W0-a `pot_before_current_aggression` increment), use it — the EXACT
+        # pre-aggression pot. Do NOT subtract `current_bet_to`: that is the
+        # aggressor's full bet-TO, which OVER-subtracts (denominator too small →
+        # faced_frac OVERSTATED → over-fold) whenever the aggressor already had
+        # street chips before this action — a self-re-raise (bet→raise) OR a
+        # back-raise after calling (call→raise). Fresh aggression (0 prior street
+        # chips) has contribution == current_bet_to, so the two agree.
+        #
+        # The legacy `max(current_bet_to, to_call)` branch remains ONLY for
+        # un-opted-in direct callers (harness, estimator, unit tests) that pass no
+        # contribution — byte-identical to pre-W1-b. Its over-subtraction is the
+        # documented approximation THERE; the estimator additionally never
+        # reconstructs to_call (it builds CALL with min_bb=None → numerator 0), so
+        # its faced_frac is 0 regardless — a separate, pre-existing approximation.
         to_call_bb = by_kind[ActionType.CALL].min_bb or 0.0
-        faced_frac = to_call_bb / max(pot_bb - max(current_bet_to, to_call_bb), 0.01)
+        if latest_aggressor_contribution_bb is None:
+            faced_frac = to_call_bb / max(pot_bb - max(current_bet_to, to_call_bb), 0.01)
+        else:
+            faced_frac = to_call_bb / max(pot_bb - latest_aggressor_contribution_bb, 0.01)
         fold_merit = _FOLD_BASE[bucket] * _price_factor(faced_frac, pf.stickiness)
         # F4 (RES-D §6): bluff-catch-class buckets fold MORE per added
         # opponent — direction only, see _MW_CATCH_TIGHTEN above.
@@ -519,15 +548,27 @@ def sample_postflop_decision(
         else:
             agg_merit = (_AGG_BASE[bucket] + _DRAW_AGG_BONUS[draw]) * agg_scale
             check_merit = _CHECK_BASE[bucket]
+            # W1-c (F13): tighten thin made-value BETTING as the field grows —
+            # the value-side mirror of the multiway bluff damp. BET only (the
+            # matched-with-option check-RAISE is out of scope); HU byte-identical.
+            if agg_action is ActionType.BET and bucket in _MW_VALUE_BUCKETS:
+                agg_merit *= _MW_VALUE_DAMP ** min(max(opponents - 1, 0), _MW_VALUE_CAP)
             # River polarization: the matched-with-option RAISE (check-raise
-            # line) is floored like the facing raise; the unopened BET is NOT
-            # touched — thin river value bets stay legal.
+            # line) is floored for the whole one-pair class; the unopened BET is
+            # floored for MIDDLE_PAIR ONLY (W1-a) — top-pair/overpair keep the
+            # thin river value bet.
             if (
                 agg_action is ActionType.RAISE
                 and street is Street.RIVER
                 and bucket in _RIVER_RAISE_FLOOR
             ):
                 agg_merit = 0.0
+            elif (
+                agg_action is ActionType.BET
+                and street is Street.RIVER
+                and bucket in _RIVER_BET_FLOOR
+            ):
+                agg_merit = 0.0  # middle pair never value-bets the river
         entries.append((ActionType.CHECK, check_merit))
         entries.append((agg_action, agg_merit))
 

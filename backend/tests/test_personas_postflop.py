@@ -537,9 +537,11 @@ class _CaptureWeights:
         return [population[0]]
 
 
-def _faced_fold_weight(pot_bb, to_call, current_bet_to):
+def _faced_fold_weight(pot_bb, to_call, current_bet_to, contribution=None):
     """Normalized FOLD weight in a FOLD/CALL/RAISE spot (fixed tag + middle
-    pair, no draw, SPR well above commit) — only the price factor varies."""
+    pair, no draw, SPR well above commit) — only the price factor varies.
+    `contribution` (None = legacy denominator) opts into the W1-b exact
+    pre-aggression denominator."""
     pack = _pack("tag")
     legal = [
         personas_postflop_legal_fold(),
@@ -557,6 +559,7 @@ def _faced_fold_weight(pot_bb, to_call, current_bet_to):
         1,
         cap,  # type: ignore[arg-type] — duck-typed capture rng
         current_bet_to=current_bet_to,
+        latest_aggressor_contribution_bb=contribution,
     )
     return cap.dist[ActionType.FOLD]
 
@@ -592,6 +595,50 @@ def test_faced_frac_check_raise_lands_large():
     flipped = _faced_fold_weight(pot_bb=28.0, to_call=10.0, current_bet_to=16.0)
     medium = _faced_fold_weight(pot_bb=28.0, to_call=10.0, current_bet_to=10.0)
     assert flipped > medium  # LARGE α 0.47 > MEDIUM α 0.375 → more fold mass
+
+
+# W1-b (F9) — faced_frac increment fix. The live loop supplies the W0-a
+# latest-aggressor increment as the EXACT pre-aggression denominator; the legacy
+# `max(current_bet_to, to_call)` branch (no increment supplied) OVER-subtracts
+# when the aggressor already had street chips → over-fold. These pin the fix at
+# the sampler via exact captured FOLD weights (never sampled counts).
+
+
+def test_faced_frac_selfreraise_folds_less():
+    """Self-re-raise (SB bets 2, BB raises 6, SB re-raises to 13; BB faces
+    to_call 7, live pot 21, current_bet_to 13). SB's true increment is 11 (13−2),
+    so faced_frac = 7/(21−11) = 0.700 (MEDIUM). The legacy denominator subtracts
+    the whole 13 → 7/(21−13) = 0.875 (LARGE, α 0.47), OVER-stating the price and
+    over-folding. The fix (contribution=11) folds strictly LESS."""
+    legacy = _faced_fold_weight(pot_bb=21.0, to_call=7.0, current_bet_to=13.0)
+    fixed = _faced_fold_weight(pot_bb=21.0, to_call=7.0, current_bet_to=13.0, contribution=11.0)
+    assert fixed < legacy  # MEDIUM α 0.375 < LARGE α 0.47 → less fold mass
+    # The fixed value matches a genuine simple MEDIUM bet at the same 0.700 frac.
+    genuine_medium = _faced_fold_weight(pot_bb=17.0, to_call=7.0, current_bet_to=7.0)
+    assert fixed == pytest.approx(genuine_medium)
+
+
+def test_faced_frac_backraise_after_call_corrected():
+    """Back-raise after calling (Codex #2 — divergence is NOT limited to
+    self-re-raises): a prior caller re-raises, so its increment (25) is less than
+    its bet-TO (30). Facing to_call 15, live pot 65 → true frac 15/(65−25) = 0.375
+    (SMALL); legacy gives 15/(65−30) = 0.4286 (MEDIUM), over-folding. Fixed folds
+    less and matches a genuine simple SMALL bet at the same frac."""
+    legacy = _faced_fold_weight(pot_bb=65.0, to_call=15.0, current_bet_to=30.0)
+    fixed = _faced_fold_weight(pot_bb=65.0, to_call=15.0, current_bet_to=30.0, contribution=25.0)
+    assert fixed < legacy  # SMALL α 0.25 < MEDIUM α 0.375 → less fold mass
+    genuine_small = _faced_fold_weight(pot_bb=55.0, to_call=15.0, current_bet_to=15.0)
+    assert fixed == pytest.approx(genuine_small)
+
+
+def test_faced_frac_fresh_raise_byte_identical():
+    """Fresh aggression (a raiser with zero prior street chips) has increment ==
+    bet-TO, so supplying the contribution reproduces the legacy denominator
+    EXACTLY — the fix touches only prior-investment lines (bet 3 into 9, raised to
+    8 by a fresh raiser → to_call 5, contribution 8 == current_bet_to 8)."""
+    legacy = _faced_fold_weight(pot_bb=20.0, to_call=5.0, current_bet_to=8.0)
+    fixed = _faced_fold_weight(pot_bb=20.0, to_call=5.0, current_bet_to=8.0, contribution=8.0)
+    assert fixed == legacy
 
 
 # =====================================================================
@@ -863,6 +910,28 @@ def test_multiway_unopened_air_bet_freq_lower_than_hu(persona):
     assert three_way < hu, f"{persona} 3-way bluff freq {three_way} not below HU {hu}"
 
 
+def test_multiway_made_value_bet_damped_monotone_and_scoped():
+    """W1-c (F13): thin made-value (top pair) unopened BET frequency is strictly
+    non-increasing as opponents rise 1→4 and PLATEAUS past the labeled 4-way cap
+    (exact captured weights, never sampled counts). Strong value (an overpair) is
+    NOT in the damped set → flat across opponents. HU (opponents==1) is
+    byte-identical (exponent 0), also enforced by the untouched HU suite."""
+    board = ["Kc", "7s", "2h"]  # dry flop, no draw
+    legal = [personas_postflop_legal_check(), personas_postflop_legal_bet(2.0, 100.0)]
+
+    def pbet(hole, opp):
+        return _exact_dist_opp("tag", hole, board, legal, 6.0, 100.0, opponents=opp)[
+            ActionType.BET
+        ]
+
+    tp = [pbet(("Kh", "Qd"), o) for o in (1, 2, 3, 4, 5)]  # top pair
+    assert tp[0] > tp[1] > tp[2] > tp[3]  # thin value tightens as the field grows
+    assert tp[4] == pytest.approx(tp[3])  # capped at the 4-way tier (3 added opp)
+    # Scoping: an overpair is strong value (not in _MW_VALUE_BUCKETS) → flat.
+    op = [pbet(("Ah", "Ad"), o) for o in (1, 2, 3)]
+    assert op[0] == pytest.approx(op[1]) and op[1] == pytest.approx(op[2])
+
+
 @pytest.mark.parametrize("persona", ALL_PERSONAS)
 def test_multiway_facing_bluff_catch_fold_freq_higher_than_hu(persona):
     """Direction (RES-D §6, 'fold more vs a bet multiway' for bluff-catchers):
@@ -1066,10 +1135,12 @@ def test_river_one_pair_never_raises_facing_a_bet(persona):
 
 
 def test_river_check_raise_branch_floored_bet_untouched():
-    """Matched-with-option branch: the CHECK+RAISE agg merit is floored for
-    the one-pair class (maniac pre-P2a: MP .706 / TP .873 / OVERPAIR .929 →
-    all 0.0), but the unopened CHECK+BET branch is NOT touched — thin river
-    value bets stay legal (river weights == streetless weights)."""
+    """Matched-with-option branch: the CHECK+RAISE agg merit is floored for the
+    whole one-pair class on the river (maniac pre-P2a: MP .706 / TP .873 /
+    OVERPAIR .929 → all 0.0). The unopened CHECK+BET branch is now floored for
+    MIDDLE_PAIR ONLY (W1-a) — TOP_PAIR/OVERPAIR keep the thin river value bet
+    (river BET weights == streetless). This is the sanctioned W1-a unit-assertion
+    split (theory-contract §7), NOT a band re-anchor."""
     matched = [personas_postflop_legal_check(), personas_postflop_legal_raise(6.0, 97.0)]
     unopened = [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 97.0)]
     for bucket in _ONE_PAIR_FLOOR:
@@ -1077,10 +1148,34 @@ def test_river_check_raise_branch_floored_bet_untouched():
         river = _dist_street("maniac", hole, _RIVER_BOARD, matched, Street.RIVER)
         assert river[ActionType.RAISE] == 0.0, bucket
         assert _dist_street("maniac", hole, _RIVER_BOARD, matched, None)[ActionType.RAISE] > 0.0
-        # BET branch byte-identical river vs streetless.
-        assert _dist_street(
+        river_bet = _dist_street(
             "maniac", hole, _RIVER_BOARD, unopened, Street.RIVER, current_bet_to=0.0
-        ) == _dist_street("maniac", hole, _RIVER_BOARD, unopened, None, current_bet_to=0.0)
+        )
+        streetless_bet = _dist_street(
+            "maniac", hole, _RIVER_BOARD, unopened, None, current_bet_to=0.0
+        )
+        if bucket is StrengthBucket.MIDDLE_PAIR:
+            # W1-a: middle-pair unopened river BET floored to 0 (bluff-catcher);
+            # the floor is river-only, so the streetless BET stays positive.
+            assert river_bet[ActionType.BET] == 0.0, bucket
+            assert streetless_bet[ActionType.BET] > 0.0, bucket
+        else:
+            # TOP_PAIR / OVERPAIR: thin river value bet untouched (byte-identical).
+            assert river_bet == streetless_bet, bucket
+
+
+def test_river_bet_floor_middle_pair_river_gated():
+    """W1-a: MIDDLE_PAIR unopened BET floored to 0 on the RIVER; the SAME hole on
+    the TURN board is byte-identical to street=None (unchanged) — the floor is
+    river-only and MIDDLE_PAIR-only."""
+    unopened = [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 97.0)]
+    mp = _RIVER_HOLES[StrengthBucket.MIDDLE_PAIR]
+    river = _dist_street("maniac", mp, _RIVER_BOARD, unopened, Street.RIVER, current_bet_to=0.0)
+    assert river[ActionType.BET] == 0.0
+    # Turn control: same middle-pair hole on the turn board — BET untouched.
+    turn = _dist_street("maniac", mp, _TURN_BOARD, unopened, Street.TURN, current_bet_to=0.0)
+    assert turn == _dist_street("maniac", mp, _TURN_BOARD, unopened, None, current_bet_to=0.0)
+    assert turn[ActionType.BET] > 0.0
 
 
 @pytest.mark.parametrize("persona", ALL_PERSONAS)
@@ -1817,22 +1912,36 @@ def _persona_stats_ext(packs, persona: str, n: int) -> ExtStats:
     return stats
 
 
-# Golden AF/FtC/WTSD captured on the PRE-refactor code at a fixed (persona, n)
-# with the harness's own deterministic seed (20260710). The log->HandResult
-# refactor for W0-b must reproduce these EXACTLY — band membership is too wide
-# to prove byte-identity (Sol #4 / refuter #3). None = below the >=30 floor.
+# Golden AF/FtC/WTSD at a fixed (persona, n) with the harness's own deterministic
+# seed (20260710). Originally captured on the PRE-refactor code to prove the
+# W0-b log->HandResult refactor was byte-identical (band membership is too wide
+# to prove it — Sol #4 / refuter #3). Now doubles as an intended-behavior-change
+# tripwire. None = below the >=30 floor.
+#
+# RE-RECORDED for W1-a (persona-realism-w1, 2026-07-24 — slice-authorized): the
+# harness runs villains through the SAME postflop sampler, so the middle-pair
+# river BET floor (F6) deliberately changes river play -> AF/FtC/WTSD shift.
+# Re-record of the exact tripwire (MUST track intended behavior), NOT the
+# population WTSD/AF tolerance-band re-anchor, which stays frozen to W4-b.
+# RE-RECORDED for W1-c (persona-realism-w1, 2026-07-24 — slice-authorized): the
+# multiway made-value BET damp (F13) tightens top/middle-pair betting as the
+# field grows -> multiway spots in the harness shift AF/FtC/WTSD again. These are
+# the post-W1-c exact goldens (post-W1-b golden was byte-identical to W1-a — the
+# faced_frac fix is inert in this harness wrapper).
 _GOLDEN_STATS_N200 = {
-    "calling_station": (0.4069400631, 0.2258064516, 0.5491525424),
-    "lag": (2.775, None, 0.5222222222),
-    "maniac": (3.5362318841, 0.3953488372, 0.4364640884),
-    "nit": (None, None, 0.5227272727),
-    "passive_fish": (0.5845410628, 0.3225806452, 0.5776699029),
-    "tag": (2.0, None, 0.5306122449),
+    "calling_station": (0.4411764706, 0.1641791045, 0.6172413793),
+    "lag": (3.3404255319, None, 0.6330275229),
+    "maniac": (3.4915254237, 0.5217391304, 0.4719101124),
+    "nit": (None, None, 0.5882352941),
+    "passive_fish": (0.5156950673, 0.3414634146, 0.6396396396),
+    "tag": (2.4210526316, None, 0.5974025974),
 }
 
 
 def test_persona_stats_byte_identical_after_log_refactor():
-    """W0-b guard: the log->HandResult refactor must NOT shift AF/FtC/WTSD."""
+    """W0-b guard (re-recorded W1-a): AF/FtC/WTSD must match the pinned goldens
+    exactly — any UNINTENDED shift breaks byte-identity. Re-record only under
+    explicit slice authorization when a slice intentionally changes bot play."""
     packs = load_persona_packs()
     for persona, (g_af, g_ftc, g_wtsd) in _GOLDEN_STATS_N200.items():
         af, ftc, wtsd, *_ = _persona_stats(packs, persona, 200)
