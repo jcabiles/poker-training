@@ -565,13 +565,18 @@ def test_reveal_all_returns_every_nonhero_seat(db):
     assert {s.seat_index for s in result.seats} == set(range(1, 9))  # hero excluded
 
 
-def test_reveal_unavailable_when_hero_not_folded(db):
+def test_reveal_available_when_hero_not_folded(db):
+    # Debug reveal works on ANY completed hand, hero fold or not; the hero is
+    # always excluded and last-in still means non-hero IN/ALLIN seats.
     state = _terminal_state(hero="in", in_seats=(2,))
     view = create_session(db)
     _write_terminal(db, view.session_id, state)
-    for scope in ("last-in", "all"):
-        result = reveal(db, view.session_id, scope)
-        assert not result.available and result.seats == []
+    last_in = reveal(db, view.session_id, "last-in")
+    assert last_in.available
+    assert {s.seat_index for s in last_in.seats} == {2}  # hero (seat 0) excluded
+    all_seats = reveal(db, view.session_id, "all")
+    assert all_seats.available
+    assert {s.seat_index for s in all_seats.seats} == set(range(1, 9))
 
 
 def test_reveal_unavailable_on_live_hand_and_unknown_scope(db):

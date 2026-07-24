@@ -28,6 +28,7 @@ import SimRecap from "./simulate/SimRecap";
 import SimShowdown from "./simulate/SimShowdown";
 import SimSpeedPicker, { type SimSpeed } from "./simulate/SimSpeedPicker";
 import SimWatchToggle from "./simulate/SimWatchToggle";
+import SimDebugToggle from "./simulate/SimDebugToggle";
 import SimStreetReport from "./simulate/SimStreetReport";
 import SimTable from "./simulate/SimTable";
 import SimVillainRange from "./simulate/SimVillainRange";
@@ -48,6 +49,7 @@ const STORAGE_KEY = "simulate.session_id";
 const SPEED_KEY = "simulate.speed";
 const WATCH_KEY = "simulate.watch";
 const COACH_KEY = "simulate.coachMode";
+const DEBUG_REVEAL_KEY = "simulate.debugReveal";
 
 // The client's json<T>() throws Error("<url> -> <status>") on non-2xx, so a
 // lost/ended session surfaces as a message ending "-> 404".
@@ -98,6 +100,17 @@ function readWatch(): boolean {
 function readCoachMode(): boolean {
   try {
     return window.localStorage.getItem(COACH_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+// Debug reveal toggle (client-only, localStorage). ON offers the villain-card
+// reveal buttons after every hand for range inspection; OFF (default) keeps
+// normal play. Absent/garbage storage ⇒ default false (off).
+function readDebugReveal(): boolean {
+  try {
+    return window.localStorage.getItem(DEBUG_REVEAL_KEY) === "on";
   } catch {
     return false;
   }
@@ -165,6 +178,19 @@ export default function SimulateView() {
     setCoachMode(next);
     try {
       window.localStorage.setItem(COACH_KEY, next ? "on" : "off");
+    } catch {
+      /* private-mode storage — setting still applies this session */
+    }
+  }, []);
+
+  // Debug reveal toggle (client-only, localStorage). Read at render time — like
+  // coachMode it only gates what renders on the hand-over panel, never a
+  // click-time decision branch.
+  const [debugReveal, setDebugReveal] = useState<boolean>(readDebugReveal);
+  const changeDebugReveal = useCallback((next: boolean) => {
+    setDebugReveal(next);
+    try {
+      window.localStorage.setItem(DEBUG_REVEAL_KEY, next ? "on" : "off");
     } catch {
       /* private-mode storage — setting still applies this session */
     }
@@ -785,6 +811,7 @@ export default function SimulateView() {
               </button>
             )}
             <SimWatchToggle watch={watch} onChange={changeWatch} />
+            <SimDebugToggle debugReveal={debugReveal} onChange={changeDebugReveal} />
             <SimGradingToggle coachMode={coachMode} onChange={changeCoachMode} />
             <SimSpeedPicker speed={speed} onChange={changeSpeed} />
             <button
@@ -894,6 +921,7 @@ export default function SimulateView() {
                   showdown={hand.showdown}
                   seats={hand.seats}
                   heroFolded={heroFolded}
+                  debugReveal={debugReveal}
                   revealScope={revealScope}
                   onReveal={onReveal}
                 />
