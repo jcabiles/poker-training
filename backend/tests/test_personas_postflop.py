@@ -1310,19 +1310,34 @@ def test_street_none_byte_identical_to_omitted_kwarg():
         assert river != explicit_none, bucket
 
 
-def test_non_river_street_identical_to_none():
-    """Only Street.RIVER floors: on flop/turn boards, passing the street
-    explicitly reproduces the street=None weights exactly (byte-identity for
-    the live loop's flop/turn decisions)."""
+def test_flop_street_identical_to_none():
+    """W3-c invariant: FLOP == street=None byte-for-byte (the street schedule's
+    flop multiplier is exactly 1.0), for value, one-pair, AND air alike."""
     legal = _facing_legal()
     flop = ["Kc", "9s", "3h"]
     for hole in (("9h", "4d"), ("Kh", "8d"), ("6h", "4d")):
         assert _dist_street("maniac", hole, flop, legal, Street.FLOP) == _dist_street(
             "maniac", hole, flop, legal, None
         )
+
+
+def test_turn_decays_air_bluff_but_not_value():
+    """W3-c (F4): the turn is NO LONGER byte-identical to the pre-W3 sampler for
+    a BLUFF hand — air's semi/bluff aggression decays (street mult 0.6). A
+    one-pair value hand with no draw/bluff on the turn is still identical (the
+    schedule scales bluff/semi-bluff ONLY, never value)."""
+    legal = _facing_legal()
+    # MIDDLE_PAIR / TOP_PAIR (no draw): value untouched → turn == None.
+    for hole in (("9h", "4d"), ("Kh", "8d")):
         assert _dist_street("maniac", hole, _TURN_BOARD, legal, Street.TURN) == _dist_street(
             "maniac", hole, _TURN_BOARD, legal, None
         )
+    # AIR: bluff-raise mass decays on the turn → strictly less raise weight.
+    air = ("6h", "4d")
+    turn = _dist_street("maniac", air, _TURN_BOARD, legal, Street.TURN)
+    none = _dist_street("maniac", air, _TURN_BOARD, legal, None)
+    assert turn != none
+    assert turn[ActionType.RAISE] < none[ActionType.RAISE]
 
 
 @pytest.mark.parametrize("persona", ["maniac", "lag", "tag"])
@@ -2151,13 +2166,21 @@ def _persona_stats_ext(packs, persona: str, n: int) -> ExtStats:
 # non-facing STRONG draws, and bets up to ~1.3× pot are unchanged; only overbet-
 # draw + weak-draw-commit spots move, covered by the exact-weight commit unit
 # tests.) All six personas shift via the shared-rng stream. Exact tripwire.
+# RE-RECORDED for W3-b/c/d (persona-realism-w3bcd, 2026-07-24 — slice-authorized):
+# the position IP/OOP multiplier (W3-b, opted personas tag/nit/lag), the street
+# aggression schedule + busted-river bluff (W3-c, all personas), and the made-hand
+# overcard/wetness texture brakes (W3-d, all personas) all change villain postflop
+# play, so the shared-rng stream drifts and every persona's AF/FtC/WTSD moves. The
+# flop stays byte-identical for the street schedule (mult 1.0), but W3-b (opted) and
+# W3-d shift flop one-pair betting, so this whole tripwire re-records. Covered by
+# the W3-b/c/d exact-weight unit tests.
 _GOLDEN_STATS_N200 = {
-    "calling_station": (0.3448275862, 0.2173913043, 0.6048951049),
-    "lag": (3.0869565217, None, 0.4732142857),
-    "maniac": (2.8734177215, 0.511627907, 0.5189189189),
-    "nit": (1.1578947368, None, 0.6119402985),
-    "passive_fish": (0.6348314607, 0.2564102564, 0.6380952381),
-    "tag": (None, None, 0.5070422535),
+    "calling_station": (0.4324324324, 0.2463768116, 0.6022304833),
+    "lag": (1.7843137255, None, 0.5684210526),
+    "maniac": (3.7118644068, 0.3888888889, 0.4880382775),
+    "nit": (1.1333333333, None, 0.7307692308),
+    "passive_fish": (0.6352941176, 0.3714285714, 0.6036866359),
+    "tag": (1.7142857143, None, 0.6710526316),
 }
 
 
@@ -2203,6 +2226,15 @@ def test_persona_stats_ext_all_metrics_compute():
                 assert 0.0 <= r <= 1.0, f"{persona} rate out of [0,1]: {r}"
 
 
+# Fixed, machine-independent sample for every WTSD assertion (bands + ordering).
+# Large enough that 3σ on the tightest gap (station-vs-tag ≈ 0.044 post-W3-b) and
+# on the tightest band margin (lag 0.55 vs its 0.59 ceiling) is comfortably under
+# it. AF/FtC stay on the cheaper throughput-n; only WTSD (fragile near band edges
+# under-sampled at n~250) needs the floor. `_persona_stats` memoizes per
+# (persona, n), so the bands and ordering tests share these sims — paid once.
+_WTSD_ORDER_N = 2500
+
+
 @pytest.mark.parametrize("persona", ALL_PERSONAS)
 def test_persona_postflop_bands(persona, budget):
     packs, per_persona_n, _texture_n, _hands_per_s = budget
@@ -2231,8 +2263,18 @@ def test_persona_postflop_bands(persona, budget):
         # is covered by the exact-weight commit/draw-gate unit tests.
         if persona == "maniac":
             pytest.skip("maniac WTSD on the 0.50 ceiling; throughput-n noise — reconcile W4-b")
+        # W3-b/c/d: measure the WTSD-vs-band at the stable large-n (memoized,
+        # shared with the ordering test). The throughput-n estimate breaches band
+        # ceilings by under-sampling noise alone — lag's true WTSD 0.55 spikes to
+        # 0.59+ at n~247 despite sitting well inside its [0.37, 0.59] band. AF/FtC
+        # keep the cheaper throughput-n; the band VALUES are untouched (frozen).
+        _a, _f, wtsd_stable, _c, _fn, wtsd_stable_n = _persona_stats(
+            packs, persona, _WTSD_ORDER_N
+        )
         lo, hi = wtsd_band
-        assert lo <= wtsd <= hi, f"{persona} WTSD {wtsd:.2f} outside [{lo},{hi}] (n={wtsd_n})"
+        assert lo <= wtsd_stable <= hi, (
+            f"{persona} WTSD {wtsd_stable:.2f} outside [{lo},{hi}] (n={wtsd_stable_n})"
+        )
 
 
 def test_persona_wtsd_ordering_invariants(budget):
@@ -2245,10 +2287,20 @@ def test_persona_wtsd_ordering_invariants(budget):
     discipline (station folds least -> highest WTSD; maniac folds most among
     the aggressive personas -> lowest WTSD relative to the calling personas).
     """
-    packs, per_persona_n, _texture_n, _hands_per_s = budget
+    # W3-b/c/d (persona-realism-w3bcd, 2026-07-24): the position IP/OOP c-bet
+    # boost narrowed the station-vs-tag WTSD gap to ~0.044 (station 0.63 > tag
+    # 0.59, verified robust at n>=2000) — still the correct ordering, but the
+    # throughput-derived `per_persona_n` (~200-400) has 3σ≈0.10 on the WTSD
+    # difference there, so the STRICT leg flipped ~half of isolated runs (flaky).
+    # This ordering test therefore uses its OWN fixed, machine-independent sample
+    # (_WTSD_ORDER_N) large enough that 3σ (~0.028) < the real gap — keeping every
+    # leg STRICT. The band test above keeps the cheaper throughput-n (it needs the
+    # shared budget); _persona_stats memoizes per (persona, n), so this is a
+    # separate, one-time set of sims.
+    packs, _per_persona_n, _texture_n, _hands_per_s = budget
     wtsd = {}
     for persona in ("calling_station", "tag", "lag", "passive_fish", "maniac"):
-        _af, _ftc, w, _cn, _fn, wn = _persona_stats(packs, persona, per_persona_n)
+        _af, _ftc, w, _cn, _fn, wn = _persona_stats(packs, persona, _WTSD_ORDER_N)
         assert w is not None, f"{persona} WTSD unmeasurable at n={wn} (<30 floor)"
         wtsd[persona] = w
 
@@ -2352,3 +2404,208 @@ def test_suite_runtime_budget_documented():
     # The budget derivation lives in the module docstring + _derive_n above;
     # this is a placeholder assertion so the intent is test-visible.
     assert _derive_n(430.0)[0] >= 150
+
+
+# ============================ W3-b — position IP/OOP (B1, F1) ===================
+from app.domain.table.postflop_context import PostflopContext  # noqa: E402
+
+_IP = PostflopContext(in_position=True)
+_OOP = PostflopContext(in_position=False)
+_CBET_LEGAL = [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 100.0)]
+# TPTK made hand on a dry, unpaired, low-follow board (no draw; avoids W3-d
+# overcard/wetness damp so the position effect is isolated).
+_TPTK_DRY = (("Ah", "Kd"), ["Ac", "7s", "2d"])
+
+
+def _pack_with(persona, **overrides):
+    p = _pack(persona)
+    return p.model_copy(update={"postflop": p.postflop.model_copy(update=overrides)})
+
+
+def _dist_pack_ctx(
+    pack, hole, board, legal, *, street=None, context=None, pot=6.0, stack=100.0,
+    opponents=1, current_bet_to=0.0,
+):
+    cap = _CaptureWeights()
+    sample_postflop_decision(
+        pack, hole, board, legal, pot, stack, opponents, cap,  # type: ignore[arg-type]
+        current_bet_to=current_bet_to, street=street, context=context,
+    )
+    return cap.dist
+
+
+def _bet(dist):
+    return dist.get(ActionType.BET, 0.0)
+
+
+def test_position_sensitivity_zero_is_position_blind():
+    pack = _pack_with("tag", position_sensitivity=0.0)
+    hole, board = _TPTK_DRY
+    ip = _dist_pack_ctx(pack, hole, board, _CBET_LEGAL, context=_IP)
+    oop = _dist_pack_ctx(pack, hole, board, _CBET_LEGAL, context=_OOP)
+    assert ip == oop  # s=0 → identity, exact
+
+
+def test_position_none_context_is_identity_to_blind():
+    # An un-opted caller (context=None) and a position-blind pack agree exactly.
+    pack = _pack_with("tag", position_sensitivity=0.0)
+    hole, board = _TPTK_DRY
+    blind = _dist_pack_ctx(pack, hole, board, _CBET_LEGAL, context=None)
+    opted_noctx = _dist_pack_ctx(_pack("tag"), hole, board, _CBET_LEGAL, context=None)
+    assert blind == opted_noctx  # context=None bypasses the multiplier regardless of lever
+
+
+def test_position_boosts_cbet_ip_over_oop_for_opted_pack():
+    hole, board = _TPTK_DRY
+    for persona in ("tag", "nit", "lag"):  # opted in content
+        ip = _bet(_dist_pack_ctx(_pack(persona), hole, board, _CBET_LEGAL, context=_IP))
+        oop = _bet(_dist_pack_ctx(_pack(persona), hole, board, _CBET_LEGAL, context=_OOP))
+        assert ip > oop, f"{persona}: expected CBet_IP>CBet_OOP, got {ip} not> {oop}"
+
+
+def test_position_noctx_sits_between_ip_and_oop():
+    hole, board = _TPTK_DRY
+    ip = _bet(_dist_pack_ctx(_pack("nit"), hole, board, _CBET_LEGAL, context=_IP))
+    none = _bet(_dist_pack_ctx(_pack("nit"), hole, board, _CBET_LEGAL, context=None))
+    oop = _bet(_dist_pack_ctx(_pack("nit"), hole, board, _CBET_LEGAL, context=_OOP))
+    assert ip > none > oop
+
+
+def test_position_does_not_touch_facing_raise():
+    # Facing a bet (FOLD+CALL+RAISE): the RAISE is defense-side, position must
+    # NOT move it (no-go: aggressor-side c-bet/barrel frequency ONLY).
+    legal = [
+        personas_postflop_legal_fold(),
+        personas_postflop_legal_call(2.0),
+        personas_postflop_legal_raise(6.0, 100.0),
+    ]
+    hole, board = _TPTK_DRY
+    ip = _dist_pack_ctx(_pack("tag"), hole, board, legal, context=_IP, current_bet_to=2.0)
+    oop = _dist_pack_ctx(_pack("tag"), hole, board, legal, context=_OOP, current_bet_to=2.0)
+    assert ip == oop
+
+
+def test_position_does_not_touch_matched_option_raise():
+    # Matched-with-option (CHECK+RAISE, e.g. facing a check behind): agg_action
+    # is RAISE (check-raise line), out of the c-bet/barrel scope → unaffected.
+    legal = [personas_postflop_legal_check(), personas_postflop_legal_raise(2.0, 100.0)]
+    hole, board = _TPTK_DRY
+    ip = _dist_pack_ctx(_pack("tag"), hole, board, legal, context=_IP)
+    oop = _dist_pack_ctx(_pack("tag"), hole, board, legal, context=_OOP)
+    assert ip == oop
+
+
+
+# ============================ W3-c — street schedule (B6/B7, F4/F19/F8) =========
+from app.domain.table.postflop_context import BustedDraw  # noqa: E402
+
+_UNOPENED = [personas_postflop_legal_check(), personas_postflop_legal_bet(1.0, 100.0)]
+
+
+def _br(persona, hole, board, *, street=None, context=None, legal=None):
+    """Exact BET weight for a persona in an unopened spot (or given legal)."""
+    dist = _dist_pack_ctx(
+        _pack(persona), hole, board, legal or _UNOPENED, street=street, context=context
+    )
+    return _bet(dist)
+
+
+def test_street_agg_mult_flop_is_identity():
+    assert personas_postflop._STREET_AGG_MULT[Street.FLOP] == 1.0
+    assert personas_postflop._STREET_WEAK_DRAW_MULT[Street.FLOP] == 1.0
+    assert personas_postflop._draw_agg_street_mult(DrawCategory.WEAK, Street.FLOP) == 1.0
+    assert personas_postflop._draw_agg_street_mult(DrawCategory.STRONG, None) == 1.0
+
+
+def test_air_bluff_decays_flop_turn_river():
+    air = ("7c", "2d")
+    flop = _br("lag", air, ["Kc", "9s", "3h"], street=Street.FLOP)
+    turn = _br("lag", air, ["Kc", "9s", "3h", "4d"], street=Street.TURN)
+    river = _br("lag", air, ["Kc", "9s", "3h", "4d", "Jc"], street=Street.RIVER)
+    assert flop > turn > river
+
+
+def test_weak_draw_semibluff_decays_steeper_than_strong():
+    m = personas_postflop._draw_agg_street_mult
+    assert m(DrawCategory.WEAK, Street.TURN) < m(DrawCategory.STRONG, Street.TURN)
+    assert m(DrawCategory.WEAK, Street.RIVER) == 0.0
+
+
+def test_busted_draw_river_bluff_needs_bet_prev_street():
+    # Hold position constant (in_position=True for both) so this isolates the B7
+    # busted-barrel bonus from the W3-b position multiplier.
+    busted = ("8c", "9d")
+    board = ["6h", "7s", "Kc", "2d", "Qs"]  # busted OESD, air by the river
+    ip_barrel = PostflopContext(
+        in_position=True, bet_prev_street=True, busted_draw=BustedDraw.STRAIGHT
+    )
+    ip_checked = PostflopContext(
+        in_position=True, bet_prev_street=False, busted_draw=BustedDraw.STRAIGHT
+    )
+    barrel = _br("tag", busted, board, street=Street.RIVER, context=ip_barrel)
+    checked = _br("tag", busted, board, street=Street.RIVER, context=ip_checked)
+    assert barrel > checked  # the barrel story adds river bluff mass
+
+
+def test_busted_straight_bluffs_more_than_busted_flush():
+    b = personas_postflop._BUSTED_RIVER_BLUFF
+    assert b[BustedDraw.STRAIGHT] > b[BustedDraw.FLUSH]
+
+
+# ============================ W3-d — texture brakes (B2/B3, F3/F20) =============
+
+
+def test_overcard_count_helper():
+    oc = personas_postflop._overcard_count
+    assert oc(("9h", "7d"), ["9c", "4s", "2d"]) == 0
+    assert oc(("7h", "6d"), ["9c", "7s", "2d"]) == 1
+    assert oc(("5h", "4d"), ["Kc", "5s", "9d"]) == 2
+
+
+def test_overcard_damp_nonlinear():
+    d = personas_postflop._overcard_bet_damp
+    assert (d(0), d(1), d(2), d(3)) == (1.0, 0.75, 0.5, 0.5)
+
+
+def test_middle_pair_bet_falls_with_overcards():
+    b0 = _br("tag", ("9h", "7d"), ["9c", "4s", "2d"], street=Street.FLOP)
+    b1 = _br("tag", ("7h", "6d"), ["9c", "7s", "2d"], street=Street.FLOP)
+    b2 = _br("tag", ("5h", "4d"), ["Kc", "5s", "9d"], street=Street.FLOP)
+    assert b0 > b1 > b2
+
+
+def test_wetness_bet_mult_ordering():
+    m = personas_postflop._wetness_bet_mult
+    dry = m(["Kc", "8s", "3d"])
+    two_tone = m(["Kc", "8s", "3s"])
+    connected = m(["9c", "8s", "7d"])
+    mono = m(["Kc", "8c", "3c"])
+    assert dry >= two_tone >= connected >= mono
+    assert dry == 1.0 and mono < connected
+
+
+def test_one_pair_bet_falls_with_wetness_same_overcards():
+    h = ("9h", "7d")  # pair of 9s, 0 overcards on both boards
+    dry = _br("tag", h, ["9c", "4s", "2d"], street=Street.FLOP)
+    mono = _br("tag", h, ["9c", "4c", "2c"], street=Street.FLOP)
+    assert dry > mono
+
+
+def test_overpair_and_set_still_bet_on_wet_boards():
+    # OVERPAIR_TPTK and MONSTER are out of scope: still bet freely on a wet
+    # monotone board with overcards (texture brakes are bucket-gated).
+    over = _br("tag", ("Ah", "Ad"), ["Kc", "8c", "3c"], street=Street.FLOP)
+    setbet = _br("tag", ("7s", "7d"), ["7c", "Kc", "3c"], street=Street.FLOP)
+    assert over > 0.5 and setbet > 0.5
+
+
+def test_position_sensitivity_bounded_to_unit_interval():
+    # The OOP multiplier 1 - 0.25*s must stay positive; the schema caps s at 1.0.
+    import pydantic
+
+    from app.domain.content.models import PersonaPostflop
+
+    base = _pack("tag").postflop.model_dump()
+    PersonaPostflop.model_validate({**base, "position_sensitivity": 1.0})  # ok
+    with pytest.raises(pydantic.ValidationError):
+        PersonaPostflop.model_validate({**base, "position_sensitivity": 1.5})

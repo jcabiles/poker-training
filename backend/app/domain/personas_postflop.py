@@ -17,16 +17,14 @@ from __future__ import annotations
 import itertools
 import random
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
 from app.domain.action import Decision
 from app.domain.content.models import PersonaPack, PersonaPostflop
 from app.domain.equity import _RIDX, _eval5
 from app.domain.spot import ActionType, Card, LegalAction, Street
+from app.domain.table.postflop_context import BustedDraw, PostflopContext
 from app.domain.table.sizing import postflop_node_key, pot_fraction_to_bb
-
-if TYPE_CHECKING:
-    from app.domain.table.postflop_context import PostflopContext
+from app.domain.texture import classify
 
 _ACE = 12  # rank index of the ace in equity.RANKS
 _KING = 11
@@ -296,6 +294,78 @@ _COMMIT_AGG_BOOST = 3.0  # SPR-commit shift toward call/jam
 # commitment when the draw is NOT value-committed (below T1) — a naked draw stops
 # stacking off. Scaled by the commitment fraction c in [0,1]. FIT SEED.
 _B5B_DRAW_DAMP = 0.7
+# W3-c (B6, F4/F19/F8): street-conditional aggression. A `street_agg_mult` decays
+# the BLUFF/semi-bluff merit ONLY (value never scaled) as the hand goes deeper —
+# people barrel air less on later streets and give up. FLOP == 1.0 keeps the flop
+# byte-identical (the invariant); an omitted/None street (harness, estimator) also
+# resolves to 1.0. FIT SEEDS.
+_STREET_AGG_MULT = {Street.FLOP: 1.0, Street.TURN: 0.6, Street.RIVER: 0.33}
+# F19: a WEAK (thin) semi-bluff dies faster than a generic bluff — full on the flop,
+# cut on the turn, ~0 by the river (a busted thin draw stops barrelling).
+_STREET_WEAK_DRAW_MULT = {Street.FLOP: 1.0, Street.TURN: 0.4, Street.RIVER: 0.0}
+# B7 (F8): extra RIVER bluff mass for a busted draw that BET the previous street —
+# a coherent barrel-then-miss story. Busted STRAIGHT is preferred over busted FLUSH
+# (the missed suit shows on board). Added AFTER the street decay so the story-bluff
+# survives it. FIT SEEDS; gated on context.bet_prev_street.
+_BUSTED_RIVER_BLUFF = {BustedDraw.STRAIGHT: 0.30, BustedDraw.FLUSH: 0.15}
+
+
+def _draw_agg_street_mult(draw: DrawCategory, street: Street | None) -> float:
+    """Street decay for a draw's SEMI-BLUFF aggression bonus (F19): WEAK draws
+    decay steeply, STRONG draws on the generic bluff schedule. Flop/None → 1.0."""
+    if draw is DrawCategory.WEAK:
+        return _STREET_WEAK_DRAW_MULT.get(street, 1.0)
+    if draw is DrawCategory.STRONG:
+        return _STREET_AGG_MULT.get(street, 1.0)
+    return 1.0
+
+
+# W3-d (B2, F3): a vulnerable one-pair made hand slows its BETTING as overcards
+# fall. Scoped to MIDDLE_PAIR / TOP_PAIR ONLY — OVERPAIR_TPTK bundles overpairs
+# (which want to keep betting) and is untouched. Non-linear in the count of board
+# cards ranked above the pair. FIT SEEDS.
+_VULNERABLE_ONE_PAIR = (StrengthBucket.MIDDLE_PAIR, StrengthBucket.TOP_PAIR)
+
+
+def _overcard_count(hole: tuple[Card, Card], board: list[Card]) -> int:
+    """Board cards ranked strictly above this hand's pair. Pair rank = the pocket
+    rank, or the single hole card that paired the board; ambiguous shapes (two
+    pair / unpaired) fall back conservatively to max(hole) → few/no overcards."""
+    r1, r2 = _RIDX[hole[0][0]], _RIDX[hole[1][0]]
+    if r1 == r2:
+        pair_rank = r1
+    else:
+        board_ranks = {_RIDX[c[0]] for c in board}
+        if r1 in board_ranks and r2 not in board_ranks:
+            pair_rank = r1
+        elif r2 in board_ranks and r1 not in board_ranks:
+            pair_rank = r2
+        else:
+            pair_rank = max(r1, r2)
+    return sum(1 for c in board if _RIDX[c[0]] > pair_rank)
+
+
+def _overcard_bet_damp(count: int) -> float:
+    """B2 damp: 0 overcards → 1.00, 1 → 0.75, 2+ → 0.50 (non-linear FIT SEEDS)."""
+    return 1.0 if count == 0 else 0.75 if count == 1 else 0.5
+
+
+# W3-d (B3, F20): board WETNESS gates whether-to-bet one pair, not just sizing.
+# Ordering asserted (dry ≥ high-two-tone ≥ low-connected ≥ monotone); magnitudes
+# are FIT SEEDS. Reuses the ONE texture classifier (never a second taxonomy).
+def _wetness_bet_mult(board: list[Card]) -> float:
+    if len(board) < 3:
+        return 1.0
+    tex = classify(board)  # classifies the flop (first 3 cards)
+    if tex.suitedness == "monotone":
+        return 0.55
+    if tex.connectedness == "connected":  # low/high connected — draw-heavy
+        return 0.70
+    if tex.suitedness == "two-tone":
+        return 0.85
+    return 1.0  # dry: rainbow + disconnected
+
+
 # F3 bounded aggression (RES-D §0 saturation fix): the `aggression` lever is
 # capped before it scales any merit. An uncapped maniac lever (15.0) multiplies
 # one side of the un-normalized merit ratio so hard that rng.choices degenerates
@@ -489,6 +559,22 @@ def _commit_transform(
     ]
 
 
+# W3-b (B1, F1): the aggressor-side position multiplier. In position → boost the
+# whole aggressive candidate (bluff + value + semi-bluff), out of position → damp
+# it, symmetrically about 1.0 and scaled by the persona's position_sensitivity
+# (0/None = position-blind). FIT SEED; per-type LOW confidence. Applies to the
+# unopened/betting BET candidate only (c-bet/barrel/lead) — the OOP defense damp
+# is a later slice, and the matched-with-option check-raise is out of scope.
+_POSITION_AGG_DELTA = 0.25
+
+
+def _position_agg_mult(pf: PersonaPostflop, context: PostflopContext | None) -> float:
+    s = pf.position_sensitivity
+    if not s or context is None:  # None/0 lever, or an un-opted caller → identity
+        return 1.0
+    return 1.0 + _POSITION_AGG_DELTA * s if context.in_position else 1.0 - _POSITION_AGG_DELTA * s
+
+
 def sample_postflop_decision(
     pack: PersonaPack,
     hole: tuple[Card, Card],
@@ -569,6 +655,13 @@ def sample_postflop_decision(
         bluff_mass *= sum(
             w * _bluff_size_factor(float(k)) for k, w in sizing_dist.items()
         ) / sum(sizing_dist.values())
+    # W3-c (B6/B7): decay the generic air bluff by street (flop/None → ×1.0, so
+    # byte-identical), then add the busted-draw story bluff on the river — a hand
+    # that bet the prior street and missed keeps a coherent barrel (survives the
+    # decay; STRAIGHT > FLUSH). Value merit is never touched here.
+    bluff_mass *= _STREET_AGG_MULT.get(street, 1.0)
+    if street is Street.RIVER and context is not None and context.bet_prev_street:
+        bluff_mass += _BUSTED_RIVER_BLUFF.get(context.busted_draw, 0.0)
 
     entries: list[tuple[ActionType, float]] = []
     if ActionType.FOLD in by_kind:  # facing chips
@@ -620,7 +713,12 @@ def sample_postflop_decision(
             if bluff_cell:
                 raise_merit = _BLUFF_RAISE_FACTOR * bluff_mass  # polar bluff survives
             else:
-                raise_merit = (_RAISE_BASE[bucket] + _DRAW_RAISE_BONUS[draw]) * agg_scale
+                # W3-c: the draw's semi-bluff RAISE bonus decays by street (value
+                # _RAISE_BASE unchanged); flop/None → ×1.0.
+                raise_merit = (
+                    _RAISE_BASE[bucket]
+                    + _DRAW_RAISE_BONUS[draw] * _draw_agg_street_mult(draw, street)
+                ) * agg_scale
                 if street is Street.RIVER and bucket in _RIVER_RAISE_FLOOR:
                     raise_merit = 0.0  # bluff-catchers never value-raise the river
             entries.append((ActionType.RAISE, raise_merit))
@@ -630,13 +728,24 @@ def sample_postflop_decision(
             agg_merit = bluff_mass
             check_merit = max(1.0 - bluff_mass, 0.0)
         else:
-            agg_merit = (_AGG_BASE[bucket] + _DRAW_AGG_BONUS[draw]) * agg_scale
+            # W3-c: the draw's semi-bluff BET bonus decays by street (value
+            # _AGG_BASE unchanged); flop/None → ×1.0.
+            agg_merit = (
+                _AGG_BASE[bucket] + _DRAW_AGG_BONUS[draw] * _draw_agg_street_mult(draw, street)
+            ) * agg_scale
             check_merit = _CHECK_BASE[bucket]
             # W1-c (F13): tighten thin made-value BETTING as the field grows —
             # the value-side mirror of the multiway bluff damp. BET only (the
             # matched-with-option check-RAISE is out of scope); HU byte-identical.
             if agg_action is ActionType.BET and bucket in _MW_VALUE_BUCKETS:
                 agg_merit *= _MW_VALUE_DAMP ** min(max(opponents - 1, 0), _MW_VALUE_CAP)
+            # W3-d (B2/B3, F3/F20): a vulnerable one-pair hand slows down as
+            # overcards fall and on wetter boards — whether-to-bet, not just size.
+            # MIDDLE_PAIR/TOP_PAIR only; composes multiplicatively with position +
+            # multiway. A set/overpair is out of scope and keeps betting.
+            if agg_action is ActionType.BET and bucket in _VULNERABLE_ONE_PAIR:
+                agg_merit *= _overcard_bet_damp(_overcard_count(hole, board))
+                agg_merit *= _wetness_bet_mult(board)
             # River polarization: the matched-with-option RAISE (check-raise
             # line) is floored for the whole one-pair class; the unopened BET is
             # floored for MIDDLE_PAIR ONLY (W1-a) — top-pair/overpair keep the
@@ -653,6 +762,11 @@ def sample_postflop_decision(
                 and bucket in _RIVER_BET_FLOOR
             ):
                 agg_merit = 0.0  # middle pair never value-bets the river
+        # W3-b (B1, F1): position tilts the aggressor-side BET frequency (c-bet/
+        # barrel/lead). Multiplicative on the whole aggressive candidate; a floored
+        # 0 stays 0. The matched-with-option check-RAISE is out of scope.
+        if agg_action is ActionType.BET:
+            agg_merit *= _position_agg_mult(pf, context)
         entries.append((ActionType.CHECK, check_merit))
         entries.append((agg_action, agg_merit))
 

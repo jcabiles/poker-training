@@ -84,10 +84,16 @@ _WANT_BB = {("BB", 1), ("BB", 2), ("BB", 3)}
 # WEAK draw stops stacking off), displacing the shared-rng stream again (old
 # post-W2-a counts: UTG2¹ 91, LJ¹ 122, HJ¹ 140, CO¹ 113, CO² 43, SB¹ 111, SB² 45,
 # BTN¹ 134, BTN² 40). Every _WANT_* shape still fires (verified) — displacement only.
+# RE-PINNED for W3-b/c/d (persona-realism-w3bcd, 2026-07-24 — slice-authorized): the
+# position IP/OOP multiplier, the street aggression schedule + busted-river bluff, and
+# the made-hand texture brakes all change villain postflop play, displacing the shared-
+# rng organic stream again (old post-W2-b counts: UTG2¹ 87, LJ¹ 110, HJ¹ 134, CO¹ 141,
+# CO² 33, SB¹ 96, SB² 69, BTN¹ 126, BTN² 44). No preflop content changed; every _WANT_*
+# coverage shape still fires (verified) — stream displacement only, not a regression.
 _PRE_M3_FIRES = {
-    ("UTG2", 1): 87, ("LJ", 1): 110, ("HJ", 1): 134, ("CO", 1): 141,
-    ("CO", 2): 33, ("SB", 1): 96, ("SB", 2): 69, ("BTN", 1): 126,
-    ("BTN", 2): 44,
+    ("UTG2", 1): 99, ("LJ", 1): 107, ("HJ", 1): 132, ("CO", 1): 118,
+    ("CO", 2): 43, ("SB", 1): 102, ("SB", 2): 50, ("BTN", 1): 130,
+    ("BTN", 2): 41,
 }
 
 

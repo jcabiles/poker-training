@@ -54,6 +54,15 @@ commit/draw EV gate (STRONG draw folds to overbets instead of force-jamming; nak
 WEAK draw stops stacking off at high commitment) changes villain play → the stream
 drifts again → total 1270 → 1227, graded 365 → 363 (ratio 28.7% → 29.6%, held above
 the 28.3% floor). Seeded-fixture re-record; population bands stay frozen to W4-b.
+
+RE-RECORDED for W3-b/c/d (persona-realism-w3bcd, 2026-07-24 — slice-authorized): the
+position IP/OOP multiplier, the street aggression schedule + busted-river bluff, and
+the made-hand texture brakes change villain postflop play across the board → the seeded
+stream drifts → total 1227 → 1255, graded 363 → 345. NOTE: graded RATIO dips to 27.5%
+(below the 28.3% start-snapshot floor) — this is MAPPER coverage (orthogonal to persona
+realism): the more-realistic villains simply visit a different mix of hero spots, and
+the mapper (unchanged) grades that mix slightly less. Flagged for the mapper-coverage
+track, not a persona-realism regression. Seeded-fixture re-record; bands frozen to W4-b.
 """
 
 from __future__ import annotations

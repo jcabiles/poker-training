@@ -156,6 +156,15 @@ class PersonaPostflop(BaseModel):
     call_looseness: float | None = Field(default=None, gt=0.0)
     # direct price exponent; 0 = size-blind; None → legacy stickiness formula
     size_elasticity: float | None = Field(default=None, ge=0.0)
+    # W3-b (B1, F1): how strongly this persona's aggressor-side c-bet/barrel
+    # frequency swings with position. 0.0 (or None) = position-blind (an intended
+    # leak for stations/fish/maniac); 1.0 = full IP-boost / OOP-damp. Scales a
+    # symmetric multiplier on the WHOLE aggressive candidate (bluff + value +
+    # semi-bluff) in the unopened/betting branch only — the OOP continue/defense
+    # damp is a separate later slice. None → 0.0, keeping un-opted packs identical.
+    # Bounded to [0, 1] so the symmetric OOP multiplier 1 − 0.25·s stays strictly
+    # positive — a larger s would drive it <= 0 and silently zero every OOP bet.
+    position_sensitivity: float | None = Field(default=None, ge=0.0, le=1.0)
     bluff_freq: float = Field(ge=0.0, le=1.0)  # baseline bet/raise rate with air
     sizing: dict[str, float]  # pot-fraction str -> weight; weights sum to ~1
     # R2: optional per-node override, keyed by postflop node name (e.g.
