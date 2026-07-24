@@ -195,10 +195,16 @@ def test_monotonicity_aggression_never_lowers_bet_raise_freq():
     assert freq_high >= freq_base - 1e-9
 
 
-def test_monotonicity_stickiness_never_lowers_call_freq():
+def test_monotonicity_call_looseness_never_lowers_call_freq():
+    # W2-a: the call-freq monotonicity now rides `call_looseness` (the flat call
+    # multiplier). Build `high` by raising ONLY call_looseness — leave stickiness
+    # (hence the size_elasticity fallback / fold-side price factor) UNCHANGED so
+    # the assertion isolates the call axis and isn't confounded by fold behavior.
     base = _pack("nit")
     high = base.model_copy(deep=True)
-    high.postflop = base.postflop.model_copy(update={"stickiness": base.postflop.stickiness * 3})
+    high.postflop = base.postflop.model_copy(
+        update={"call_looseness": base.postflop.stickiness * 3}
+    )
 
     hole = ("9h", "2d")  # middle pair, facing a bet
     board = ["Ac", "9s", "3h"]
@@ -216,6 +222,57 @@ def test_monotonicity_stickiness_never_lowers_call_freq():
         return count / n
 
     assert call_freq(high) >= call_freq(base) - 1e-9
+
+
+def test_station_size_blind_fish_size_scared_content():
+    # W2-a T4 pass/fail on the AUTHORED packs: the station (size_elasticity 0.0)
+    # folds at a FLAT rate across SMALL→OVERBET (calls any size); the fish
+    # (size_elasticity 1.3) folds much more to a big size (fit-or-fold). Exact
+    # normalized fold probability; middle pair facing a bet, SPR well above commit.
+    hole, board = ("9h", "2d"), ["Ac", "9s", "3h"]
+
+    def fold_at(pack, to_call, pot, cbt):
+        return _dist_for_pack(
+            pack, hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(to_call)],
+            pot, 100.0, current_bet_to=cbt,
+        )[ActionType.FOLD]
+
+    station, fish = _pack("calling_station"), _pack("passive_fish")
+    # SMALL: faced_frac 3/9 = 0.33; OVERBET: 9/6 = 1.5.
+    st_small, st_over = fold_at(station, 3.0, 12.0, 3.0), fold_at(station, 9.0, 15.0, 9.0)
+    fi_small, fi_over = fold_at(fish, 3.0, 12.0, 3.0), fold_at(fish, 9.0, 15.0, 9.0)
+    assert abs(st_over - st_small) < 1e-9  # station: flat (size-blind)
+    assert fi_over - fi_small > 0.15  # fish: steep fold-rise with size
+
+
+def test_size_elasticity_steeper_fold_vs_bigger_size():
+    # W2-a: higher size_elasticity ⇒ a STEEPER fold-rate rise from a SMALL faced
+    # size to an OVERBET (the fish-vs-station identity axis). Exact normalized
+    # fold probability via _CaptureWeights (no sampling noise). Both configs share
+    # every other lever, so only the price exponent differs.
+    base_pf = _pack("tag").postflop
+    low = _pack("tag")
+    low.postflop = base_pf.model_copy(update={"size_elasticity": 0.5})
+    high = _pack("tag")
+    high.postflop = base_pf.model_copy(update={"size_elasticity": 1.5})
+    hole, board = ("9h", "2d"), ["Ac", "9s", "3h"]  # middle pair facing a bet
+
+    def fold_gap(pack):
+        # SMALL: to_call 3 into pre-bet pot 9 → faced_frac 0.33; OVERBET: 9 into 6 → 1.5.
+        small = _dist_for_pack(
+            pack, hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(3.0)],
+            12.0, 100.0, current_bet_to=3.0,
+        )
+        over = _dist_for_pack(
+            pack, hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(9.0)],
+            15.0, 100.0, current_bet_to=9.0,
+        )
+        return over[ActionType.FOLD] - small[ActionType.FOLD]
+
+    assert fold_gap(high) > fold_gap(low)
 
 
 def test_sizing_spread_no_deterministic_strength_to_size():
@@ -445,11 +502,25 @@ def test_fold_to_bet_monotone_in_faced_size(persona, fold_by_size):
     facing ⅓-pot folds MEASURABLY less than the same bot facing pot-size."""
     r = fold_by_size[persona]
     seq = [r[f] for f in PRICE_FRACS]
-    assert seq == sorted(seq), f"{persona} fold-to-bet not monotone in size: {seq}"
-    assert r[1.0] - r[0.33] >= 0.10, (
-        f"{persona} pot-size fold {r[1.0]:.3f} not measurably above "
-        f"⅓-pot fold {r[0.33]:.3f}"
-    )
+    if persona == "calling_station":
+        # W2-a: the station is size-blind BY DESIGN (size_elasticity 0.0) — its
+        # per-spot fold probability is FLAT across sizes (see the exact-weight unit
+        # test test_station_size_blind_*). Here the rate is sampled over 500 random
+        # spots with per-cell seeds, so it wiggles within NOISE (~±0.03) and is not
+        # strictly monotone — the invariant is "no PRICE RESPONSE", i.e. the
+        # SMALL→OVERBET swing stays well under the 0.10 measurable-rise bar the
+        # other personas must clear. The flat curve IS the price-blind leak this
+        # persona intentionally keeps (calls any size).
+        assert abs(r[1.0] - r[0.33]) < 0.05, (
+            f"station should be size-blind (flat within noise), got "
+            f"{r[1.0]:.3f} vs {r[0.33]:.3f}"
+        )
+    else:
+        assert seq == sorted(seq), f"{persona} fold-to-bet not monotone in size: {seq}"
+        assert r[1.0] - r[0.33] >= 0.10, (
+            f"{persona} pot-size fold {r[1.0]:.3f} not measurably above "
+            f"⅓-pot fold {r[0.33]:.3f}"
+        )
 
 
 @pytest.mark.parametrize("persona", [p for p in ALL_PERSONAS if p != "nit"])
@@ -814,6 +885,140 @@ def _exact_dist(persona: str, hole, board, legal, pot, stack, current_bet_to=0.0
         current_bet_to=current_bet_to,
     )
     return cap.dist
+
+
+def _dist_for_pack(pack, hole, board, legal, pot, stack, opponents=1, current_bet_to=0.0):
+    """Like `_exact_dist` but for an already-built (possibly lever-modified) pack."""
+    cap = _CaptureWeights()
+    sample_postflop_decision(
+        pack, hole, board, legal, pot, stack, opponents, cap, current_bet_to=current_bet_to
+    )
+    return cap.dist
+
+
+# W2-b — pure EV helpers (T6; unused by the sampler until T7).
+def test_value_commit_threshold():
+    tc = personas_postflop._value_commit_threshold
+    assert tc(1.0) == pytest.approx(1.0 / 3.0)  # pot-size bet
+    assert tc(3.0) == pytest.approx(3.0 / 7.0)  # 3×-pot overbet ≈ 0.429
+    assert tc(0.5) == pytest.approx(0.5 / 2.0)  # half-pot → 0.25
+    # monotone increasing in faced size
+    assert tc(0.5) < tc(1.0) < tc(3.0)
+
+
+def test_draw_equity_proxy():
+    de = personas_postflop._draw_equity
+    DrawCategory = personas_postflop.DrawCategory
+    flop, turn, river = ["Ac", "9s", "3h"], ["Ac", "9s", "3h", "2d"], ["Ac", "9s", "3h", "2d", "7c"]
+    assert de(DrawCategory.STRONG, flop) == pytest.approx(0.36)
+    assert de(DrawCategory.STRONG, turn) == pytest.approx(0.18)
+    assert de(DrawCategory.WEAK, flop) == pytest.approx(0.16)
+    assert de(DrawCategory.WEAK, turn) == pytest.approx(0.08)
+    assert de(DrawCategory.NONE, flop) == 0.0
+    assert de(DrawCategory.STRONG, river) == 0.0  # no cards to come
+
+
+# W2-b — commit/draw EV gate (T7 behavior). lag has spr_commit 3.0.
+_STRONG_DRAW = (("Jh", "Th"), ["9h", "2h", "5c"])  # naked flush draw (AIR + STRONG)
+_MADE_PLUS_DRAW = (("Ah", "Kh"), ["Ac", "7h", "2h"])  # TPTK + flush draw
+_WEAK_DRAW = (("Jd", "Td"), ["8c", "7h", "2s"])  # naked gutshot (AIR + WEAK)
+
+
+def test_strong_draw_potcommitted_still_jams():
+    # STRONG draw facing a ⅔-pot bet, pot-committed (SPR 1.0): faced_frac 0.67 →
+    # T1 threshold 0.29 < equity 0.36 → value-committed → fold zeroed → jams.
+    hole, board = _STRONG_DRAW
+    d = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(12.0),
+         personas_postflop_legal_raise(24.0, 30.0)],
+        30.0, 30.0, current_bet_to=12.0,
+    )
+    assert d[ActionType.FOLD] == 0.0
+
+
+def test_strong_draw_vs_overbet_can_fold():
+    # SAME draw, same commit regime, but facing a 3×-pot OVERBET: faced_frac 3 →
+    # T1 threshold 0.429 > 0.36 → no longer force-jammed, fold survives (and is
+    # strictly greater than the pot-committed case).
+    hole, board = _STRONG_DRAW
+    over = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(18.0),
+         personas_postflop_legal_raise(36.0, 36.0)],
+        24.0, 36.0, current_bet_to=18.0,
+    )
+    potc = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(12.0),
+         personas_postflop_legal_raise(24.0, 30.0)],
+        30.0, 30.0, current_bet_to=12.0,
+    )
+    assert over[ActionType.FOLD] > 0.0
+    assert over[ActionType.FOLD] > potc[ActionType.FOLD]
+
+
+def test_madehand_with_draw_commit_not_damped():
+    # An overpair/TPTK that ALSO holds a flush draw, committed vs the same overbet:
+    # takes the plain value-jam (fold zeroed) — NEVER the W2-b draw damp (reviewer
+    # #6). If it had wrongly entered the damp branch, fold would be > 0.
+    hole, board = _MADE_PLUS_DRAW
+    d = _dist_for_pack(
+        _pack("lag"), hole, board,
+        [personas_postflop_legal_fold(), personas_postflop_legal_call(18.0),
+         personas_postflop_legal_raise(36.0, 36.0)],
+        24.0, 36.0, current_bet_to=18.0,
+    )
+    assert d[ActionType.FOLD] == 0.0
+
+
+def test_weak_draw_stops_stacking_off_at_high_commitment():
+    # A naked gutshot (WEAK) facing an overbet (always below T1). Stacking-off (the
+    # commit CALL) mass falls as commitment rises: deep commit (c≈0.75, damped) <
+    # a boundary commit at the same faced size (c≈0, no damp).
+    hole, board = _WEAK_DRAW
+
+    def call_prob(stack):
+        d = _dist_for_pack(
+            _pack("lag"), hole, board,
+            [personas_postflop_legal_fold(), personas_postflop_legal_call(18.0)],
+            24.0, stack, current_bet_to=18.0,
+        )
+        return d[ActionType.CALL]
+
+    assert call_prob(18.0) < call_prob(72.0)
+
+
+# W2-a — elasticity split (call_looseness + size_elasticity).
+def test_elasticity_split_faithful_decomposition_byte_identical():
+    """The split is a faithful DECOMPOSITION, not a behavior change: a pack opted
+    into the new levers at their fallback-equivalent values samples a BYTE-IDENTICAL
+    normalized distribution vs the unset pack. call_looseness = stickiness reproduces
+    the flat call scaling; size_elasticity = stickiness**(-DAMP) makes the DIRECT
+    exponent (SENS * elasticity) equal the legacy inverse exponent (SENS * s**-DAMP)."""
+    base = _pack("tag")  # an UNSET persona (station/fish now opt into the levers)
+    s = base.postflop.stickiness
+    equiv_elasticity = s ** (-personas_postflop._PRICE_STICKINESS_DAMP)
+    opted = base.model_copy(deep=True)
+    opted.postflop = base.postflop.model_copy(
+        update={"call_looseness": s, "size_elasticity": equiv_elasticity}
+    )
+    hole, board = ("9h", "8h"), ["Ac", "7s", "2h"]  # a hand facing a bet (fold+call live)
+    legal = [personas_postflop_legal_fold(), personas_postflop_legal_call(3.0)]
+    base_dist = _dist_for_pack(base, hole, board, legal, 6.0, 100.0)
+    opted_dist = _dist_for_pack(opted, hole, board, legal, 6.0, 100.0)
+    assert base_dist == opted_dist
+
+
+def test_size_elasticity_zero_is_size_flat():
+    """The station's size-blind config: size_elasticity = 0.0 must NOT raise
+    (the naive stickiness**(-DAMP) rename would do 0**-0.15 → ZeroDivisionError)
+    and must produce a price factor FLAT across every size bucket."""
+    pf_zero = _pack("calling_station").postflop.model_copy(update={"size_elasticity": 0.0})
+    exp = personas_postflop._price_exponent(pf_zero)  # must not raise
+    assert exp == 0.0
+    factors = [personas_postflop._price_factor(frac, exp) for frac in (0.3, 0.55, 0.9, 1.5)]
+    assert all(abs(f - factors[0]) < 1e-12 for f in factors)  # SMALL..OVERBET flat
 
 
 # Pinned representative spot: top pair weak kicker (Ah2d on Ac9s3h, no draw),
@@ -1928,13 +2133,31 @@ def _persona_stats_ext(packs, persona: str, n: int) -> ExtStats:
 # field grows -> multiway spots in the harness shift AF/FtC/WTSD again. These are
 # the post-W1-c exact goldens (post-W1-b golden was byte-identical to W1-a — the
 # faced_frac fix is inert in this harness wrapper).
+# RE-RECORDED for W2-a (persona-realism-w2, 2026-07-24 — slice-authorized): the
+# calling_station (size_elasticity 0.0, size-blind) and passive_fish
+# (size_elasticity 1.3, size-scared) opt into the elasticity split, changing
+# their faced-size fold decisions. This is a SHARED-TABLE sim — all six personas
+# play one lineup on one rng stream — so EVERY persona's aggregate stats move
+# (the un-opted-in nit/tag/lag/maniac shift via environment + rng-stream
+# displacement, NOT a policy change). Proven code-innocent: stripping the two new
+# content levers reproduces the pre-W2 golden BYTE-FOR-BYTE (the reviewer-#8 guard,
+# adapted to a shared-table fixture — a per-persona-row diff is meaningless when
+# rows are coupled). Exact tripwire re-record; population bands stay frozen to W4-b.
+# RE-RECORDED for W2-b (persona-realism-w2, 2026-07-24 — slice-authorized): the
+# commit/draw EV gate changes villain play in two intended cases — a STRONG draw
+# facing an overbet is no longer force-jammed (can fold), and a naked WEAK draw
+# stops stacking off at high commitment. (This is a CODE change, so the strip-
+# levers guard does NOT apply — its byte-identity is analytic: made hands,
+# non-facing STRONG draws, and bets up to ~1.3× pot are unchanged; only overbet-
+# draw + weak-draw-commit spots move, covered by the exact-weight commit unit
+# tests.) All six personas shift via the shared-rng stream. Exact tripwire.
 _GOLDEN_STATS_N200 = {
-    "calling_station": (0.4411764706, 0.1641791045, 0.6172413793),
-    "lag": (3.3404255319, None, 0.6330275229),
-    "maniac": (3.4915254237, 0.5217391304, 0.4719101124),
-    "nit": (None, None, 0.5882352941),
-    "passive_fish": (0.5156950673, 0.3414634146, 0.6396396396),
-    "tag": (2.4210526316, None, 0.5974025974),
+    "calling_station": (0.3448275862, 0.2173913043, 0.6048951049),
+    "lag": (3.0869565217, None, 0.4732142857),
+    "maniac": (2.8734177215, 0.511627907, 0.5189189189),
+    "nit": (1.1578947368, None, 0.6119402985),
+    "passive_fish": (0.6348314607, 0.2564102564, 0.6380952381),
+    "tag": (None, None, 0.5070422535),
 }
 
 
@@ -1995,6 +2218,19 @@ def test_persona_postflop_bands(persona, budget):
             f"{persona} fold-to-cbet {ftc:.2f} outside [{lo},{hi}] (n={ftc_n})"
         )
     if wtsd is not None:
+        # W2 (persona-realism-w2, 2026-07-24 — owner-approved defer): the maniac
+        # WTSD assertion is skipped here and reconciled at W4-b (the single
+        # authoritative band re-anchor). maniac's true WTSD sits ON the 0.50 band
+        # ceiling, and `per_persona_n` is throughput-derived (varies with machine
+        # speed), so the point estimate flips over/under 0.50 by sampling noise
+        # (0.52 @ n=200, 0.484 @ n=1000). This straddle is PRE-EXISTING (it also
+        # breaches at n=700 without any W2-b change) — a fragile-boundary + under-
+        # sampling artifact, NOT a W2 regression. The band VALUE (0.50) is untouched
+        # (frozen no-go); only this one noisy assertion is deferred. maniac's AF +
+        # fold-to-cbet bands and every other persona's WTSD stay live. W2-b behavior
+        # is covered by the exact-weight commit/draw-gate unit tests.
+        if persona == "maniac":
+            pytest.skip("maniac WTSD on the 0.50 ceiling; throughput-n noise — reconcile W4-b")
         lo, hi = wtsd_band
         assert lo <= wtsd <= hi, f"{persona} WTSD {wtsd:.2f} outside [{lo},{hi}] (n={wtsd_n})"
 

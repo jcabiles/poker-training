@@ -19,7 +19,7 @@ import random
 from enum import StrEnum
 
 from app.domain.action import Decision
-from app.domain.content.models import PersonaPack
+from app.domain.content.models import PersonaPack, PersonaPostflop
 from app.domain.equity import _RIDX, _eval5
 from app.domain.spot import ActionType, Card, LegalAction, Street
 from app.domain.table.sizing import postflop_node_key, pot_fraction_to_bb
@@ -288,6 +288,10 @@ _RIVER_RAISE_FLOOR = (
 _RIVER_BET_FLOOR = (StrengthBucket.MIDDLE_PAIR,)
 _BLUFF_RAISE_FACTOR = 0.3  # bluff-raising is structurally rarer than bluff-betting
 _COMMIT_AGG_BOOST = 3.0  # SPR-commit shift toward call/jam
+# W2-b (B5b, F7): the max fraction of a draw's CALL/RAISE bonus removed at full
+# commitment when the draw is NOT value-committed (below T1) — a naked draw stops
+# stacking off. Scaled by the commitment fraction c in [0,1]. FIT SEED.
+_B5B_DRAW_DAMP = 0.7
 # F3 bounded aggression (RES-D §0 saturation fix): the `aggression` lever is
 # capped before it scales any merit. An uncapped maniac lever (15.0) multiplies
 # one side of the un-normalized merit ratio so hard that rng.choices degenerates
@@ -327,10 +331,13 @@ _ALPHA_REF = _BUCKET_ALPHA[SizeBucket.MEDIUM]
 #   over-folded the α ceiling at every size (a tag folded ~0.39 to a ⅓-pot bet
 #   vs α 0.25); 0.35 re-levels the whole curve under the ceiling.
 # - SENSITIVITY: exponent on the α ratio — how fast fold merit grows with size.
-# - STICKINESS_DAMP: the `stickiness` lever wiring — the effective exponent is
-#   SENSITIVITY * stickiness**(-DAMP), so stickier personas (station 1.8,
+# - STICKINESS_DAMP: the LEGACY `stickiness` price wiring, used ONLY when a pack
+#   has not opted into W2-a (`size_elasticity is None`) — the effective exponent
+#   is SENSITIVITY * stickiness**(-DAMP), so stickier personas (station 1.8,
 #   fish 1.4) respond LESS to price than the disciplined low-stickiness ones
-#   (nit/tag 0.6), on top of stickiness's existing call-merit scaling.
+#   (nit/tag 0.6). W2-a splits this: an explicit `size_elasticity` bypasses this
+#   branch for a DIRECT exponent (see `_price_exponent`), and the flat call-merit
+#   scaling moves to the separate `call_looseness` lever.
 _PRICE_LEVEL = 0.35
 _PRICE_SENSITIVITY = 2.2
 _PRICE_STICKINESS_DAMP = 0.15
@@ -406,13 +413,76 @@ def _sizing_dist(pf, board: list[Card], legal: list[LegalAction], is_aggressor: 
     return pf.sizing
 
 
-def _price_factor(faced_fraction: float, stickiness: float) -> float:
+def _price_factor(faced_fraction: float, exponent: float) -> float:
     """Multiplier on the fold merit for a faced bet at `faced_fraction` of the
-    pot: LEVEL * (α_bucket/α_ref) ** (SENSITIVITY * stickiness**-DAMP).
-    Monotone non-decreasing across SMALL→OVERBET because _BUCKET_ALPHA is."""
+    pot: LEVEL * (α_bucket/α_ref) ** exponent. Monotone non-decreasing across
+    SMALL→OVERBET because _BUCKET_ALPHA is (for any exponent >= 0). The exponent
+    is resolved by `_price_exponent` (W2-a)."""
     alpha = _BUCKET_ALPHA[size_bucket(faced_fraction)]
-    exponent = _PRICE_SENSITIVITY * stickiness ** (-_PRICE_STICKINESS_DAMP)
     return _PRICE_LEVEL * (alpha / _ALPHA_REF) ** exponent
+
+
+def _price_exponent(pf: PersonaPostflop) -> float:
+    """W2-a: the price-response exponent, driven by `size_elasticity`.
+
+    Two branches to preserve default-off byte-identity WHILE fixing the crash +
+    direction reversal a naive rename would cause:
+    - `size_elasticity is None` (un-opted-in) → the LEGACY inverse formula
+      `SENSITIVITY * stickiness**(-DAMP)`: stickier personas (station 1.8, fish
+      1.4) respond LESS to price than the disciplined low-stickiness ones
+      (nit/tag 0.6). Byte-identical to pre-W2.
+    - `size_elasticity` set → a DIRECT exponent `SENSITIVITY * size_elasticity`.
+      This is a DIFFERENT scale from stickiness, chosen so 0.0 is size-blind
+      (exponent 0 → flat factor, no `0**-DAMP` ZeroDivisionError) and larger
+      values are STEEPER (scared) — the intuitive direction. ~1.0 reproduces a
+      normal price response (exponent ≈ 2.2).
+    """
+    if pf.size_elasticity is None:
+        return _PRICE_SENSITIVITY * pf.stickiness ** (-_PRICE_STICKINESS_DAMP)
+    return _PRICE_SENSITIVITY * pf.size_elasticity
+
+
+def _draw_equity(draw: DrawCategory, board: list[Card]) -> float:
+    """W2-b heuristic draw equity — rule-of-4-and-2, NO solve (interim EV; label
+    approximate). Street is derived from `len(board)` so this never depends on the
+    optional `street` kwarg being passed: flop (3 cards, 2 to come) uses ×4, turn
+    (4 cards, 1 to come) uses ×2. STRONG ≈ 9 outs (flush/OESD), WEAK ≈ 4 outs
+    (gutshot/backdoor). River (5 cards) or NONE → 0.0 (no draw equity; the made-
+    hand path governs the river). Calibration is a Later item (H7)."""
+    outs = {DrawCategory.STRONG: 9.0, DrawCategory.WEAK: 4.0}.get(draw, 0.0)
+    if outs == 0.0:
+        return 0.0
+    cards_to_come = 5 - len(board)
+    if cards_to_come >= 2:
+        return outs * 4.0 / 100.0  # STRONG 0.36 / WEAK 0.16
+    if cards_to_come == 1:
+        return outs * 2.0 / 100.0  # STRONG 0.18 / WEAK 0.08
+    return 0.0
+
+
+def _value_commit_threshold(faced_fraction: float) -> float:
+    """W2-b value-commit (T1) threshold: the equity at which calling/jamming all-in
+    is +EV, e ≥ B/(P+2B). Expressed via the faced pot-fraction f = B/P (the already
+    pre-aggression-corrected `faced_frac`): B/(P+2B) = f/(1+2f). f=1 (pot) → 1/3;
+    f=3 (3×-pot overbet) → 3/7 = 0.429. A heuristic CALL-commit price proxy for the
+    stack-off, NOT a full jam-EV solve (reviewer #3)."""
+    return faced_fraction / (1.0 + 2.0 * faced_fraction)
+
+
+def _commit_transform(
+    entries: list[tuple[ActionType, float]],
+) -> list[tuple[ActionType, float]]:
+    """The SPR value-commit shift: zero FOLD mass, boost BET/RAISE by
+    _COMMIT_AGG_BOOST, leave CALL/CHECK. Extracted so W2-b's gate can reuse it."""
+    return [
+        (
+            a,
+            0.0
+            if a is ActionType.FOLD
+            else m * (_COMMIT_AGG_BOOST if a in (ActionType.BET, ActionType.RAISE) else 1.0),
+        )
+        for a, m in entries
+    ]
 
 
 def sample_postflop_decision(
@@ -460,6 +530,10 @@ def sample_postflop_decision(
     pf = pack.postflop
     if pf is None:
         raise ValueError(f"persona pack {pack.id!r} has no postflop block")
+    # W2-a: the two split identity levers, each falling back to `stickiness` when
+    # the pack hasn't opted in (default-off byte-identity). `looseness` scales the
+    # flat CALL merit; the price-response exponent is resolved by `_price_exponent`.
+    looseness = pf.call_looseness if pf.call_looseness is not None else pf.stickiness
     bucket, draw = strength_bucket(hole, board)
     by_kind = {la.action: la for la in legal}
 
@@ -519,7 +593,7 @@ def sample_postflop_decision(
             faced_frac = to_call_bb / max(pot_bb - max(current_bet_to, to_call_bb), 0.01)
         else:
             faced_frac = to_call_bb / max(pot_bb - latest_aggressor_contribution_bb, 0.01)
-        fold_merit = _FOLD_BASE[bucket] * _price_factor(faced_frac, pf.stickiness)
+        fold_merit = _FOLD_BASE[bucket] * _price_factor(faced_frac, _price_exponent(pf))
         # F4 (RES-D §6): bluff-catch-class buckets fold MORE per added
         # opponent — direction only, see _MW_CATCH_TIGHTEN above.
         if bucket in _MW_CATCH_BUCKETS:
@@ -528,7 +602,7 @@ def sample_postflop_decision(
         # River polarization (see _RIVER_RAISE_FLOOR): air never bluff-CALLS
         # the river — it folds or bluff-raises. Flooring happens BEFORE the
         # SPR-commit block so a floored 0 survives the commit boost.
-        call_merit = (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * pf.stickiness
+        call_merit = (_CALL_BASE[bucket] + _DRAW_CALL_BONUS[draw]) * looseness
         if bluff_cell and street is Street.RIVER:
             call_merit = 0.0
         entries.append((ActionType.CALL, call_merit))
@@ -572,20 +646,45 @@ def sample_postflop_decision(
         entries.append((ActionType.CHECK, check_merit))
         entries.append((agg_action, agg_merit))
 
-    # SPR commit (rule 2): shift to call/jam, no fold mass. Live SPR only —
-    # never srs.spr_bucket (frozen SRS contract).
-    if stack_bb / pot_bb <= pf.spr_commit and (
-        _RUNG[bucket] >= _RUNG[StrengthBucket.OVERPAIR_TPTK] or draw is DrawCategory.STRONG
-    ):
-        entries = [
-            (
-                a,
-                0.0
-                if a is ActionType.FOLD
-                else m * (_COMMIT_AGG_BOOST if a in (ActionType.BET, ActionType.RAISE) else 1.0),
-            )
-            for a, m in entries
-        ]
+    # SPR commit (rule 2): shift to call/jam. Live SPR only — never srs.spr_bucket
+    # (frozen SRS contract).
+    #
+    # W2-b (F5/F7): the commit shift is EV-gated on the DRAW side (directional own-
+    # action policy — no forced-F*, owner decision).
+    #  - A made hand (rung >= OVERPAIR) commits exactly as before (equity ≈ 1): the
+    #    value-jam path is byte-identical and is NEVER draw-damped, even when it also
+    #    holds a draw (reviewer #6).
+    #  - A STRONG draw NOT facing a price (unopened/betting — no fold to zero)
+    #    commits as before.
+    #  - A draw FACING a bet commits (zero fold) ONLY when its heuristic equity
+    #    clears the value-commit threshold for the faced price (T1 = f/(1+2f)). Below
+    #    T1 the fold is NOT zeroed (the price-aware fold merit stands) and the draw's
+    #    CALL/RAISE bonus is damped by commitment so a naked draw stops stacking off
+    #    (B5b). A draw hand is never bluff_cell (draw != NONE), so the RAISE merit is
+    #    always the non-bluff value+bonus form — the bonus subtraction is exact.
+    if stack_bb / pot_bb <= pf.spr_commit:
+        made = _RUNG[bucket] >= _RUNG[StrengthBucket.OVERPAIR_TPTK]
+        facing = ActionType.FOLD in by_kind
+        drawing = draw in (DrawCategory.STRONG, DrawCategory.WEAK)
+        if made or (draw is DrawCategory.STRONG and not facing):
+            value_commit = True
+        elif facing and drawing:
+            value_commit = _draw_equity(draw, board) >= _value_commit_threshold(faced_frac)
+        else:
+            value_commit = False
+        if value_commit:
+            entries = _commit_transform(entries)
+        elif facing and drawing:  # below T1 — keep fold, damp the draw's stack-off pull
+            c = min(max((pf.spr_commit - stack_bb / pot_bb) / pf.spr_commit, 0.0), 1.0)
+            removed = _B5B_DRAW_DAMP * c
+            damped: list[tuple[ActionType, float]] = []
+            for a, m in entries:
+                if a is ActionType.CALL:
+                    m -= _DRAW_CALL_BONUS[draw] * looseness * removed
+                elif a is ActionType.RAISE:
+                    m -= _DRAW_RAISE_BONUS[draw] * agg_scale * removed
+                damped.append((a, m))
+            entries = damped
 
     # Normalize (rule 1, pinned): clamp >= 0, divide by sum; sum 0 fallback.
     weights = [max(m, 0.0) for _, m in entries]

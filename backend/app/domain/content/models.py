@@ -145,6 +145,17 @@ class PersonaPostflop(BaseModel):
 
     aggression: float = Field(gt=0.0)  # scales bet/raise merit (1.0 = neutral)
     stickiness: float = Field(gt=0.0)  # scales call merit / resistance to folding
+    # W2-a: the `stickiness` axis split into two independent identity levers.
+    # Both OPTIONAL — unset falls back to `stickiness`, keeping un-opted-in packs
+    # byte-identical (default-off contract). `call_looseness` is the flat CALL-merit
+    # multiplier; `size_elasticity` drives the price-response exponent DIRECTLY
+    # (0.0 = size-blind/flat, higher = steeper fold-rise with bet size) — a distinct
+    # scale from stickiness, NOT the legacy inverse power. This lets a station be
+    # inelastic-but-loose (calls any size) while a fish is elastic-but-scared.
+    # flat call multiplier; None → stickiness
+    call_looseness: float | None = Field(default=None, gt=0.0)
+    # direct price exponent; 0 = size-blind; None → legacy stickiness formula
+    size_elasticity: float | None = Field(default=None, ge=0.0)
     bluff_freq: float = Field(ge=0.0, le=1.0)  # baseline bet/raise rate with air
     sizing: dict[str, float]  # pot-fraction str -> weight; weights sum to ~1
     # R2: optional per-node override, keyed by postflop node name (e.g.
