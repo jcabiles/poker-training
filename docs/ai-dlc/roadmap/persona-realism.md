@@ -1,14 +1,15 @@
 # Persona Realism — Roadmap (created 2026-07-23)
 
-> Living, pass/fail, resumable. A fresh context reads this + doc 12 and knows exactly what's left.
+> Living, pass/fail, resumable. A fresh context reads this + the two source docs and knows exactly what's left.
 > **Engine contract map (READ FIRST):** `docs/research/12-persona-engine-and-realism-fixes.md`
-> — every lever, merit table, formula, line anchor, and INVARIANT. This roadmap is the *decomposition*;
-> doc 12 is the *reference*. Review record: `docs/ai-dlc/research/RES-J-persona-realism.md`.
-> Parent roadmap: `docs/ai-dlc/roadmap/simulate-table.md` (its NEXT "Persona realism" bullet points here).
->
-> **Scope (locked 2026-07-23 interview):** **Core realism fix** — correctness patches + the
-> street-aware refactor + the stickiness split + position/size-aware preflop responses. We STOP
-> before the deep-judgment tier (kicker granularity, price-vs-equity, sub-types) — those are Next/Later.
+> — every lever, merit table, formula, line anchor, and INVARIANT. This roadmap is the *decomposition*.
+> **Grounded numbers (magnitudes):** `docs/ai-dlc/research/persona-realism-audit-2026-07-24.md` §10
+> (prescriptions P1–P9) — a merit multiplier is a FIT SEED, never a drop-in constant (softmax law).
+> **Full-scope backlog (superset, local/uncommitted):** `docs/ai-dlc/research/persona-realism-FULL-BUILDOUT.md`
+> — every buildable item (Tracks A–H, Phases 0–9), findings-coverage map, owner forks. This roadmap is the
+> *committed subset* of that backlog. Roadmap-structure debate + hardening gates:
+> `docs/ai-dlc/research/persona-realism-artifacts/roadmap_debate/DEBATE.md`.
+> Parent roadmap: `docs/ai-dlc/roadmap/simulate-table.md`.
 >
 > **Resume rule:** work waves in order; verify a slice's pass/fail ACTUALLY passes before `[x]`
 > (agents falsely mark work done). Hand ONE slice at a time to `/ai-dlc`. Every slice gets a fresh
@@ -16,303 +17,396 @@
 
 ---
 
+## Decisions locked (2026-07-23 interview) — what this roadmap commits to
+
+The narrow 2026-07-23 scope lock (stop before position / stack-depth / texture) is **RE-OPENED**. The grounded
+research re-promotes those to core. This roadmap now holds the **full grounded program** as NOW/NEXT slices and
+the **deferred/architecture tail** as typed Later bets. Specifically:
+
+1. **Scope = full program, tail as Later.** Grounded prescriptions → NOW/NEXT; opener-position, villain-range
+   rungs b/c, blockers, exploit-coaching, 5+way multiway → Later bets.
+2. **Villain-range rung (a) is COMMITTED to NEXT** — a coarse static preflop-range-by-position *lookup* (data, not
+   a solver; stays no-solver-compliant). It unlocks the barrel-more-on-scare-cards pilot and "facing a [type]"
+   reads. Rungs (b) persona-conditional prior and (c) full equity-vs-range estimator stay Later.
+3. **All four hardening gates adopted:** (D7) a new metric must show the expected direction before its slice can
+   close; (D8) a seeded node-trace pack catches "right stat, wrong reasoning"; (D9) a human-realism playtest
+   before the final band re-anchor; (F1) every mechanic slice files a coaching seam-row.
+4. **Coaching seam-feeds the active teacher-rework** — concept-card candidates + a cleaner GTO grading baseline
+   ride on landed mechanics (no new coaching roadmap, no collision). Full exploit-coaching is a Later ticket.
+
+**Defaults applied (veto any at the approval gate):** opener-position-aware defense (needs schema+plumbing) →
+Later · WTSD downward re-anchor → accepted, once, at W4 close · out-of-position realization damp → Later · commit-
+factor spread → let the elasticity split carry separation first, widen the `D` exponent only if measured too weak ·
+reference pool stays **online low-mid 9-max ~100bb** (the whole keystone is calibrated to it).
+
+---
+
 ## North-star outcome — the WHY
 
 - **Primary:** *the six villain bots make decisions that match their real-world archetype* — so the
   Simulate table teaches transferable reads instead of training the hero against unhinged, streetless bots.
-  **Metric:** each persona's computed facing-a-bet distribution (the doc-12 §4/§9.2 regeneration) matches
-  its archetype's documented shape — polarized rivers, archetype-correct fold-to-size elasticity, no
-  off-archetype open-limps, no literal no-pair-no-draw calls.
-  **Baseline (measured, doc 12):** maniac raises one pair on the river 38–54% and calls busted air 23%;
-  station calls pure air 78%; fish & station differ only by a uniform stickiness shift (no shape
-  difference); every response node is position/size-blind. → **Target:** river raises come only from
+  **Metric:** each persona's computed facing-a-bet distribution matches its archetype's documented shape —
+  polarized rivers, archetype-correct fold-to-size elasticity, no off-archetype open-limps, no literal
+  no-pair-no-draw calls, position/street/stack-aware lines.
+  **Baseline (measured, doc 12):** maniac raised one pair on the river 38–54% and called busted air 23%;
+  station called pure air 78%; fish & station differed only by a uniform stickiness shift (no shape
+  difference); every response node was position/size/street-blind. → **Target:** river raises come only from
   `TWO_PAIR_PLUS+` / bluff-cell; air-call ≈0 without a draw; station fold-rate ≈flat across bet sizes while
-  fish is fit-or-fold; bots answer a UTG open differently from a BTN open. All six personas.
-  **Runnable metric (Codex-Sol F2 — "regenerate the tables" is not yet a real gate):** the north-star's
-  actual acceptance test is a **committed persona-distribution test module** with fixed hole/board/legal/
-  history contexts and explicit numeric thresholds + tolerances, asserting per persona: river bucket→action
-  distributions, size-response slopes (fold-rate vs bet size), positional/price preflop deltas, and
-  conditional barrel/give-up rates. Each slice below adds its assertions to it — that suite, not prose like
-  "≈0 / roughly flat", is what "matches its archetype" means. Population VPIP/PFR/AF/WTSD stats stay a
-  **secondary** regression check, never the north-star substitute.
+  fish is fit-or-fold; bots answer a UTG open differently from a BTN open; turn ≠ flop. All six personas.
+  **Runnable metric:** a **committed persona-distribution test module** with fixed hole/board/legal/history
+  contexts and explicit numeric thresholds + tolerances, asserting per persona: river bucket→action
+  distributions, size-response slopes (fold-rate vs bet size), positional/price preflop deltas, and conditional
+  barrel/give-up rates. Each slice adds its assertions to it — that suite, not prose like "≈0 / roughly flat",
+  is what "matches its archetype" means. Population VPIP/PFR/AF/WTSD stats stay a **secondary** regression check.
 
 ## Why this is one initiative, not six persona fixes
 
-The **same two root causes** drive every symptom (doc 12 §5, §9): (1) the postflop engine is
-**street-blind / memoryless** — flop = turn = river given the same bucket; (2) single scalars
-(`stickiness`, `aggression`) each do **two jobs**. So the fixes below repair **all six personas at
-once**; the aggressive three (maniac/LAG/TAG) are just where the river damage is loudest.
+The **same root causes** drive every symptom (doc 12 §5, §9): the postflop engine is **context-blind** — one
+shared merit table × 5 scalar levers, with no input for position, board texture, street, stack depth, or villain
+range. So the fixes below repair **all six personas at once**; the aggressive three (maniac/LAG/TAG) are just
+where the damage is loudest.
 
 ---
 
-## NOW — spec-ready vertical slices (ICE = Impact·Confidence·Ease, 1–10)
+## Cross-cutting discipline — applies to EVERY opting-in slice
 
-### Wave plan
-**W1** P1 → **W2** P2a ‖ P4 → **W3** P3 → **W4** P2b → **W5** final calibration pass.
-P2a/P3/P2b all own `personas_postflop.py` ⇒ they run **serially** on the postflop-engine spine.
-**Order is deliberate (Codex-Sol challenge):** P2a first (the headline river fix) → **P3 before P2b** so
-the `_price_factor`/facing-fold equation is stabilized *before* P2b layers a scare-card multiplier on it
-(P2b-then-P3 would force re-tuning P2b's scare weights).
-**P4 owns `personas.py` (preflop) — engine side runs parallel** to the postflop spine; but P4 edits the
-`preflop` array in the six packs (different JSON keys than P2b/P3's `postflop` lever block, so low merge
-risk) AND **shifts which ranges reach postflop** ⇒ the AF/WTSD/fold-to-cbet population calibration is NOT
-final until P4 lands. **W5 is a single combined re-anchor + coverage re-record** after both the postflop
-spine and P4 converge (see "Baseline & calibration discipline" below) — do NOT treat any mid-spine
-re-anchor as final.
-P1 lands the shared `_CALL_BASE` edit (A1) + all content, so it precedes everything.
+### Softmax law (anti-cosmetic-change) — NON-NEGOTIABLE
+The engine normalizes merits into probabilities, so a merit multiplier is **NOT** the observed frequency change.
+Every magnitude in §10 / the build-out is a **FIT SEED**: measure the observed stat → adjust the merit → re-measure.
+Dropping in "×0.75 / ×0.50" or a fixed fold-reduction as-is ships a **cosmetic** change. No slice closes on
+"the constant is in the code"; it closes on "the observed stat hit its target band."
 
-### Range-estimator parity — a NON-NEGOTIABLE for every opting-in slice (Codex-Sol HIGH)
-`range_estimate.py:278` recovers the villain's action distribution by **replaying the persona policy** with
-a capture-rng. Doc 12 §6.3's "keep `range_estimate` byte-identical" is correct **only for un-opted-in direct
-callers**. The moment P2a/P2b (street/history) or P4 (price/stack/position) make the **live** bot diverge
-from the streetless policy, the estimator MUST be threaded the **same** context and re-tested for **parity
-with the live policy** — otherwise the villain-range reveal feature (R1) infers polarized river actions
-through the stale streetless model and silently lies. **Each of P2a/P2b/P4 owns extending `range_estimate`'s
-replay context + a parity test** (live-policy `choices` distribution == estimator's recovered distribution).
-The action draw stays the FIRST `rng.choices` regardless (§6.3).
+### Metric Definition-of-Done gate (D7 — hardening gate)
+A slice that needs a NEW harness metric to prove its effect **cannot close until that metric is live AND showing
+the expected direction** (e.g. the IP-vs-OOP c-bet delta must exist and move before the position slice closes).
+This converts "directional-until-built" from an open IOU into a per-slice exit criterion.
 
-### Baseline & calibration discipline (Codex-Sol MED — anti-laundering)
-Re-recording `coverage_baseline.json` every slice replaces the comparator, so a small graded-coverage loss
-repeated across slices can vanish even if the initiative regresses net. Rule: **snapshot an immutable
-initiative-start baseline** (`coverage_baseline.persona-realism-start.json`) before P1; each slice still
-re-records the operational fixture for CI green, but **also reports the CUMULATIVE graded-coverage delta vs
-the immutable snapshot**, and any cumulative loss needs explicit adjudication (not silent acceptance). The
-W5 pass does the ONE authoritative combined population-band re-anchor after P4 + the spine converge.
+### Node-trace realism pack (D8 — hardening gate, anti-degeneracy)
+A lightweight seeded-replay pack: fixed hands per persona across IP/OOP, overcards, turn barrel, busted draw,
+multiway, high-commitment spots — logging bucket, draw class, merits, chosen action, intended prescription. Catches
+"**right stat, WRONG node**" (a maniac hitting its aggression number by over-valuing made hands instead of
+bluffing). Built in W0; each behavior slice adds its spots. Scope = seeded replay + merit log, NOT a new framework.
 
----
+### Human-realism playtest checkpoint (D9 — hardening gate)
+Blinded seeded replays + short free-play with 2–3 poker-literate reviewers. Acceptance = reviewers distinguish
+archetypes above chance AND flag no recurring persona-breaking lines. Runs at **W3.5**, after the context
+mechanics and BEFORE the final band re-anchor, so "feels human" feedback informs the fit. Stats-conformant ≠
+line-coherent.
 
-- [x] **P1 — Correctness patch: fold-aces, open-limps, oversized 3bet, air-calls, overlap guard.** ✅ DONE 2026-07-23
-      ICE 8·9·8. *(bundled quick wins — ships in days; one deliberate re-baseline)*
-      **Shipped** (branch `feat/persona-realism-p1`, 3 waves, dual-verified): B1 station raise/limp · M3
-      maniac+lag non-SB open-limps deleted · N4/N5 threebet 3.3 · N3 maniac vs_4bet jams lighter than LAG ·
-      A1 `_CALL_BASE[AIR]` 0.25→0.08 · N2 **dead-mix** validator (redefined from "reject overlaps" — 17 benign
-      catch-all overlaps found; only unreachable mixes are the real bug) + N3 CI guard. **M1 DROPPED → NEXT**
-      (breaks the aggression-cap guard, zero behavior change). Suite green (852), coverage 28.3%→29.4%, all pins
-      intact. Follow-up noted: `test_persona_postflop_bands[lag]` AF is a pre-existing wall-clock-N flake.
-      **Problem:** several outright bugs make bots visibly "unhinged" independent of the deep engine
-      flaws — the station folds AA/KK/AKs 40% unopened (B1), maniac & LAG open-limp every seat (M3),
-      maniac 3-bets 24.75bb (**N4/N5** — doc 12 §9.3; NOT §5's unrelated bucket-collapse "N4", which is
-      deferred to this roadmap's NEXT), every persona calls literal no-pair-no-draw (A1), maniac's
-      4bet/5bet is *tighter* than LAG's (N3), and authored mixes are silently shadowed (N2).
-      **Outcome-link:** removes the loudest off-archetype behavior before the structural work.
-      **Solution (content + one shared-table edit + a validator):**
-      - **B1** `calling_station.json` — change the premium `unopened` `{raise .6, fold .4}` to
-        `raise`/`limp`/`call` (station never folds premiums first-to-act).
-      - **M3** delete the **non-SB open-limp** mixes for `maniac.json` + `lag.json` (raise-or-fold archetype).
-      - **N4/N5** drop maniac `threebet_mult` 5.5 → ~3.0–3.5 (24.75bb → ~13–16bb).
-      - **N3** rebuild maniac `vs_3bet`/`vs_4bet`: wider 4bet value+bluff split + light 5bet-shove bluffs
-        (Axs/small-pair), so maniac re-jams *lighter* than LAG, plus a few KK/AA flats for traps.
-      - ~~**M1 (content half)** re-author maniac `aggression` 15.0 → ≤5.6 cap.~~ **DROPPED from P1 at
-        `/ai-dlc` (refuter F1):** setting the lever to the cap breaks `test_aggression_cap_binds_maniac_only`
-        (it asserts maniac `aggression > cap` *strictly* — the 15.0 exists to prove the cap clips maniac)
-        while changing **zero** sampled behavior. No behavioral value + a guard cost → **moved to NEXT**,
-        bundled with the behavior-changing `tanh` code-half (they should land together).
-      - **A1 (shared table)** in `personas_postflop.py` lower `_CALL_BASE[AIR]` ~0.25 → ~0.05–0.10 and
-        gate any air-continue behind a real draw (`_DRAW_CALL_BONUS`). **Ownership boundary (Codex-Sol F4):
-        A1 is STREET-NEUTRAL** — it drops the *base* air-call merit on every street. The **river-specific**
-        "air-call ≈0" gate is **P2a's** (street-aware), not P1's — P1 must not encode river logic. So P1's
-        pass/fail asserts the *base* air-call drop (air folds far more to a bet on a no-draw board);
-        P2a asserts the additional river-zero gate.
-      - **N2** add a content validator rejecting **overlapping combos across mixes in a node**
-        (first-match-wins makes later overlaps unreachable — pairs with the B1 premium-fold check).
-        **Ordering:** run the validator AFTER N3's maniac rebuild so it self-checks the new mixes for
-        introduced overlaps.
-      **Pass/fail:** station never folds AA/KK/AKs unopened (test); no persona has a non-SB open-limp mix
-      (validator test); maniac `threebet_mult ≤ 3.5`; maniac vs_4bet jams *lighter/trappier* than LAG
-      (≥3 shove combos LAG never shoves + nonzero AA/KK trap-flat weight — behavioral, not set-superset); a
-      no-pair-no-draw board drops air's no-draw call-freq to a medium bet ≥50% vs baseline with fold>call
-      (relative, NOT literal ≥0.9 — that river gate is P2a's; regenerate §4 dist); overlap validator
-      rejects a synthetic overlapping-combo pack; population bands re-anchored **with in-file justification**
-      + `coverage_baseline.json` re-recorded (§6.3); `verify.sh` + `ruff` green.
-      **Appetite:** ~1 small epic. **No-gos:** no engine-signature change here (that's P2/P4); no solver
-      ranges; no grader/`spot_signature()` touch; keep the anti-sizing-tell overlap.
+### Coaching seam intake (F1 — hardening gate)
+> ⚠️ Code collision: this hardening-gate **F1** (seam intake) is NOT the audit's **finding F1** (position ignored
+> postflop, which this roadmap fixes in W3-b). Same string, unrelated referents — disambiguate on hand-off.
+Every mechanic slice files a structured seam-row (mechanic · concept-card candidate · baseline stat moved ·
+example replay seed · source test · owner · status) into the `professional-teacher-rework` **Next** column as
+accepted / deferred-with-reason. **A slice isn't done until its seam-row is filed.** Batch handoff at W4 close.
 
-- [x] **P2a — Street-aware refactor: thread `street` + polarize the river.** *(THE keystone)* ✅ DONE 2026-07-23
-      ICE 9·7·5. *(fixes M2 + M7 — the user's #1 complaint "maniac over-calls the river / weird choices")*
-      **Shipped** (branch `feat/persona-realism-p2a`, stacked on P1, 3 waves, dual-verified — fan-in refuter
-      patched out the flooring and confirmed the polarization/parity tests genuinely fail without it): `street`
-      kwarg (default byte-identical) floors river RAISE for {MP,TP,OVERPAIR_TPTK} + air-CALL to 0; `play.py` +
-      `range_estimate.py` opt in (estimator parity test green). Measured: maniac river raise MP .382→0, TP
-      .543→0, OVERPAIR .777→0; air CALL→0 (bluff-raise survives); TWO_PAIR_PLUS/MONSTER + TURN byte-unchanged.
-      OVERPAIR_TPTK flooring = coarse compromise (finer split → N4). Bands re-anchored (WTSD/AF), ordering on the
-      exact-weight pin; coverage 28.3%→29.3% held. Follow-up: exact-equality assertion for TWO_PAIR_PLUS/MONSTER
-      river raises (behavior verified; guard missing).
-      **Problem:** the postflop engine takes **no street argument** — flop = turn = river given the same
-      bucket (doc 12 §2.4, `:381`). So the maniac raises one pair on the river for "value" (MP 38% / TP 54%),
-      LAG/TAG raise one pair 40%/32%, and busted air still calls — rivers should be **polarized** (nuts or
-      bluff, never a medium made hand).
-      **Outcome-link:** the single change that makes rivers realistic for **all six** personas.
-      **Solution:** add a `street` kwarg to `sample_postflop_decision` (derive from `len(board)` at the
-      live loop) with a **default that reproduces today's behavior** (mirror `is_aggressor=False`, §6.2).
-      On the **river**: floor `_RAISE_BASE[MIDDLE_PAIR]` and `[TOP_PAIR]` to ≈0 (medium hands
-      bet/check/call, never raise) and hold air calls near zero.
-      **⚠️ Boundary decision (Codex-Sol F7 — internal inconsistency to resolve at `/ai-dlc`):** the stated
-      "river raises only from `TWO_PAIR_PLUS+` / bluff-cell" is NOT achieved by flooring MP/TP alone —
-      `OVERPAIR_TPTK` keeps a positive shared raise merit (`_RAISE_BASE=0.25 × agg`, and the maniac raises it
-      at 5.6×). Decide explicitly whether an overpair/TPTK is "river medium-strength" (thin value → floor it
-      too) or a legitimate river value-raise (keep it) — and make the mechanic match the stated boundary.
-      Do NOT pull M4/kicker-split into NOW to resolve this; it's a coarse policy gate.
-      The live loop (`sim_session.py` / `table/play.py`) opts in; then re-baseline.
-      **Estimator parity (Codex-Sol F1 — P2a OWNS this):** when the live loop passes `street=`,
-      `range_estimate.py` must ALSO pass it (extend its replay context with street) + a parity test proving
-      the estimator's recovered river distribution matches the live polarized policy. "Byte-identical"
-      applies only to un-opted-in direct callers, NOT to the reveal feature.
-      **Pass/fail:** (a) **default-off (direct callers, no `street=` kwarg)** ⇒ `test_personas_postflop.py`
-      byte-identical (verified no `street=` call sites there); (b) **street-on (via `table/play.py` AND
-      `range_estimate.py`)** ⇒ maniac river MIDDLE_PAIR raise ≈0 (was 38%), TOP_PAIR raise ≈0 (was 54%),
-      LAG/TAG one-pair river raise ≈0, river raises only from the class the boundary-decision permits
-      (regenerate §9.2 dist); **estimator-parity test green** (recovered dist == live dist on a river spot);
-      `coverage_baseline.json` re-recorded + cumulative-delta reported vs the immutable snapshot; action draw
-      still the FIRST `rng.choices` (§6.3); `verify.sh` green.
-      **Appetite:** ~1 large epic. **No-gos:** no scare-card term yet (P2b); no bluff-decay yet (P2b); don't
-      insert a new `rng` draw before the action `choices` (breaks `range_estimate` — §6.3).
+### Range-estimator parity — for any slice that makes the LIVE bot diverge (Codex-Sol HIGH)
+`range_estimate.py:278` recovers the villain's action distribution by **replaying the persona policy** with a
+capture-rng. "Keep `range_estimate` byte-identical" holds **only for un-opted-in direct callers**. The moment a
+slice makes the live bot diverge from the streetless policy, the estimator MUST be threaded the **same** context
+and re-tested for **parity with the live policy** — else the villain-range reveal feature silently lies. Each such
+slice owns extending the estimator's replay context + a parity test. The action draw stays the FIRST `rng.choices`.
 
-- [ ] **P2b — Memory term: scare-card fold + per-street bluff decay + give-up.**
-      ICE 7·7·4. *(**W4 — after P2a AND P3**: needs P2a's `street` arg + P3's stabilized facing-fold
-      equation, so scare weights are tuned against the final `_price_factor`, not re-tuned later)*
-      *(fixes F3/N3 + the M5 remainder)*
-      **May split at `/ai-dlc` (Codex-Sol F5):** scare-card **folding** (a facing-fold-merit multiplier) and
-      bluff **decay/give-up** (initiative/history-conditioned *betting*) have different inputs, paths, and
-      failure modes — treat as two sub-slices (P2b-i scare-fold, P2b-ii barrel-decay/give-up) if the
-      contract scan says so.
-      **Problem:** even with street threaded, the engine has no **fear response** and no **give-up** model:
-      `bluff_mass` is identical flop = turn = river (doc 12 §5 F3/M5), so the nit can't "run scared when an
-      overcard hits the turn" and the maniac barrels air at the same rate on every street.
-      **Outcome-link:** the documented nit "one-and-done barrel fold" + realistic declining bluff frequency.
-      **Solution:** thread prior-street bucket + **prior aggression** into the facing-fold term; add a
-      **scare-card multiplier** (new overcard / flush- or straight-completing card / paired board) on the
-      fold merit for pair-class buckets, with **persona-specific sensitivity** (strong for nit/fish,
-      near-zero for the inelastic station); **decay `bluff_mass` per street** + explicit give-up /
-      continuation logic keyed to prior aggression + runout. **Define "prior aggression" up front
-      (Codex-Sol F5):** it means *this bot's own prior-street action + whether it holds initiative* (NOT the
-      opponent's aggression) — pin the exact history projection before coding.
-      **Estimator parity (Codex-Sol F1):** history-conditioned live behavior means `range_estimate` must be
-      threaded the same prior-street/initiative context + a parity test (same as P2a).
-      **Pass/fail:** nit folds top pair more on a turn overcard than on a blank turn (direction test);
-      station scare-sensitivity ≈0 (near-flat, test); for a fixed persona/bucket `bluff_mass(river) <
-      bluff_mass(flop)` (test); a give-up line exists (bot checks back / folds air it would have barrelled);
-      estimator-parity test green on a history-conditioned spot; bands re-anchored with justification;
-      coverage baseline re-recorded + cumulative-delta reported; `verify.sh` green.
-      **Appetite:** ~1 large epic. **No-gos:** heuristic scare term only (no equity solve — that's Next N5);
-      keep the default-off byte-identity for un-updated direct callers until the live loop opts in.
-
-- [ ] **P3 — Split `stickiness` → `call_looseness` + `size_elasticity`.**
-      ICE 8·7·5. *(**W3 — after P2a, BEFORE P2b**: stabilize the `_price_factor`/facing-fold equation first
-      so P2b's scare multiplier is layered on the final equation, not re-tuned — Codex-Sol F5. Street-neutral,
-      so it does not depend on P2a's street logic, only on the shared `personas_postflop.py` spine order.)*
-      *(fixes F1/M8 — the defining fish/station flaw)*
-      **Problem:** one dial controls **both** how loose a persona calls **and** how much bet size scares it
-      (doc 12 §5 F1: flat CALL multiplier `:484` **and** the price-fold exponent `:377`). So you can't make
-      the **station inelastic-but-loose** (calls regardless of size) while the **fish is elastic-but-scared**
-      (fit-or-fold) — the one axis that *defines* the difference is welded shut. Both currently swing
-      fold-rate ~4.7× SMALL→OVERBET.
-      **Outcome-link:** fish and station finally differ in **shape**, not just a uniform stickiness shift.
-      **Solution:** add two optional levers — `call_looseness` (the flat CALL multiplier) and
-      `size_elasticity` (drives the `price_factor` exponent, decoupled from looseness); default = today's
-      `stickiness` behavior for unauthored packs. Prefer a **continuous** faced-size function over the 4
-      abrupt α buckets. Set station `size_elasticity ≈ 0` (near-flat) + high looseness; fish high elasticity
-      + moderate looseness. **Update the monotonicity pins to the new levers** while keeping the directional
-      guarantees.
-      **Pass/fail:** station fold-rate roughly **flat** across SMALL→OVERBET (elasticity≈0, test); fish
-      fold-rate rises steeply with size; `call_looseness↑` never lowers call freq; fold monotone in faced
-      size + respects the α ceiling (updated pins); persona-ordering test re-anchored **deliberately**; bands
-      re-anchored + baseline re-recorded; `verify.sh` green.
-      **Appetite:** ~1 large epic. **No-gos:** don't break the monotonicity/α-ceiling invariants (§6.3);
-      keep default-off byte-identity for the un-split packs until re-baselined.
-
-- [ ] **P4 — Position/size/stack-aware preflop responses.**
-      ICE 7·6·4. *(owns `personas.py` — runs PARALLEL to the P2/P3 postflop spine on the ENGINE side)*
-      *(fixes N1/N2-pf)*
-      **⚠️ Content dependency on P1:** P4 position-splits the SAME `vs_3bet`/`vs_4bet` pack nodes that
-      P1's N3 rebuilds for maniac/lag. The wave plan already serializes P1 (W1) before P4 (W2), so there's
-      no concurrency conflict — but a P4 implementer must **build on P1's rebuilt value/bluff mixes, not
-      re-litigate N3**. `PersonaNode.positions` already exists in the schema (verified) ⇒ P4 is a
-      content-authoring exercise, NOT a content-model change; the "default = today's behavior" claim scopes
-      only to `sample_preflop_action`'s function signature.
-      **Problem:** `sample_preflop_action` sees only categorical `facing` (doc 12 §5 N2-pf / §9.3 N1,
-      `personas.py:61`): a TAG answers a UTG open exactly like a BTN open, and a min-raise exactly like an
-      all-in. Real continue frequency is **position-, price-, and stack-sensitive** — this is the
-      "not playing within their range realistically" feel.
-      **Outcome-link:** preflop responses that respect position and price, on a separate engine from the
-      postflop keystone.
-      **Solution:** pass **raise size + position + effective stack + all-in state** into the preflop sampler
-      (new kwargs, default = today's behavior so existing callers stay byte-identical); author
-      **position-split** + **price-elastic** response nodes for `vs_rfi` / `vs_3bet` / `vs_4bet` across the
-      six packs. The live loop (`sim_session.py`) opts in.
-      **⚠️ NOT cleanly parallel — population coupling (Codex-Sol F3):** P4 changes *which ranges and pot
-      types reach the flop*, so the postflop AF/WTSD/fold-to-cbet calibration done in the P2/P3 spine is
-      **not final** until P4 lands. P4's pack edits are the `preflop` array (different JSON keys than the
-      spine's `postflop` block → low merge risk), but the **population re-anchor + coverage re-record is
-      deferred to the W5 combined pass** after BOTH P4 and the spine converge — do not re-anchor bands
-      "final" mid-spine.
-      **Estimator parity (Codex-Sol F1):** when the live loop passes price/stack/position, `range_estimate`'s
-      preflop path must be threaded the same context + a parity test — else the preflop range read diverges
-      from the price/stack-aware live policy.
-      **Pass/fail:** a TAG facing a UTG open continues **tighter** than vs a BTN open (direction test); a
-      min-raise vs a shove produce **different** continue frequencies at the same `facing` (test);
-      default-off ⇒ existing preflop tests byte-identical; preflop estimator-parity test green; VPIP/PFR
-      bands still hold for all six personas (checked in the W5 combined pass); **coverage baseline re-recorded
-      — P4 DOES change the played stream** (Codex-Sol F6 — it was missing this); `spot_signature()` untouched
-      (grader's, not the bots'); `verify.sh` green.
-      **Appetite:** ~1 large epic. **No-gos:** no solver ranges; no signature-dim renumbering; keep the
-      first-match-wins semantics (author non-overlapping nodes — P1's validator guards this).
+### Baseline & calibration discipline (anti-laundering)
+Re-recording `coverage_baseline.json` every slice replaces the comparator, so small repeated losses can vanish.
+Rule: an **immutable initiative-start snapshot** (`coverage_baseline.persona-realism-start.json`) exists; each
+slice re-records the operational fixture for CI green **and** reports the CUMULATIVE graded-coverage delta vs the
+immutable snapshot; any cumulative loss needs explicit adjudication. The **W4 pass** does the ONE authoritative
+combined population-band re-anchor after the whole spine converges (don't chase bands across waves).
 
 ---
 
-## NEXT — validated problems, not yet spec'd (deeper realism; ship a slice each when core lands)
+## NOW — the grounded program, as spec-ready vertical slices
 
-- **M4 / F6 — Split `aggression` into value/bluff × bucket (× street).** One scalar multiplies every
-  non-bluff bucket's raise merit uniformly (5.6× hits weak made hands the same as monsters); also shrinks
-  nit MONSTER value-betting. → `value_agg` (made ≥ TOP_PAIR) separate from the bluff term; or scale
-  `_RAISE_BASE` by rung.
-- **M6 / F8 — Graded SPR-commit curve.** Binary cliff + identical 3.0 boost for all personas; a scared fish
-  never folds an overpair below SPR 2. → smooth commitment over (spr_commit − live SPR) × equity × draw ×
-  street, per-persona commit strength; keep TPTK able to fold rivers.
-- **M1 (code half + deferred content half) — Soft-saturation (`tanh`) aggression** so a higher lever still
-  strictly orders maniac above LAG at every merit (replaces the hard 5.6 cap; calibrate to observable AF, not
-  lever magnitude). The maniac `aggression` re-author (deferred from P1) lands **here** — once the cap is
-  replaced by `tanh`, re-authoring 15.0 becomes behavior-meaningful instead of a dead-above-cap no-op.
-- **N6 — Value/bluff/street/texture sizing overrides.** Fish & station share identical own-sizing. →
-  permit sizing overrides **respecting the anti-sizing-tell no-go** (F2 two-stage factorization is the template).
-- **N5 — Faced price meets hand equity / draw odds.** Bet size scales `_FOLD_BASE` alone; a gutshot and a
-  flush draw defend through the same generic mechanism. → coarse pot-odds-vs-outs, then persona deviations.
-- **N4 — Bucket/kicker granularity.** All top pairs share TOP_PAIR; every set/straight/flush is one MONSTER
-  blob; king-high lumps into ACE_HIGH. → kicker strength, relative-nut class, board vulnerability, blockers.
-- **N2-claude — Same-street 3bet+ under-folds.** Acknowledged in-code (`:468-474`); fix if the memory rework
-  touches that path.
+### Wave plan (dependency order from the build-out §4)
+**W0 foundation** (denominator + measurement + anti-degeneracy infra — unblocks honest gating for all of NOW)
+→ **W1 low-risk wins** → **W2 identity + EV** → **W3 context** (plumbing → position/street/texture)
+→ **W3.5 human-realism checkpoint** → **W4 commitment brake LAST + single band re-anchor + seam batch**.
+All postflop-mechanic slices own `personas_postflop.py` ⇒ they run **serially** on that spine. The commitment
+brake is sequenced LAST (highest regression risk; it must layer on the stabilized price/fold equation, not force
+re-tuning). Every slice: default-off byte-identity for un-opted-in direct callers until the live loop opts in.
 
-## LATER — bets (problem · confidence · assumption to test)
+---
 
-- **F5 — Persona sub-types (multiple packs per archetype).** `VillainType` is enum-locked (one
-  `passive_fish`/`calling_station` slot; loader raises on duplicates). Separate a stable `profile_id` from a
-  broad `archetype`. **Confidence: med.** *This is the direct enabler for **Hidden-persona mode**, not for
-  realism per se* — assumption to test: sub-types are wanted **before** Hidden-persona ships. Sequence it
-  **with** that mode, not here. (Review-by: when Hidden-persona mode is scoped.)
-- **Solver-boundary revisit for N4/N5.** Heuristics hit a ceiling on kicker/equity precision.
-  **Confidence: low.** Assumption to test: whether "simplified-but-winning" heuristics are enough, or this is
-  the trigger to revisit the solver-baseline no-go. EVs stay labeled *approximate* either way. (No hard date.)
+### ✅ DONE
+
+- [x] **P1 — Correctness patch (fold-aces, open-limps, oversized 3bet, air-calls, dead-mix guard).** ✅ 2026-07-23
+      Branch `feat/persona-realism-p1` (#83). Station no longer folds AA/KK/AKs unopened; maniac/LAG non-SB
+      open-limps deleted; maniac `threebet_mult`→~3.3; maniac vs_4bet re-jams lighter/trappier than LAG;
+      `_CALL_BASE[AIR]` 0.25→0.08 (street-neutral base drop); dead-mix validator + CI guard. Suite green,
+      coverage 28.3→29.4%. (`tanh`-saturation `aggression` re-author deferred → NEXT.)
+
+- [x] **P2a — Street-aware refactor + river polarization (keystone).** ✅ 2026-07-23
+      Branch `feat/persona-realism-p2a` (#85). Added the `street` kwarg (default byte-identical); floored river
+      RAISE for {MIDDLE_PAIR, TOP_PAIR, OVERPAIR_TPTK} + air-CALL to 0; `play.py` + `range_estimate.py` opt in
+      (estimator-parity test green). Bands re-anchored (WTSD/AF). **Note the residue for W1:** P2a floored the
+      river *raise*; the unopened river one-pair **BET** floor (MIDDLE_PAIR only) is still open → slice W1-a below.
+
+---
+
+### W0 — foundation (measurement + shared inputs + anti-degeneracy)
+
+- [ ] **W0-a — Shared pot-before-aggression denominator (A1).** *ICE 7·9·8 — small, shared.*
+      **Problem:** the commitment gate (W2), the semi-bluff EV math (W2), and the faced_frac fix (W1) all need
+      "the pot before the current bet/raise" + the latest aggressor's increment; a wrong denominator silently
+      corrupts every EV threshold downstream.
+      **Solution:** one domain-pure helper reconstructing pot-before + latest-aggressor increment from
+      `state.action_history` (already at the `play.py` call site). No DB, no new state.
+      **Pass/fail:** a self-re-raise unit test returns the correct pre-aggression pot; every existing suite stays
+      byte-identical (pure add, no consumers yet). **No-gos:** domain purity; don't rewire the action draw.
+      **Appetite:** ~1 small slice.
+
+- [ ] **W0-b — Harness metric scaffolding + Definition-of-Done gate (D1–D7).** *ICE 8·8·5 — infra, walking skeleton.*
+      **Problem:** the harness measures only 3 stats today (AF, fold-to-cbet, WTSD). Six grounded mechanics can't
+      be *honestly* gated without new metrics — so their acceptance would be prose, not a test.
+      **Solution:** add the metric framework + six metrics: CBet-flop overall (D1), W$SD (D2), VPIP/PFR/gap joint
+      (D3), size-bucket Fold-to-C-bet curve (D4 — the elasticity test), IP-vs-OOP C-bet split (D5), turn-barrel%
+      (D6). Wire the **metric-DoD rule (D7)**: a downstream slice may not close until its metric is live + directional.
+      **Pass/fail:** each metric computes on the existing fixture and emits a value; the DoD rule is documented in
+      this file and referenced by the slices that depend on it. **No-gos:** measurement only, no behavior change;
+      don't re-anchor any band here. **Appetite:** ~1 large slice (can sub-split per metric at `/ai-dlc`).
+
+- [ ] **W0-c — Node-trace realism pack (D8) + harness-fit loop doc (D11).** *ICE 7·8·6 — infra, anti-degeneracy.*
+      **Problem:** stat-conformant bots can still play incoherent lines ("right stat, wrong node"); and the softmax
+      law means every magnitude is a fit loop that must be repeatable.
+      **Solution:** the seeded-replay + merit-log pack (D8) with an initial spot set; a short documented fit loop
+      (measure → adjust seed → re-measure) + the single-end-of-cluster re-anchor rule (D11).
+      **Pass/fail:** the pack runs and logs bucket/draw/merits/action/prescription for the seed set; the fit-loop
+      doc exists and is linked from each mechanic slice. **No-gos:** lightweight (no new framework). **Appetite:** ~1 slice.
+
+### W1 — low-risk wins (small, contained, some infra already present)
+
+- [ ] **W1-a — River one-pair BET floor, MIDDLE_PAIR only (B8, fixes F6).** *ICE 7·8·7 — small; re-anchors bands.*
+      **Problem:** P2a floored the river *raise* but the unopened river **BET** for a middle pair (a bluff-catcher,
+      never a value bet) is still not floored.
+      **Solution:** `_RIVER_BET_FLOOR = (MIDDLE_PAIR,)` — floor the unopened river BET for MIDDLE_PAIR ONLY; strictly
+      narrower than the existing raise-floor (which also covers top pair). Reframe as a conservative HU/balanced-villain
+      DEFAULT (middle pair CAN value-bet vs capped/station ranges — a rank approximation, not a theorem).
+      **Pass/fail:** middle-pair river unopened BET → 0 (committed unit assertion); top-pair/overpair BET untouched
+      (assertion split). **The population WTSD/AF band re-anchor is DEFERRED to W4-b** (§10.4: P5 ships behind the
+      unit-assertion split ONLY — re-anchoring here would re-fit bands that W2/W3 then move again). **No-gos:** don't
+      touch the raise-floor P2a set; MIDDLE_PAIR only; no band edits pre-W4. **Appetite:** ~1 small slice.
+
+- [ ] **W1-b — faced_frac increment fix + backwards comment (B9, fixes F9).** *ICE 7·9·8 — small, genuinely low-risk.*
+      **Problem:** on same-street re-raises the faced-price denominator uses the whole bet-to instead of the latest
+      aggressor's increment → over-states price → over-folds; the in-code comment documents this backwards.
+      **Solution:** use the A1 latest-aggressor increment as the same-street re-raise denominator; fix the comment.
+      **Depends-on:** W0-a. **Pass/fail:** existing faced_frac tests 563/577 stay green (they cover fresh raisers
+      only); a NEW self-re-raise test proves bots over-fold slightly less to 3-bet wars. **No-gos:** don't change
+      fresh-raiser behavior. **Appetite:** ~1 small slice.
+
+- [ ] **W1-c — Multiway made-value tightening (B10, fixes F13).** *ICE 6·7·8 — small, directional.*
+      **Problem:** value-betting is opponent-count-blind — made hands barely tighten as more players see the flop.
+      **Solution:** a geometric damp `~0.8**(opp−1)` (FIT SEED) on made-value aggression as opponent count rises;
+      HU byte-identical; cap at a **labeled 4-way tier** (5+way magnitudes are unresearched — Later).
+      **Pass/fail:** made-value aggression non-increasing in opponents (monotone test); HU byte-identical.
+      **No-gos:** don't extend past the 4-way label; directional-only until a multiway metric exists. **Appetite:** ~1 small slice.
+
+### W2 — persona identity + EV correctness
+
+- [ ] **W2-a — Elasticity split: `stickiness` → `call_looseness` + `size_elasticity` (C1, fixes F10).** *ICE 8·7·5 — the keystone identity fix.*
+      **Problem:** one dial controls **both** how loose a persona calls **and** how much bet size scares it, so you
+      can't make the **station inelastic-but-loose** (calls any size) while the **fish is elastic-but-scared**
+      (fit-or-fold) — the one axis that *defines* their difference is welded shut.
+      **Solution:** two optional levers — `call_looseness` (the flat CALL multiplier) + `size_elasticity` (drives the
+      price_factor exponent, decoupled from looseness); default = today's `stickiness`. Prefer a **continuous** faced-
+      size function over the 4 abrupt α buckets. Station `size_elasticity ≈ 0` + high looseness; fish high elasticity +
+      moderate looseness. Update the monotonicity pins to the new levers.
+      **Depends-on:** W0-b (D4 size-bucket FtC curve — the elasticity test) must be live + directional before close.
+      **Pass/fail:** station fold-rate roughly flat across SMALL→OVERBET; fish fold-rate rises steeply with size;
+      `call_looseness↑` never lowers call freq; α-ceiling + monotonicity pins re-anchored deliberately (these are
+      lever-identity assertions, NOT the population bands). **Population WTSD/AF band re-anchor DEFERRED to W4-b** —
+      do not re-fit bands mid-spine. **No-gos:** keep default-off byte-identity for un-split packs; no band edits
+      pre-W4. **Appetite:** ~1 large slice.
+
+- [ ] **W2-b — Semi-bluff draw-jam gate + weak-draw equity gate (B5 + B5b, fixes F5 + F7).** *ICE 7·8·5 — coupled pair.*
+      **Problem:** the SPR-commit path zeros fold merit and fires for naked air+draw (forced no-fold jam, F5); and the
+      `_DRAW_CALL_BONUS` (0.20, ~2.5× the air base) makes bots chase weak draws too far (F7) — a fold-side brake alone
+      can't overpower it.
+      **Solution (one slice, two coupled levers):** (B5) zero fold ONLY inside the value-commit zone T1 (equity ≥
+      B/(P+2B)); below T1 set fold merit so the *normalized* fold prob ≈ F* (the T2 required-fold identity), NOT a fixed
+      multiplier; multiway preserves more fold mass. (B5b) a SEPARATE gate damping the draw call/raise BONUS by
+      commitment/equity at high c. Sequence B5b→B5 finalize (B5's F* fold-merit is set LAST against the boosted denominator).
+      **Depends-on:** W0-a. EV identities re-derivation-CONFIRMED (T1/T2; the 3×-pot threshold is **42.9%**, not 60%).
+      **Pass/fail:** a flush draw pot-committed still jams; the same draw vs a 3×-pot overbet now folds; a naked weak
+      draw stops stacking off at high commitment. **No-gos:** no equity SOLVE (heuristic rule-of-4-and-2 proxy; its
+      calibration is Later/H7). **Appetite:** ~1 large slice.
+
+### W3 — context (plumbing → position / street / texture)
+
+- [ ] **W3-a — Just-ahead plumbing: `in_position` + `bet_prev_street` + `busted_draw` (A2/A3/A4).** *ICE 7·8·6 — plumbing, walking-skeleton.*
+      **Problem:** the postflop sampler receives almost no situational context; the position/street/busted mechanics
+      below each need one boolean the sampler doesn't get.
+      **Solution:** thread three derived inputs (default = today's behavior): **A2** `in_position` (true iff no
+      not-folded, not-all-in opponent acts after me this street — exclude FOLDED + ALL-IN seats; **BB IS in position vs
+      SB** postflop; 3+-handed = last live seat); **A3** `bet_prev_street` (per-street aggressor memory — fixes the
+      whole-hand `is_aggressor` mislabel F17, which ALSO corrupts sizing-node selection); **A4** `busted_draw` provenance
+      (preserve "was a draw that missed" past the river).
+      **Pass/fail:** derivation unit tests for multiway / BvB / all-in (A2), delayed-stab vs barrel + sizing-node
+      selection (A3), busted-draw survives the river reset (A4); all existing suites byte-identical (no consumers yet).
+      **No-gos:** thread just-ahead of consumers, not big-bang; domain purity. **Appetite:** ~1 slice.
+
+- [ ] **W3-b — Position mechanic IP/OOP (B1, fixes F1).** *ICE 7·6·5 — GROUNDED direction, DIRECTIONAL magnitude.*
+      **Problem:** bots play IP and OOP identically.
+      **Solution:** an IP/OOP multiplier on the WHOLE aggressive candidate (bluff_mass + `_AGG_BASE` + draw-agg bonus,
+      not just `_AGG_BASE`) + an optional per-persona `position_sensitivity` lever (station/fish ≈ 0 = stay
+      position-blind as an intended leak; TAG/nit = full). FIT SEEDS, per-type LOW-confidence.
+      **Depends-on:** W3-a (A2); W0-b D5 (IP/OOP c-bet split) live + directional before close (D7 gate). Coordinate the
+      bet-band re-level with W3-c.
+      **Pass/fail:** a CBet_IP > CBet_OOP gap appears for disciplined types (D5 metric); aggression-factor stays in band.
+      **No-gos:** aggressor-side c-bet/barrel frequency ONLY (the OOP continue-realization damp is Later — don't smuggle
+      it in). **Appetite:** ~1 large slice.
+
+- [ ] **W3-c — Street-conditional aggression schedule + busted-draw river bluff (B6 + B7, fixes F4/F19/F8).** *ICE 7·7·4 — GROUNDED shape, turn LEVEL fit.*
+      **Problem:** aggression is street-neutral (turn == flop byte-identical); `bluff_mass` doesn't decay; busted draws
+      lose their identity at the river and can't tell a coherent story.
+      **Solution:** a `street_agg_mult` on the BLUFF/semi-bluff merit ONLY (value unchanged): flop 1.0 (byte-identical
+      invariant) → turn ~0.5–0.7× → river ~0.33× at pot (FIT SEEDS); polarization tightens flop 2:1 → turn 1:1 → river
+      1:2. Street-scale the weak-draw agg bonus (full flop → cut turn → ~0 river) to fix F19. Add river bluff mass when
+      the hand was a draw that bet the prior street (B7, via A4); prefer busted STRAIGHT draws over busted FLUSH draws
+      (a provenance PROXY — validate via the LBR harness before treating as HARD). Optional `street_polarization` lever
+      (maniac ≈ flat decline, nit steep).
+      **Depends-on:** W3-a (A3/A4); W0-b D6 (turn-barrel%) live + directional before close (D7 gate).
+      **Pass/fail:** the turn decision is no longer byte-identical to flop; `bluff_mass(river) < bluff_mass(flop)` for a
+      fixed persona/bucket; a give-up line exists (checks back / folds air it would have barrelled); turn-barrel bands
+      land in archetype ranges (D6). **No-gos:** heuristic only (no equity solve). **Appetite:** ~1 large slice.
+
+- [ ] **W3-d — Made-hand vulnerability + texture brakes (B2 + B3, fixes F3-overcard-side + F20).** *ICE 7·6·4 — GROUNDED direction, magnitudes fit.*
+      **Problem:** a vulnerable made hand doesn't slow down when overcards fall (F3); board texture affects only SIZING,
+      never whether-to-bet (F20).
+      **Solution:** (B2) on MIDDLE_PAIR / TOP_PAIR ONLY (NOT OVERPAIR_TPTK — it bundles overpairs), damp the bet merit by
+      the count of overcards on board (0→×1.00, 1→×0.75, 2+→×0.50 FIT SEEDS; non-linear). (B3) multiply the whether-to-bet
+      merit for one-pair by board wetness class (dry ×1.00 → high-two-tone ×0.85 → low-connected ×0.70 → monotone ×0.55
+      FIT SEEDS; ordering asserted, magnitudes fit; a set still bets). Compose JOINTLY with B1 + multiway so multipliers
+      don't stack into over-suppression. (The "barrel-MORE on scare cards" range side is DEFERRED to the villain-range
+      pilot — NEXT.)
+      **Depends-on:** W3-b (joint composition); D8 node-trace coverage.
+      **Pass/fail:** made-pair bet-rate falls by overcard count for TAG/nit (by-overcard metric); one-pair bet-rate falls
+      with wetness (ordering test); OVERPAIR_TPTK untouched. **No-gos:** gate strictly to the named buckets. **Appetite:** ~1 large slice.
+
+### W3.5 — checkpoint (gates before the final re-anchor)
+
+- [ ] **W3.5 — Human-realism playtest (D9).** Blinded seeded replays + short free-play, 2–3 poker-literate reviewers.
+      **Pass/fail:** reviewers distinguish archetypes above chance AND flag no recurring persona-breaking lines; any
+      flagged line feeds a fix before W4. Runs after W3, before the W4 re-anchor.
+
+### W4 — highest regression risk, LAST
+
+- [ ] **W4-a — Stack-depth commitment brake (B4, fixes F2).** *ICE 7·6·4 — HIGHEST regression risk → sequenced LAST.*
+      **Problem:** pricing is pot-fraction only, no stack-depth term — a scared fish never folds an overpair below SPR 2.
+      **Solution:** a multiplicative brake on FOLD merit keyed on commitment fraction `c = to_call/stack`, with a
+      dead-zone `c₀≈0.25–0.35` (no-op when shallow-cost → byte-identical on deep-stack tests). It's an SPR-interaction
+      term (NOT orthogonal to pot price) — compose with, don't replace, the fitted MDF/α price math (RES-D).
+      **Depends-on:** the stabilized W2/W3 price/fold equation; **W3.5 (D9 playtest) — any flagged persona-breaking
+      line fixed before this slice starts.** Core term `c=to_call/stack` is stack-based (no A1 needed); A1 only if it
+      also uses a pot-before/SPR-safety component.
+      **Pass/fail:** a TAG folds ~80%-stack King-high while still stacking off a set; aggression-factor/fold-to-cbet
+      survive; `test_clamp_and_jam_edge` green. **No-gos:** scope to facing-fold merit only. **Appetite:** ~1 large slice.
+      *(Commit-factor archetype spread: let W2-a's `call_looseness` carry nit-vs-station separation first; widen the `D`
+      exponent only if the spread measures too weak.)*
+
+- [ ] **W4-b — Single combined band re-anchor (D11) + coaching seam batch handoff (F1).** *ICE 8·8·6 — the ONE authoritative re-anchor.*
+      **Problem:** mid-spine re-anchors aren't final (population coupling); coaching seams must be handed off coherently.
+      **Solution:** the ONE authoritative combined WTSD/AF population-band re-anchor + coverage re-record after the whole
+      spine converges; report the cumulative graded-coverage delta vs the immutable start snapshot; batch-file all
+      accumulated seam-rows into `professional-teacher-rework` Next.
+      **Pass/fail:** all six personas' bands hold with in-file justification; cumulative coverage delta adjudicated (not
+      silently accepted); every mechanic slice has a filed seam-row. **No-gos:** no NEW behavior here — calibration +
+      handoff only. **Appetite:** ~1 slice.
+
+---
+
+## NEXT — validated problems / committed items, not yet spec'd (ship a slice each)
+
+> Direction is *indicated* (these are triaged, grounded problems) but NOT locked — the mechanic, magnitudes, and
+> pass/fail belong to `/ai-dlc` slice planning when each is promoted to NOW. Treat the solution sketches as leads.
+
+- **Villain-range rung (a) — coarse static preflop-range-by-position lookup (G1-a) — COMMITTED.** Give the engine a
+  cheap, static, per-position preflop range *lookup* (data, not a solver — stays no-solver-compliant). Unlocks the
+  **barrel-MORE-on-scare-cards** side of F3/B2 (currently deferred) and "you're facing a [type]" reads. Ships with its
+  validation: **the LBR-style exploiter harness (D10)** + an offline Spearman equity-correlation check (the only
+  non-circular way to validate a range/texture proxy without a solver) + a focused **range-proxy research pass (H1)**
+  and **draw-equity proxy validation (H7)**. Source: build-out Track G1 rung (a), Track D10, Track H1/H7.
+- **Preflop price/stack-aware responses (non-schema part).** Pass raise-size + effective stack + all-in state into the
+  preflop sampler (new kwargs, default = today's behavior); author price-elastic response nodes. A min-raise vs a shove
+  must produce different continue frequencies at the same `facing`. *(The opener-position axis needs a schema change →
+  Later.)* Population coupling: re-anchor deferred to a combined pass, as in W4.
+- **Coaching concept cards per landed mechanic (F2) → feed teacher-rework.** Point-of-need cards for: position/equity-
+  realization, SPR/commitment, river polarity (bluff-catch vs thin value), board texture/overcards, barreling & give-up,
+  persona elasticity. Each rides on a landed mechanic; concept cards only (no browsable library); EVs labeled approximate;
+  grading behind the async `StrategyProvider`. Owned by `professional-teacher-rework`.
+- **Cleaner GTO-baseline for grading (F3).** Feed the grounded GTO-baseline layer (the "A" layer of the two-layer frame)
+  into the `StrategyProvider` so grading reflects sounder baselines.
+- **`tanh` soft-saturation aggression (M1, code + deferred content half).** Replace the hard 5.6 cap so a higher lever
+  still strictly orders maniac above LAG at every merit; calibrate to observable AF, not lever magnitude. The maniac
+  `aggression` re-author deferred from P1 lands here.
+- **Split `aggression` into value/bluff × bucket × street (M4/F6).** One scalar multiplies every non-bluff bucket's raise
+  merit uniformly; separate `value_agg` (made ≥ TOP_PAIR) from the bluff term.
+- **Graded SPR-commit curve (M6/F8).** Smooth commitment over (spr_commit − live SPR) × equity × draw × street, per-persona
+  commit strength; keep TPTK able to fold rivers. *(Partly complemented by W4-a's fold-side brake — spec the boost-side here.)*
+- **Value/bluff/street/texture sizing overrides (N6).** Permit sizing overrides **respecting the anti-sizing-tell no-go**.
+- **Bucket/kicker granularity (N4).** Kicker strength, relative-nut class, board vulnerability. *(Blocker/combinatorics is Later.)*
+- **Same-street 3bet+ under-folds (N2-claude).** Fix the acknowledged `:468-474` path if the memory rework touches it.
+
+## LATER — bets (problem · confidence · assumption to test) — the deferred / architecture tail
+
+- **Villain-range rungs (b) + (c) (G1-b/c).** (b) persona-conditional range prior updated by the betting line — medium;
+  (c) full equity-vs-range estimator — the only NO-GO-ADJACENT rung vs "no solver tables". **Confidence: med/low.** Assumption:
+  whether rung (a) realism is enough, or the barrel-more/exploit payoff justifies climbing. Decide the rung at promotion.
+- **Exploit-coaching in-program ("you're facing a [type], here's how to adjust") (F4).** *High-level placeholder — the owner
+  wants this eventually.* Teach the hero to adjust vs each archetype (vs a station value-bet thinner / never bluff; vs a nit
+  fold to aggression). **Depends on:** villain-range rung (a) exposed to the grader **+ a new research pass for adjustment
+  magnitudes (H2)** — the grounding research explicitly deferred exploit-coaching. **Context/source docs:**
+  `persona-realism-FULL-BUILDOUT.md` Track F4 + Track G1; audit `§10.5` + `§9.2` (coaching-scope = baseline+behavior only
+  this pass); studies RP1/RP8. **Confidence: med.** Assumption: the coaching payoff justifies the villain-range + research cost.
+- **Blocker / combinatorics awareness on the river (G2).** A hand representation richer than the 7-rung strength ladder so
+  river value/bluff selection can use blockers/removal (the dominant modern river factor). **Confidence: low.** Assumption: a
+  rank-only engine's river ceiling is unacceptable. (No "% of benefit" figure — that unsupported claim was struck.)
+- **Multiway theory beyond a 4-way tier (G3).** Calibrated 5+way adjustments. **Confidence: low** (solver support for 3+way is
+  thin; 5-way ≈ 1.6% of hands). Direction-only until researched (H5).
+- **Out-of-position equity-realization damp (B11).** An OOP facing-continue / bluff-catch realization damp (the R-factor's
+  effect on CALLING, not just betting). **Confidence: med.** Deferred — risks colliding with the W4 commitment brake +
+  faced-price defense; revisit after the position/street bands settle. Do NOT claim W3-b already represents it.
+- **Delayed c-bet / probe / stab frequencies (B12).** Checked-prior-street stab lines. **Confidence: low** — solver-sanctioned
+  but published only qualitatively; needs a research pass (H4) for numbers. Reuses A2 + A3 machinery once those land.
+- **Opener-position-aware preflop defense (E1) + limper-count ranges (E3).** BB defends ~3–3.5× as wide vs a BTN open as vs a
+  UTG open. **Confidence: med.** Deferred — needs a `content/models.py` schema change (opener-position axis on `vs_rfi`) +
+  sampler plumbing (A5/A6) + an Alembic-style data-shape migration + new tests. Owner gate.
+- **Persona sub-types (multiple packs per archetype) (F5).** `VillainType` is enum-locked. **Confidence: med.** *Direct enabler
+  for Hidden-persona mode, not for realism per se* — sequence it WITH that mode, not here.
+- **Reference-pool recalibration (H6).** If the target pool ever changes from "online low-mid 9-max ~100bb," the whole keystone
+  (archetype stat table) needs recalibration. **Confidence: n/a** — a conditional trigger, not a planned build.
+- **Solver-boundary revisit for kicker/equity precision (N4/N5 ceiling).** **Confidence: low.** Assumption: whether
+  "simplified-but-winning" heuristics suffice, or this is the trigger to revisit the no-solver line. EVs stay *approximate* either way.
 
 ---
 
 ## Global out-of-scope / NO-GOS (inherited invariants — doc 12 §6.3)
 
-- **No solver tables** — heuristic + interim EV only; EVs labeled *approximate*.
-- **Grader untouched** — do NOT edit `grade_map*.py` / `postflop.py` graders; `spot_signature()` +
-  `TAXONOMY_VERSION` stay **frozen** (they're the grader's, not the bots'). Blast radius = bot side only.
+- **No solver tables** — heuristic + interim EV only; EVs labeled *approximate*. *(Villain-range rung (a) is a static data
+  lookup, NOT a solver — it stays inside this line; rung (c) is the no-go-adjacent one.)*
+- **Grader untouched** — do NOT edit `grade_map*.py` / `postflop.py` graders; `spot_signature()` + `TAXONOMY_VERSION` stay
+  **frozen** (they're the grader's, not the bots'). Blast radius = bot side only.
 - **Domain purity** — `personas.py` / `personas_postflop.py` stay pure domain (no web/DB imports).
-- **Action draw stays the FIRST `rng.choices`** — `range_estimate.py:278` replays it via a capture-rng; any
-  new randomness comes *after* the action draw (F2 two-stage bluff-sizing is the template).
-- **New args default to today's behavior** (mirror `is_aggressor=False`) so `range_estimate` + the population
-  harness stay byte-identical until the live loop deliberately opts in.
-- **Re-anchor bands levers-first** — tune pack levers before widening test bands; widen only with in-file
-  justification (RES-D §4 is the precedent).
-- **Re-record `coverage_baseline.json` deliberately** with each play-changing slice; verify graded coverage
-  did not regress.
-- **Anti-sizing-tell** — value hands must not become size-readable
-  (`test_sizing_spread_no_deterministic_strength_to_size`).
-- **`test_bluff_ordering_across_personas_at_fixed_size`** pins `station < nit < fish < tag < lag < maniac` —
-  any bluff-path change must re-anchor it deliberately.
-- **F5 sub-types are Later**, coupled to Hidden-persona mode — not this initiative.
+- **Action draw stays the FIRST `rng.choices`** — `range_estimate.py:278` replays it via a capture-rng; any new randomness
+  comes *after* the action draw (F2 two-stage bluff-sizing is the template).
+- **New args default to today's behavior** (mirror `is_aggressor=False`) so `range_estimate` + the population harness stay
+  byte-identical until the live loop deliberately opts in.
+- **Softmax law** — every magnitude is fit-to-observed-stat, not a drop-in constant (no cosmetic changes).
+- **Re-anchor bands levers-first, ONCE per cluster** — tune pack levers before widening test bands; the ONE authoritative
+  combined re-anchor is W4; widen only with in-file justification.
+- **Re-record `coverage_baseline.json` deliberately** with each play-changing slice + report cumulative delta vs the
+  immutable snapshot; any cumulative loss needs explicit adjudication.
+- **Anti-sizing-tell** — value hands must not become size-readable (`test_sizing_spread_no_deterministic_strength_to_size`);
+  F14 is an INTENTIONAL-LEAVE, do not "fix" it.
+- **INTENTIONAL-LEAVE** — F12 (aggression cap compresses strong hands — a deliberate RES-D saturation fix) + F14 (sizing
+  decoupled from strength on purpose). Do NOT "fix" these.
+- **`test_bluff_ordering_across_personas_at_fixed_size`** pins `station < nit < fish < tag < lag < maniac` — any bluff-path
+  change re-anchors it deliberately.
+- **The architectural line** — range-blindness (F16) is currently by design. The barrel-more range side, exploit-coaching,
+  and villain-range rungs (b)/(c) push against "no solver tables"; building them past rung (a) is an owner-gated architecture
+  decision, not a bug-fix.
 
 ---
-*Handoff: on approval, the top NOW slice (P1) goes to `/ai-dlc` for per-feature planning. One slice at a time.*
+*Handoff: on approval, the top unchecked NOW slice (W0-a) goes to `/ai-dlc` for per-feature planning. One slice at a time;
+re-read pass/fail state between slices (agents falsely mark work done); fresh `refuter` at each fan-in.*
