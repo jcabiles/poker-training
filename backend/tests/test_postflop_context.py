@@ -160,6 +160,13 @@ def test_busted_draw_none_before_river():
     assert busted_draw_kind(hole, board[:3]) is BustedDraw.NONE  # flop
 
 
+def test_busted_draw_none_on_malformed_oversized_board():
+    # A busted draw is a complete-board (5-card) concept; a >5-card board is
+    # malformed and must return NONE, not classify off board[:4].
+    hole, board = _BUSTED_FLUSH
+    assert busted_draw_kind(hole, [*board, "Ac"]) is BustedDraw.NONE
+
+
 def test_busted_ordering_prefers_straight_over_flush():
     # The IntEnum ordering a W3-c consumer relies on.
     assert BustedDraw.STRAIGHT > BustedDraw.FLUSH > BustedDraw.NONE

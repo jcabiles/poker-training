@@ -126,7 +126,7 @@ def busted_draw_kind(hole: tuple[Card, Card], board: list[Card]) -> BustedDraw:
     busted-air bluff candidate). Type: FLUSH if the turn draw had a flush
     component (its missed suit is visible on board), else STRAIGHT.
     """
-    if len(board) < 5:
+    if len(board) != 5:  # a busted draw is a river concept — complete board only
         return BustedDraw.NONE
     made, _ = strength_bucket(hole, board)
     if made not in (StrengthBucket.AIR, StrengthBucket.ACE_HIGH):

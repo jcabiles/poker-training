@@ -54,4 +54,14 @@ turn→river, no-predecessor, two-back), A4 (busted flush/straight, completed, n
 pre-river, ordering) + the bundle.
 
 ## Review dispositions
-_(folded from the refuter + Codex Sol fan-in — see the PR.)_
+Fan-in: Claude `refuter` + Codex Sol, both on the diff. Both returned **PASS** —
+byte-identity confirmed structurally (sampler never reads `context`) AND empirically
+(golden/coverage/limper fixtures unchanged, no re-record; refuter ran a 20k-hand fuzz
+differential of `_has_flush_draw` vs `_draw_category` with zero mismatches). Two LOW
+findings folded:
+- **Codex Sol** — `busted_draw_kind` guarded `len(board) < 5`, so a malformed 6+-card
+  board would classify off `board[:4]`. Tightened to `!= 5` (complete-board-only
+  contract) + locked with `test_busted_draw_none_on_malformed_oversized_board`.
+- **refuter** — `test_domain_purity.py`'s hardcoded module list omitted the new module,
+  leaving it outside the automated purity gate. Added
+  `app.domain.table.postflop_context` to the list.
