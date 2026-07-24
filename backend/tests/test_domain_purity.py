@@ -14,7 +14,7 @@ def test_domain_has_no_web_or_db_imports():
         "'app.domain.scenarios','app.domain.grading','app.domain.hand_rank','app.domain.archetypes',"
         "'app.domain.challenge','app.domain.table.deck','app.domain.personas','app.domain.table.engine',"
         "'app.domain.personas_postflop','app.domain.table.play','app.domain.table.grade_map',"
-        "'app.domain.table.range_estimate']\n"
+        "'app.domain.table.postflop_context','app.domain.table.range_estimate']\n"
         "for m in mods:\n"
         "    importlib.import_module(m)\n"
         "web_libs = ('fastapi', 'starlette', 'sqlmodel', 'sqlalchemy')\n"

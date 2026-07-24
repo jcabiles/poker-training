@@ -244,7 +244,7 @@ re-tuning). Every slice: default-off byte-identity for un-opted-in direct caller
 
 ### W3 — context (plumbing → position / street / texture)
 
-- [ ] **W3-a — Just-ahead plumbing: `in_position` + `bet_prev_street` + `busted_draw` (A2/A3/A4).** *ICE 7·8·6 — plumbing, walking-skeleton.*
+- [x] **W3-a — Just-ahead plumbing: `in_position` + `bet_prev_street` + `busted_draw` (A2/A3/A4).** *ICE 7·8·6 — plumbing, walking-skeleton.* ✅ 2026-07-24 (PR pending) — new pure `table/postflop_context.py` (derivations + `PostflopContext`), threaded through `sample_postflop_decision` unread (defaults = today); 18 derivation unit tests; every golden/coverage/limper fixture byte-identical with NO re-record (walking skeleton = zero rng displacement). First of the 2-PR W3 packaging (plumbing seam).
       **Problem:** the postflop sampler receives almost no situational context; the position/street/busted mechanics
       below each need one boolean the sampler doesn't get.
       **Solution:** thread three derived inputs (default = today's behavior): **A2** `in_position` (true iff no
